@@ -3,10 +3,35 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const path = require("path");
+const { MongoClient, ServerApiVersion } = require("mongodb");
+require("dotenv").config(); // load MONGO_URI from .env
 
-// ---- In-memory storage ----
-const users = new Map();          // socketId -> { whatsapp }
-const conversations = new Map();  // whatsapp -> messages[]
+// ---- MongoDB Setup ----
+const uri = process.env.MONGO_URI || "mongodb+srv://chaloalba05_db_user:lam08Xnkf8v0zV3W@albastuzbackup.frhubzf.mongodb.net/chatDB?retryWrites=true&w=majority";
+
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  }
+});
+
+let db;
+async function connectDB() {
+  try {
+    await client.connect();
+    db = client.db("chatDB"); // your database name
+    console.log("MongoDB connected and ready to use");
+  } catch (err) {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
+  }
+}
+connectDB();
+
+// ---- In-memory tracking ----
+const users = new Map(); // socketId -> { whatsapp }
 
 // ---- Setup server ----
 const app = express();
@@ -29,11 +54,9 @@ app.use(cors({
 app.use(express.json());
 
 // ---- Serve HTML files ----
-app.use(express.static(path.join(__dirname, "public"))); // <-- serve public folder
+app.use(express.static(path.join(__dirname, "public"))); 
 
 app.get("/", (req, res) => res.send("Chat backend running"));
-
-// Explicit routes for easy links
 app.get("/chat", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "chat.html"));
 });
@@ -41,29 +64,54 @@ app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
+// ---- MongoDB helper functions ----
+async function saveMessage(whatsapp, message) {
+  const chats = db.collection("chats");
+  await chats.updateOne(
+    { whatsappNumber: whatsapp },
+    { $push: { messages: message } },
+    { upsert: true }
+  );
+}
+
+async function getMessages(whatsapp, sort = true) {
+  const chats = db.collection("chats");
+  const chat = await chats.findOne({ whatsappNumber: whatsapp });
+  if (!chat) return [];
+  if (sort) {
+    return chat.messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  }
+  return chat.messages;
+}
+
 // ---- Socket.IO events ----
 io.on("connection", (socket) => {
   console.log("Incoming connection from:", socket.id);
 
-  // Detect admin connection
-  socket.on("admin_connect", () => {
+  // Admin connection
+  socket.on("admin_connect", async () => {
     console.log("✓ Admin connected:", socket.id);
     socket.join("admin");
 
-    // Send all past conversations to admin
-    conversations.forEach((messages) => {
-      messages.forEach(msg => socket.emit("new_message", msg));
+    const chats = db.collection("chats");
+    const allChats = await chats.find({}).toArray();
+
+    allChats.forEach(chat => {
+      const sortedMessages = chat.messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      sortedMessages.forEach(msg => socket.emit("new_message", msg));
     });
   });
 
   // Register user
-  socket.on("register", ({ whatsapp }) => {
+  socket.on("register", async ({ whatsapp }) => {
     if (!whatsapp) return;
 
     users.set(socket.id, { whatsapp });
 
-    if (!conversations.has(whatsapp)) {
-      conversations.set(whatsapp, []);
+    const chats = db.collection("chats");
+    const chatExists = await chats.findOne({ whatsappNumber: whatsapp });
+    if (!chatExists) {
+      await chats.insertOne({ whatsappNumber: whatsapp, messages: [] });
       console.log(`✓ New conversation started for: ${whatsapp}`);
     }
 
@@ -73,36 +121,30 @@ io.on("connection", (socket) => {
   });
 
   // Send message
-  socket.on("send_message", ({ whatsapp, sender, text }) => {
+  socket.on("send_message", async ({ whatsapp, sender, text }) => {
     if (!whatsapp || !text) return;
 
-    const message = { 
-      sender: sender || "user", 
-      whatsapp, 
-      text, 
-      timestamp: new Date().toISOString() 
+    const message = {
+      sender: sender || "user",
+      whatsapp,
+      text,
+      timestamp: new Date().toISOString()
     };
 
     console.log(`\n📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
 
-    if (!conversations.has(whatsapp)) {
-      conversations.set(whatsapp, []);
-    }
+    await saveMessage(whatsapp, message);
 
-    conversations.get(whatsapp).push(message);
-
-    // Send to user's room
     io.to(whatsapp).emit("new_message", message);
-    
-    // Send to admin channel (unless sender is admin)
+
     if (sender !== "admin") {
       io.to("admin").emit("new_message", message);
     }
   });
 
   // Get message history
-  socket.on("get_messages", ({ whatsapp }) => {
-    const msgs = conversations.get(whatsapp) || [];
+  socket.on("get_messages", async ({ whatsapp }) => {
+    const msgs = await getMessages(whatsapp);
     socket.emit("message_history", msgs);
   });
 
