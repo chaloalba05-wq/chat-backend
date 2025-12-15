@@ -12,11 +12,7 @@ const conversations = new Map();  // whatsapp -> messages[]
 const app = express();
 const server = http.createServer(app);
 
-// ---- Serve static files ----
-app.use(express.static(path.join(__dirname, "public")));
-app.use(express.json());
-
-// ---- CORS for Socket.IO ----
+// FIXED CORS configuration
 const io = new Server(server, {
   cors: {
     origin: ["https://chat-backend-p2b9.onrender.com", "http://localhost:3000"],
@@ -25,22 +21,31 @@ const io = new Server(server, {
   }
 });
 
-// ---- Test route ----
+app.use(cors({
+  origin: ["https://chat-backend-p2b9.onrender.com", "http://localhost:3000"],
+  credentials: true
+}));
+
+app.use(express.json());
+
+// ---- Serve HTML files ----
+app.use(express.static(path.join(__dirname, "public"))); // <-- serve public folder
+
 app.get("/", (req, res) => res.send("Chat backend running"));
 
-// Optional explicit routes
+// Explicit routes for easy links
+app.get("/chat", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "chat.html"));
+});
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
-});
-app.get("/user", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "chat.html"));
 });
 
 // ---- Socket.IO events ----
 io.on("connection", (socket) => {
   console.log("Incoming connection from:", socket.id);
 
-  // Admin joins
+  // Detect admin connection
   socket.on("admin_connect", () => {
     console.log("✓ Admin connected:", socket.id);
     socket.join("admin");
@@ -51,13 +56,12 @@ io.on("connection", (socket) => {
     });
   });
 
-  // User registers
+  // Register user
   socket.on("register", ({ whatsapp }) => {
     if (!whatsapp) return;
 
     users.set(socket.id, { whatsapp });
 
-    // Initialize conversation
     if (!conversations.has(whatsapp)) {
       conversations.set(whatsapp, []);
       console.log(`✓ New conversation started for: ${whatsapp}`);
@@ -79,17 +83,18 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString() 
     };
 
-    console.log(`📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
+    console.log(`\n📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
 
     if (!conversations.has(whatsapp)) {
       conversations.set(whatsapp, []);
     }
+
     conversations.get(whatsapp).push(message);
 
-    // Send to user room
+    // Send to user's room
     io.to(whatsapp).emit("new_message", message);
-
-    // Send to admin room if not from admin
+    
+    // Send to admin channel (unless sender is admin)
     if (sender !== "admin") {
       io.to("admin").emit("new_message", message);
     }
@@ -101,7 +106,7 @@ io.on("connection", (socket) => {
     socket.emit("message_history", msgs);
   });
 
-  // Disconnect
+  // Handle disconnect
   socket.on("disconnect", () => {
     const user = users.get(socket.id);
     if (user) {
