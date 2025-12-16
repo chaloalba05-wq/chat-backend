@@ -11,3 +11,4 @@ yarn-error.log*
 
 # Optional: OS files
 .DS_Store
+node_modules/ 
