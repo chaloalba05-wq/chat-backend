@@ -202,7 +202,7 @@ app.get("/agent:num.html", (req, res) => {
   }
 });
 
-// File upload endpoint
+// File upload endpoint - UPDATED to provide full URL
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -215,6 +215,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       mimetype: req.file.mimetype,
       size: req.file.size,
       path: `/uploads/${req.file.filename}`,
+      // Add full URL for client-side access
+      url: `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`,
       uploadDate: new Date()
     };
 
@@ -519,7 +521,7 @@ io.on("connection", (socket) => {
     io.to("super_admin").emit("agent_updated", { agentId });
   });
 
-  // Agent sends message (NEW) - FIXED to save to MongoDB
+  // Agent sends message (UPDATED to fix inconsistent format)
   socket.on("agent_message", async (data) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'agent') return;
@@ -540,67 +542,113 @@ io.on("connection", (socket) => {
       await saveMessageToMongoDB(data.whatsapp, message);
     }
     
-    // Broadcast to all Super Admins
-    io.to("super_admin").emit("agent_message_received", {
+    // Send to super_admin in consistent format
+    io.to("super_admin").emit("new_message", {
+      sender: 'agent',
       agentId: userData.agentId,
       agentName: agent.name,
       message: data.message,
-      timestamp: new Date().toISOString()
+      whatsapp: data.whatsapp || 'unknown',
+      timestamp: new Date().toISOString(),
+      id: `agent_${Date.now()}`
     });
+    
+    // Also send to the specific user if we have their whatsapp
+    if (data.whatsapp) {
+      io.to(data.whatsapp).emit("new_message", {
+        sender: 'agent',
+        agentId: userData.agentId,
+        agentName: agent.name,
+        message: data.message,
+        whatsapp: data.whatsapp,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     logActivity('agent_message_sent', {
       agentId: userData.agentId,
       agentName: agent.name,
-      message: data.message
+      message: data.message,
+      to: data.whatsapp || 'broadcast'
     });
   });
 
-  // ===== USER MESSAGES (NEW + OLD) - FIXED to save to MongoDB =====
+  // ===== USER MESSAGES - FIXED VERSION =====
   socket.on("user_message", async (data) => {
-    // FIX: Use userId as whatsapp if whatsapp not provided
+    // Ensure we have whatsapp/userId
     const whatsapp = data.whatsapp || data.userId;
     if (!whatsapp) return;
     
+    // Create a clean message object
     const message = {
-      ...data,
-      whatsapp: whatsapp, // Ensure whatsapp field exists
+      whatsapp: whatsapp,
+      userId: data.userId || whatsapp,
+      message: data.message,
       timestamp: new Date().toISOString(),
-      id: Date.now().toString(),
-      sender: "user"
+      id: `${whatsapp}_${Date.now()}`,
+      sender: "user",
+      type: data.type || "text",
+      originalMessageId: data.originalMessageId || null
     };
     
-    userMessages.push(message);
-    
-    // Save to MongoDB if connected
-    if (conversationsCollection) {
-      await saveMessageToMongoDB(whatsapp, message);
+    // Handle attachments properly
+    if (data.attachment) {
+      message.attachment = data.attachment;
+      message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // Send to all Super Admins (ALWAYS)
+    // Save to MongoDB if connected - FIXED to include attachments
+    if (conversationsCollection) {
+      const dbMessage = {
+        ...message,
+        sender: 'user',
+        text: data.message || '',
+        timestamp: new Date().toISOString()
+      };
+      
+      if (data.attachment) {
+        dbMessage.attachment = data.attachment;
+        dbMessage.text = data.message || `[${data.attachment.type || 'Attachment'}]`;
+      }
+      
+      await saveMessageToMongoDB(whatsapp, dbMessage);
+    }
+    
+    // Send to user's own socket (so they see their message)
+    socket.emit("new_message", {
+      ...message,
+      sender: "user"  // Explicitly set sender as user
+    });
+    
+    // Send ONLY ONCE to each recipient type
+    // 1. Send to super_admin room
     io.to("super_admin").emit("user_message", message);
     
-    // Send to all non-muted agents (NEW FUNCTIONALITY)
+    // 2. Send to regular admin room
+    io.to("admin").emit("new_message", message);
+    
+    // 3. Send to all non-muted agents
+    const onlineAgents = [];
     agents.forEach((agent, agentId) => {
       if (!agent.muted && agent.socketId) {
         io.to(agent.socketId).emit("user_message", message);
+        onlineAgents.push(agentId);
       }
     });
-    
-    // Send to regular admin (OLD FUNCTIONALITY)
-    io.to("admin").emit("new_message", message);
     
     // Update active chats
     activeChats.set(whatsapp, {
       whatsapp: whatsapp,
-      lastMessage: data.message,
+      lastMessage: data.message || (data.attachment ? `[${data.attachment.type || 'Attachment'}]` : ''),
       lastMessageTime: message.timestamp,
       unread: true
     });
     
     logActivity('user_message_received', {
       from: whatsapp,
-      message: data.message,
-      forwardedTo: Array.from(agents.values()).filter(a => !a.muted && a.socketId).length
+      messageType: message.type,
+      hasAttachment: !!data.attachment,
+      forwardedToAgents: onlineAgents.length
     });
   });
 
@@ -635,7 +683,7 @@ io.on("connection", (socket) => {
     console.log(`✓ Registered: ${whatsapp} with socket ${socket.id}`);
   });
 
-  // Send message (OLD - with attachments)
+  // Send message (OLD - with attachments) - UPDATED to avoid duplicates
   socket.on("send_message", async ({ whatsapp, sender, text, agentId, agentName, attachment }) => {
     if (!whatsapp || (!text && !attachment)) return;
 
@@ -651,6 +699,7 @@ io.on("connection", (socket) => {
 
     if (attachment) {
       message.attachment = attachment;
+      message.type = 'image'; // Add type field
       console.log(`\n📎 Attachment sent from ${message.sender} to ${whatsapp}: ${attachment.filename}`);
     } else {
       console.log(`\n📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
@@ -664,39 +713,26 @@ io.on("connection", (socket) => {
     logActivity('message_sent', { 
       whatsapp, 
       sender: message.sender, 
-      agentId, 
-      agentName,
       hasAttachment: !!attachment 
     });
 
     // Send to user's room
     io.to(whatsapp).emit("new_message", message);
     
+    // Send to appropriate recipients based on sender
     if (message.sender === "user") {
-      // User sent message - also forward to non-muted agents (NEW)
-      agents.forEach((agent, agentId) => {
-        if (!agent.muted && agent.socketId) {
-          io.to(agent.socketId).emit("new_message", message);
-        }
-      });
-      
-      // Send to Super Admin (NEW) - Include whatsapp for proper saving
+      // User messages go to super_admin and admin
       io.to("super_admin").emit("user_message", {
-        userId: whatsapp,
         whatsapp: whatsapp,
+        userId: whatsapp,
         message: text,
-        timestamp: message.timestamp
+        timestamp: message.timestamp,
+        sender: "user"
       });
-      
-      // Send to regular admin (OLD)
-      io.to("admin").emit("new_message", message);
-      
-    } else if (message.sender === "agent") {
-      // Agent sent message - also send to super admins for monitoring
-      io.to("super_admin").emit("new_message", message);
       io.to("admin").emit("new_message", message);
     } else {
-      // Regular user message or admin message
+      // Agent/Admin messages go to super_admin and admin
+      io.to("super_admin").emit("new_message", message);
       io.to("admin").emit("new_message", message);
     }
   });

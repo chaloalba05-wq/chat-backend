@@ -4,28 +4,132 @@
   <meta charset="UTF-8">
   <title>Live Chat</title>
   <style>
-    body { font-family: Arial; margin: 20px; }
-    #chat { display: none; margin-top: 20px; }
-    #messages { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
-    input, button { padding: 8px; margin-top: 5px; font-size: 14px; }
+    body { 
+      font-family: Arial; 
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
     
-    /* Updated message styles */
-    .message-container {
-      margin: 5px 0;
-      padding: 8px;
+    /* Header styling - covers 1/6 of display */
+    #header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+      padding: 15px 0;
+      height: 16.67vh; /* Approximately 1/6 of viewport height */
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .logo-text {
+      font-size: 2.5rem;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      margin: 0;
+    }
+    
+    .logo-subtext {
+      font-size: 1rem;
+      opacity: 0.9;
+      margin-top: 5px;
+      letter-spacing: 1px;
+    }
+    
+    #register {
+      padding: 40px 20px;
+      text-align: center;
+      background: white;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    #chat { 
+      display: none; 
+      flex: 1;
+      flex-direction: column;
+      height: calc(100vh - 16.67vh);
+    }
+    
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .chat-header {
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+    
+    #messages { 
+      border: 1px solid #ddd;
+      height: 400px;
+      overflow-y: auto;
+      padding: 15px;
+      margin-bottom: 15px;
+      background: #fafafa;
+      border-radius: 10px;
+      flex: 1;
+    }
+    
+    input, button { 
+      padding: 10px; 
+      margin-top: 5px; 
+      font-size: 14px; 
       border-radius: 5px;
     }
     
+    #messageInput {
+      flex: 1;
+      border: 1px solid #ddd;
+      margin-right: 10px;
+    }
+    
+    .input-container {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    /* Updated message styles */
+    .message-container {
+      margin: 8px 0;
+      padding: 10px 15px;
+      border-radius: 12px;
+      max-width: 80%;
+    }
+    
     .user-message { 
-      background-color: #e3f2fd; 
-      text-align: right; 
-      margin-left: 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-left: auto;
+      margin-right: 10px;
+      text-align: right;
     }
     
     .other-message { 
-      background-color: #f5f5f5; 
+      background: white;
+      border: 1px solid #e0e0e0;
+      margin-right: auto;
+      margin-left: 10px;
       text-align: left;
-      margin-right: 40px;
     }
     
     .unread-message {
@@ -36,24 +140,44 @@
     .message-header {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 3px;
+      margin-bottom: 5px;
+    }
+    
+    .user-message .message-sender {
+      color: rgba(255,255,255,0.9);
+    }
+    
+    .other-message .message-sender {
+      color: #333;
     }
     
     .message-sender {
       font-weight: bold;
-      color: #333;
+      font-size: 0.9rem;
+    }
+    
+    .user-message .message-time {
+      color: rgba(255,255,255,0.7);
+    }
+    
+    .other-message .message-time {
+      color: #666;
     }
     
     .message-time {
-      font-size: 11px;
-      color: #666;
+      font-size: 0.8rem;
       font-style: italic;
     }
     
+    .message-content {
+      word-wrap: break-word;
+      line-height: 1.4;
+    }
+    
     .read-status {
-      font-size: 10px;
+      font-size: 0.8rem;
       color: #4CAF50;
-      margin-top: 3px;
+      margin-top: 5px;
       text-align: right;
     }
     
@@ -63,80 +187,137 @@
       background: #4CAF50;
       color: white;
       border: none;
-      padding: 8px 12px;
-      border-radius: 4px;
+      padding: 10px 15px;
+      border-radius: 5px;
       cursor: pointer;
-      margin-left: 5px;
+      transition: background 0.3s;
+      font-weight: bold;
     }
     .file-upload-btn:hover {
       background: #45a049;
+      transform: translateY(-1px);
     }
     .file-preview {
       display: inline-block;
       margin-left: 10px;
       font-size: 12px;
       color: #666;
+      background: #f0f0f0;
+      padding: 5px 10px;
+      border-radius: 5px;
     }
     .attachment {
       display: block;
-      margin-top: 5px;
-      padding: 5px;
-      background: #f0f0f0;
-      border-radius: 3px;
-      border-left: 3px solid #4CAF50;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      border-left: 4px solid #4CAF50;
+    }
+    .other-message .attachment {
+      background: #f8f9fa;
     }
     .attachment a {
       color: #2196F3;
       text-decoration: none;
+      font-weight: bold;
     }
     .attachment a:hover {
       text-decoration: underline;
     }
     .file-icon {
-      margin-right: 5px;
+      margin-right: 8px;
     }
     .upload-progress {
       width: 100%;
       background-color: #f3f3f3;
-      border-radius: 3px;
-      margin: 5px 0;
+      border-radius: 5px;
+      margin: 10px 0;
+      overflow: hidden;
     }
     .progress-bar {
-      height: 20px;
-      background-color: #4CAF50;
-      border-radius: 3px;
+      height: 25px;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      border-radius: 5px;
       text-align: center;
       color: white;
-      line-height: 20px;
+      line-height: 25px;
       width: 0%;
-      transition: width 0.3s;
+      transition: width 0.3s ease;
+      font-weight: bold;
+    }
+    
+    .send-btn {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+      font-weight: bold;
+    }
+    
+    .send-btn:hover {
+      background: #1976D2;
+      transform: translateY(-1px);
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
     }
   </style>
 </head>
 <body>
 
-<div id="register">
-  <h3>Enter WhatsApp number</h3>
-  <input id="whatsapp" placeholder="+2547xxxxxxx" style="width: 200px;">
-  <button onclick="register()">Start Chat</button>
+<!-- Header with logo - covers 1/6 of display -->
+<div id="header">
+  <div class="logo-text">ALBASTUZ3D</div>
+  <div class="logo-subtext">OFFICIAL SUPPORT</div>
 </div>
 
-<div id="chat">
-  <h3>Chat: <span id="chatNumber"></span></h3>
-  <div id="messages"></div>
-  <div>
-    <input id="messageInput" placeholder="Type your message" style="width: 300px;">
-    <button onclick="sendMessage()">Send</button>
-    <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()">
-      📎 Attach File
+<!-- Registration section -->
+<div id="register">
+  <div style="max-width: 400px; width: 100%;">
+    <h2 style="color: #333; margin-bottom: 30px;">Welcome to Albastuz3D Support</h2>
+    <h3>Enter your WhatsApp number to start chatting</h3>
+    <input id="whatsapp" placeholder="+2547xxxxxxx" style="width: 100%; padding: 12px; font-size: 16px; margin: 20px 0;">
+    <button onclick="register()" style="background: #667eea; color: white; padding: 12px 30px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
+      Start Chat
     </button>
+  </div>
+</div>
+
+<!-- Chat section -->
+<div id="chat">
+  <div class="chat-container">
+    <div class="chat-header">
+      <h3 style="margin: 0; color: #333;">Chat: <span id="chatNumber" style="color: #667eea;"></span></h3>
+    </div>
+    
+    <div id="messages"></div>
+    
+    <div id="uploadProgress" style="display: none;">
+      <div class="upload-progress">
+        <div class="progress-bar" id="progressBar">0%</div>
+      </div>
+    </div>
+    
+    <div class="input-container">
+      <input id="messageInput" placeholder="Type your message here..." style="flex: 1;">
+      <div class="action-buttons">
+        <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+          📎
+        </button>
+        <button class="send-btn" onclick="sendMessage()">
+          Send
+        </button>
+      </div>
+    </div>
     <span id="filePreview" class="file-preview"></span>
     <input type="file" id="fileInput" onchange="handleFileSelect()">
-  </div>
-  <div id="uploadProgress" style="display: none;">
-    <div class="upload-progress">
-      <div class="progress-bar" id="progressBar">0%</div>
-    </div>
   </div>
 </div>
 
@@ -145,8 +326,9 @@
   const socket = io("https://chat-backend-p2b9.onrender.com");
   let whatsapp = "";
   let selectedFile = null;
+  let lastMessageTime = null;
 
-  // ===== ADD THESE NEW FUNCTIONS =====
+  // Format time functions
   function formatTime(timestamp) {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -170,9 +352,38 @@
     console.log("Registration successful:", data);
   });
 
-  // ===== UPDATE THIS EVENT HANDLER =====
+  // Handle new messages with duplicate prevention
   socket.on("new_message", (msg) => {
     console.log("New message received:", msg);
+    
+    // Skip if this is our own message that was just sent
+    if (msg.sender === "user" && msg.whatsapp === whatsapp && lastMessageTime) {
+      const messageTime = new Date(msg.timestamp).getTime();
+      const timeDiff = Math.abs(messageTime - lastMessageTime);
+      
+      // If message was sent within last 3 seconds, skip it (already shown)
+      if (timeDiff < 3000) {
+        console.log("Skipping own recent message");
+        return;
+      }
+    }
+    
+    displayMessage(msg);
+  });
+
+  // Handle message history
+  socket.on("message_history", (messages) => {
+    console.log("Message history:", messages);
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv.innerHTML = "";
+    messages.forEach(msg => {
+      displayMessage(msg, false);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+
+  // Function to display a message
+  function displayMessage(msg, scroll = true) {
     const messagesDiv = document.getElementById("messages");
     const messageDiv = document.createElement("div");
     messageDiv.className = "message-container " + 
@@ -186,61 +397,34 @@
     
     messageDiv.innerHTML = `
       <div class="message-header">
-        <span class="message-sender">${msg.sender === "user" ? "You" : msg.sender}</span>
+        <span class="message-sender">${msg.sender === "user" ? "You" : (msg.agentName || msg.sender)}</span>
         <span class="message-time" title="${formatDateTime(msg.timestamp)}">
           ${formatTime(msg.timestamp)}
         </span>
       </div>
-      <div>${msg.text || ''}</div>
+      <div class="message-content">${msg.text || ''}</div>
       ${content}
       ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
     `;
     
     messagesDiv.appendChild(messageDiv);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
+    if (scroll) {
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+  }
 
-  // ===== UPDATE THIS EVENT HANDLER =====
-  socket.on("message_history", (messages) => {
-    console.log("Message history:", messages);
-    const messagesDiv = document.getElementById("messages");
-    messagesDiv.innerHTML = "";
-    messages.forEach(msg => {
-      const messageDiv = document.createElement("div");
-      messageDiv.className = "message-container " + 
-        (msg.sender === "user" ? "user-message" : "other-message") +
-        (msg.read ? "" : " unread-message");
-      
-      let content = "";
-      if (msg.attachment) {
-        content = formatAttachment(msg.attachment);
-      }
-      
-      messageDiv.innerHTML = `
-        <div class="message-header">
-          <span class="message-sender">${msg.sender === "user" ? "You" : msg.sender}</span>
-          <span class="message-time" title="${formatDateTime(msg.timestamp)}">
-            ${formatTime(msg.timestamp)}
-          </span>
-        </div>
-        <div>${msg.text || ''}</div>
-        ${content}
-        ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
-      `;
-      
-      messagesDiv.appendChild(messageDiv);
-    });
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
-
+  // Format attachment display - UPDATED to use url field
   function formatAttachment(attachment) {
     const fileType = attachment.mimetype.split('/')[0];
     let icon = '📄';
     let preview = '';
     
+    // Use url if available, otherwise use path
+    const fileUrl = attachment.url || attachment.path;
+    
     if (fileType === 'image') {
       icon = '🖼️';
-      preview = `<br><img src="${attachment.path}" style="max-width: 200px; max-height: 150px; border-radius: 5px; margin-top: 5px;">`;
+      preview = `<br><img src="${fileUrl}" style="max-width: 200px; max-height: 150px; border-radius: 5px; margin-top: 5px; border: 1px solid #ddd;">`;
     } else if (fileType === 'video') {
       icon = '🎬';
     } else if (fileType === 'audio') {
@@ -254,7 +438,7 @@
     return `
       <div class="attachment">
         <span class="file-icon">${icon}</span>
-        <a href="${attachment.path}" target="_blank" download="${attachment.originalname}">
+        <a href="${fileUrl}" target="_blank" download="${attachment.originalname}">
           ${attachment.originalname}
         </a>
         <span style="color: #666; font-size: 11px; margin-left: 5px;">(${fileSize})</span>
@@ -282,7 +466,7 @@
     socket.emit("register", { whatsapp: whatsapp });
 
     document.getElementById("register").style.display = "none";
-    document.getElementById("chat").style.display = "block";
+    document.getElementById("chat").style.display = "flex";
     document.getElementById("chatNumber").textContent = whatsapp;
     
     // Load message history
@@ -332,11 +516,16 @@
       progressDiv.style.display = 'none';
       
       if (xhr.status === 200) {
-        const response = JSON.parse(xhr.responseText);
-        if (response.success && callback) {
-          callback(response.file);
-        } else {
-          alert('Upload failed: ' + (response.message || 'Unknown error'));
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (response.success && callback) {
+            callback(response.file);
+          } else {
+            alert('Upload failed: ' + (response.message || 'Unknown error'));
+            if (callback) callback(null);
+          }
+        } catch (e) {
+          alert('Upload failed: Invalid response from server');
           if (callback) callback(null);
         }
       } else {
@@ -366,20 +555,61 @@
     // If no text and no file, don't send
     if (!text && !selectedFile) return;
 
+    // Store current time for duplicate message prevention
+    lastMessageTime = Date.now();
+
     // If there's a file, upload it first
     if (selectedFile) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
           console.log("Sending message with attachment:", fileInfo);
+          
+          // Show message immediately in chat
+          const tempMsg = {
+            sender: "user",
+            whatsapp: whatsapp,
+            text: text,
+            attachment: fileInfo,
+            timestamp: new Date().toISOString(),
+            read: false
+          };
+          displayMessage(tempMsg);
+          
+          // Send via user_message for agents to receive (PRIMARY)
+          socket.emit("user_message", {
+            whatsapp: whatsapp,
+            userId: whatsapp,
+            message: text,
+            attachment: fileInfo
+          });
+          
+          // Also send via send_message for backward compatibility
           socket.emit("send_message", {
             whatsapp: whatsapp,
             sender: "user",
             text: text,
             attachment: fileInfo
           });
+          
         } else {
           // File upload failed, send text only if exists
           if (text) {
+            // Show message immediately in chat
+            const tempMsg = {
+              sender: "user",
+              whatsapp: whatsapp,
+              text: text,
+              timestamp: new Date().toISOString(),
+              read: false
+            };
+            displayMessage(tempMsg);
+            
+            socket.emit("user_message", {
+              whatsapp: whatsapp,
+              userId: whatsapp,
+              message: text
+            });
+            
             socket.emit("send_message", {
               whatsapp: whatsapp,
               sender: "user",
@@ -394,6 +624,25 @@
     } else {
       // No file, just send text
       console.log("Sending message:", text);
+      
+      // Show message immediately in chat
+      const tempMsg = {
+        sender: "user",
+        whatsapp: whatsapp,
+        text: text,
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+      displayMessage(tempMsg);
+      
+      // Send via user_message for agents to receive (PRIMARY)
+      socket.emit("user_message", {
+        whatsapp: whatsapp,
+        userId: whatsapp,
+        message: text
+      });
+      
+      // Also send via send_message for backward compatibility
       socket.emit("send_message", {
         whatsapp: whatsapp,
         sender: "user",
