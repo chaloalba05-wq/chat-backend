@@ -1,12 +1,3 @@
-Ah, I understand now! You want the **super admin to only manage existing agent files** (agent1.html, agent2.html, etc.) that are already in the repository. The super admin doesn't create new HTML files, but rather:
-
-1. **Assigns usernames/passwords** to existing agent files
-2. **Manages agent permissions** (mute, restrictions)
-3. **Monitors activity** on existing agents
-
-Here's the **simplified super admin** that works with pre-existing agent files:
-
-```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -364,9 +355,44 @@ Here's the **simplified super admin** that works with pre-existing agent files:
       font-size: 18px;
       z-index: 1;
     }
+    
+    /* Debug console */
+    #debugConsole {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      width: 300px;
+      height: 200px;
+      background: rgba(0,0,0,0.8);
+      color: #00ff00;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 10px;
+      overflow-y: auto;
+      border-radius: 5px;
+      z-index: 9999;
+      display: none;
+    }
+    
+    #toggleDebug {
+      position: fixed;
+      bottom: 220px;
+      right: 10px;
+      padding: 5px 10px;
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      z-index: 10000;
+    }
   </style>
 </head>
 <body>
+
+<!-- Debug Console -->
+<div id="debugConsole"></div>
+<button id="toggleDebug" onclick="toggleDebug()">🐛 Debug</button>
 
 <!-- Login Overlay -->
 <div id="loginOverlay">
@@ -380,6 +406,14 @@ Here's the **simplified super admin** that works with pre-existing agent files:
             style="width: 100%; padding: 15px; background: #1a237e; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 10px;">
       Access Dashboard
     </button>
+    <div style="margin-top: 20px; font-size: 12px; color: #888;">
+      <em>Server URL: <span id="serverUrl">https://chat-backend-p2b9.onrender.com</span></em>
+    </div>
+    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+      <button onclick="testConnection()" style="padding: 5px 10px; background: #666; color: white; border: none; border-radius: 3px; cursor: pointer;">
+        Test Connection
+      </button>
+    </div>
   </div>
 </div>
 
@@ -572,19 +606,77 @@ Here's the **simplified super admin** that works with pre-existing agent files:
   let agents = [];
   let activeChats = [];
   let users = [];
-  let agentFiles = [];
+  let activityLogs = [];
   
   // DOM Elements
   const loginOverlay = document.getElementById('loginOverlay');
   const dashboard = document.getElementById('dashboard');
   const superPassword = document.getElementById('superPassword');
   const loginError = document.getElementById('loginError');
+  const debugConsole = document.getElementById('debugConsole');
+  
+  // Debug logging
+  function debugLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const color = type === 'error' ? '#ff4444' : 
+                  type === 'success' ? '#44ff44' : 
+                  type === 'warning' ? '#ffaa00' : '#ffffff';
+    
+    const logEntry = document.createElement('div');
+    logEntry.style.color = color;
+    logEntry.textContent = `[${timestamp}] ${message}`;
+    debugConsole.appendChild(logEntry);
+    debugConsole.scrollTop = debugConsole.scrollHeight;
+    
+    // Also log to console
+    console.log(`[SuperAdmin] ${message}`);
+  }
+  
+  function toggleDebug() {
+    debugConsole.style.display = debugConsole.style.display === 'none' ? 'block' : 'none';
+  }
+  
+  // Test connection function
+  function testConnection() {
+    debugLog('Testing connection to server...', 'info');
+    loginError.textContent = 'Testing connection...';
+    
+    // Create a test socket
+    const testSocket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      timeout: 5000
+    });
+    
+    testSocket.on('connect', () => {
+      debugLog('✅ Connection test successful!', 'success');
+      loginError.textContent = '✅ Connection successful!';
+      loginError.style.color = '#4CAF50';
+      testSocket.disconnect();
+    });
+    
+    testSocket.on('connect_error', (error) => {
+      debugLog(`❌ Connection failed: ${error.message}`, 'error');
+      loginError.textContent = `Connection failed: ${error.message}`;
+      loginError.style.color = '#f44336';
+    });
+    
+    setTimeout(() => {
+      if (testSocket.connected === false) {
+        debugLog('⚠️ Connection test timeout', 'warning');
+        loginError.textContent = 'Connection timeout. Server may be offline.';
+        loginError.style.color = '#ff9800';
+      }
+    }, 5000);
+  }
   
   // Check saved authentication
   function checkSavedAuth() {
     const savedAuth = sessionStorage.getItem('superAdminAuthenticated');
     if (savedAuth === 'true') {
+      debugLog('Found saved authentication', 'info');
       initializeSuperAdmin();
+    } else {
+      debugLog('No saved authentication found', 'info');
     }
   }
   
@@ -594,23 +686,78 @@ Here's the **simplified super admin** that works with pre-existing agent files:
     
     if (!password) {
       loginError.textContent = 'Please enter password';
+      loginError.style.color = '#f44336';
       return;
     }
     
+    debugLog('Attempting login...', 'info');
+    loginError.textContent = 'Connecting to server...';
+    loginError.style.color = '#2196F3';
+    
+    // Initialize socket if not already
     if (!socket) {
-      socket = io("https://chat-backend-p2b9.onrender.com");
+      debugLog('Creating new socket connection...', 'info');
+      socket = io("https://chat-backend-p2b9.onrender.com", {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000,
+        timeout: 10000
+      });
+      
+      // Setup socket event listeners
+      socket.on('connect', () => {
+        debugLog('✅ Socket connected with ID: ' + socket.id, 'success');
+        loginError.textContent = 'Connected to server. Logging in...';
+      });
+      
+      socket.on('connect_error', (error) => {
+        debugLog(`❌ Connection error: ${error.message}`, 'error');
+        loginError.textContent = `Connection error: ${error.message}`;
+        loginError.style.color = '#f44336';
+      });
+      
+      socket.on('disconnect', (reason) => {
+        debugLog(`🔌 Disconnected: ${reason}`, 'warning');
+        if (isSuperAdminAuthenticated) {
+          debugLog('Attempting to reconnect...', 'info');
+        }
+      });
     }
     
+    // Send login request
+    debugLog('Sending login request...', 'info');
     socket.emit('super_admin_login', { password });
     
+    // Set timeout for login response
+    const loginTimeout = setTimeout(() => {
+      if (!isSuperAdminAuthenticated) {
+        debugLog('⚠️ Login timeout - no response from server', 'warning');
+        loginError.textContent = 'Login timeout. Server may be busy.';
+        loginError.style.color = '#ff9800';
+      }
+    }, 10000);
+    
+    // Listen for login response
     socket.once('super_admin_login_response', (response) => {
+      clearTimeout(loginTimeout);
+      
       if (response.success) {
+        debugLog('✅ Login successful!', 'success');
         sessionStorage.setItem('superAdminAuthenticated', 'true');
         loginOverlay.style.display = 'none';
         dashboard.style.display = 'block';
+        isSuperAdminAuthenticated = true;
+        
+        // Initialize the dashboard
         initializeSuperAdmin();
+        
+        // Request agent files list
+        socket.emit('get_agent_files');
       } else {
-        loginError.textContent = response.message || 'Invalid password';
+        debugLog(`❌ Login failed: ${response.message || 'Unknown error'}`, 'error');
+        loginError.textContent = response.message || 'Login failed. Check password.';
+        loginError.style.color = '#f44336';
         superPassword.value = '';
         superPassword.focus();
       }
@@ -619,111 +766,97 @@ Here's the **simplified super admin** that works with pre-existing agent files:
   
   // Initialize super admin panel
   function initializeSuperAdmin() {
-    console.log('Initializing Super Admin...');
-    
-    // Setup socket connection
-    if (!socket) {
-      socket = io("https://chat-backend-p2b9.onrender.com", {
-        transports: ['websocket', 'polling'],
-        reconnection: true
-      });
-    }
-    
-    // Connection events
-    socket.on('connect', () => {
-      console.log('✅ Connected to server');
-      addActivityLog('Connected to server', 'system');
-      socket.emit('get_agent_files'); // Request existing agent files
-    });
-    
-    socket.on('disconnect', () => {
-      console.log('❌ Disconnected from server');
-      addActivityLog('Disconnected from server', 'system');
-    });
-    
-    // Listen for agent files
-    socket.on('agent_files_list', (files) => {
-      console.log('📁 Agent files:', files);
-      agentFiles = files;
-      updateAgentFilesDropdown(files);
-    });
+    debugLog('Initializing Super Admin dashboard...', 'info');
     
     // Listen for data updates
     socket.on('super_admin_data', (data) => {
-      console.log('📊 Received data update:', data);
+      debugLog('📊 Received dashboard data update', 'success');
       updateDashboard(data);
     });
     
+    // Listen for agent files list
+    socket.on('agent_files_list', (files) => {
+      debugLog(`📁 Agent files found: ${files.length}`, 'info');
+      updateAgentFilesDropdown(files);
+    });
+    
+    // Listen for agent file info
+    socket.on('agent_file_info', (agent) => {
+      if (agent) {
+        debugLog(`📝 Agent file already has credentials: ${agent.name}`, 'info');
+      } else {
+        debugLog('📝 Agent file has no credentials yet', 'info');
+      }
+    });
+    
     // Agent events
-    socket.on('agent_credentials_set', (agent) => {
-      console.log('🔑 Agent credentials set:', agent.name);
+    socket.on('agent_created', (agent) => {
+      debugLog(`🆕 Agent created: ${agent.name}`, 'success');
       addAgentToList(agent);
       updateStats();
-      addActivityLog(`Credentials set for ${agent.name} (${agent.filename})`, 'agent_updated');
-      alert(`✅ Credentials set for ${agent.name}\n\nFile: ${agent.filename}\nUsername: ${agent.name}\nPassword: [hidden]`);
     });
     
     socket.on('agent_updated', (agent) => {
-      console.log('📝 Agent updated:', agent.name);
+      debugLog(`📝 Agent updated: ${agent.name}`, 'success');
       updateAgentInList(agent);
-      addActivityLog(`Permissions updated for ${agent.name}`, 'agent_updated');
+    });
+    
+    socket.on('agent_deleted', ({ agentId, agentName }) => {
+      debugLog(`🗑️ Agent deleted: ${agentName}`, 'warning');
+      removeAgentFromList(agentId);
+      updateStats();
     });
     
     socket.on('agent_status_change', (data) => {
-      console.log('🔄 Agent status:', data);
+      debugLog(`🔄 Agent ${data.agentName} is ${data.isOnline ? 'online' : 'offline'}`, 'info');
       updateAgentStatus(data);
-      addActivityLog(`Agent ${data.agentName} is ${data.isOnline ? 'online' : 'offline'}`, 'agent_status');
     });
     
     socket.on('agent_muted', (data) => {
-      console.log('🔇 Agent muted:', data);
+      debugLog(`🔇 Agent muted: ${data.agentName}`, 'warning');
       updateAgentMuteStatus(data.agentId, true);
-      addActivityLog(`Agent ${data.agentName} muted`, 'agent_muted');
     });
     
     socket.on('agent_unmuted', (data) => {
-      console.log('🔊 Agent unmuted:', data);
+      debugLog(`🔊 Agent unmuted: ${data.agentName}`, 'success');
       updateAgentMuteStatus(data.agentId, false);
-      addActivityLog(`Agent ${data.agentName} unmuted`, 'agent_unmuted');
     });
     
     // Message events
     socket.on('new_message', (message) => {
-      console.log('📨 New message:', message);
+      debugLog(`📨 New message: ${message.sender} to ${message.whatsapp}`, 'info');
       updateActiveChats(message);
-      addActivityLog(
-        `Message from ${message.whatsapp} to ${message.agentName || 'unassigned'}`,
-        'message'
-      );
     });
     
     socket.on('agent_received_message', (data) => {
-      console.log('📩 Agent received message:', data);
+      debugLog(`📩 Agent received message: ${data.agentName} from ${data.whatsapp}`, 'info');
       updateActiveChats(data);
-      addActivityLog(
-        `Agent ${data.agentName} received message from ${data.whatsapp}`,
-        'message_received'
-      );
     });
     
     socket.on('agent_sent_message', (data) => {
-      console.log('📤 Agent sent message:', data);
+      debugLog(`📤 Agent sent message: ${data.agentName} to ${data.whatsapp}`, 'info');
       updateActiveChats(data);
-      addActivityLog(
-        `Agent ${data.agentName} replied to ${data.whatsapp}`,
-        'message_sent'
-      );
+    });
+    
+    socket.on('user_assigned', (data) => {
+      debugLog(`👤 User assigned: ${data.whatsapp} to ${data.agentName}`, 'success');
+      updateUserAssignment(data);
+    });
+    
+    socket.on('agent_credentials_set', (data) => {
+      debugLog(`🔑 Credentials set for: ${data.agentName} (${data.filename})`, 'success');
     });
     
     // Request initial data
+    debugLog('Requesting initial data from server...', 'info');
     socket.emit('get_super_admin_data');
     
-    // Request updates every 5 seconds
+    // Request updates every 10 seconds
     setInterval(() => {
-      if (socket.connected) {
+      if (socket && socket.connected && isSuperAdminAuthenticated) {
         socket.emit('get_super_admin_data');
       }
-    }, 5000);
+    }, 10000);
   }
   
   // Load agent file info
@@ -736,6 +869,8 @@ Here's the **simplified super admin** that works with pre-existing agent files:
     }
     
     document.getElementById('agentCredentialsForm').style.display = 'block';
+    
+    debugLog(`Checking agent file: ${filename}`, 'info');
     
     // Check if this file already has credentials
     socket.emit('check_agent_file', { filename });
@@ -756,6 +891,8 @@ Here's the **simplified super admin** that works with pre-existing agent files:
           <p><strong>Last Active:</strong> ${agent.lastActive ? new Date(agent.lastActive).toLocaleString() : 'Never'}</p>
           <p><em>To change password, enter new password below. Username cannot be changed.</em></p>
         `;
+        
+        debugLog(`Found existing agent: ${agent.name}`, 'info');
       } else {
         // New file, no credentials set
         document.getElementById('agentUsername').value = '';
@@ -767,6 +904,8 @@ Here's the **simplified super admin** that works with pre-existing agent files:
           <p><strong>Access URL:</strong> <code>${window.location.origin}/${filename}</code></p>
           <p><em>Set username and password for this agent file</em></p>
         `;
+        
+        debugLog(`New agent file, no credentials set`, 'info');
       }
       
       infoDiv.style.display = 'block';
@@ -778,15 +917,18 @@ Here's the **simplified super admin** that works with pre-existing agent files:
     const select = document.getElementById('agentFileSelect');
     const existingOptions = Array.from(select.options).map(opt => opt.value);
     
-    // Add any new files
+    // Clear existing options except first
+    select.innerHTML = '<option value="">-- Select an agent file --</option>';
+    
+    // Add files
     files.forEach(file => {
-      if (!existingOptions.includes(file)) {
-        const option = document.createElement('option');
-        option.value = file;
-        option.textContent = file;
-        select.appendChild(option);
-      }
+      const option = document.createElement('option');
+      option.value = file;
+      option.textContent = file;
+      select.appendChild(option);
     });
+    
+    debugLog(`Updated agent files dropdown with ${files.length} files`, 'info');
   }
   
   // Save agent credentials
@@ -833,6 +975,8 @@ Here's the **simplified super admin** that works with pre-existing agent files:
     if (document.getElementById('muteAgent').checked) {
       restrictions.muted = true;
     }
+    
+    debugLog(`Setting credentials for ${filename} with username ${username}`, 'info');
     
     socket.emit('set_agent_credentials', {
       filename,
@@ -970,18 +1114,23 @@ Here's the **simplified super admin** that works with pre-existing agent files:
       if (!agent.restrictions) agent.restrictions = {};
       agent.restrictions.muted = isMuted;
       updateAgentInList(agent);
-      
-      // If muting, disconnect the agent
-      if (isMuted && agent.socketId) {
-        socket.emit('disconnect_agent', { agentId, socketId: agent.socketId });
-      }
+    }
+  }
+  
+  function removeAgentFromList(agentId) {
+    const agentDiv = document.getElementById(`agent-${agentId}`);
+    if (agentDiv) {
+      agentDiv.remove();
     }
   }
   
   // Edit agent permissions
   function editAgentPermissions(agentId) {
     const agent = agents.find(a => a.id === agentId);
-    if (!agent) return;
+    if (!agent) {
+      alert('Agent not found');
+      return;
+    }
     
     document.getElementById('editAgentModal').style.display = 'flex';
     document.getElementById('editAgentId').value = agentId;
@@ -1028,15 +1177,13 @@ Here's the **simplified super admin** that works with pre-existing agent files:
     
     const action = mute ? 'mute' : 'unmute';
     if (confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} agent "${agent.name}"?`)) {
-      socket.emit(mute ? 'mute_agent' : 'unmute_agent', { agentId });
+      if (mute) {
+        socket.emit('mute_agent', { agentId });
+      } else {
+        socket.emit('unmute_agent', { agentId });
+      }
     }
   }
-  
-  // Update
-  <!-- CONTINUATION FROM WHERE WE LEFT OFF - Complete the missing functions -->
-
-<script>
-  // CONTINUED FROM ABOVE - Complete all missing functions
   
   // Update active chats list
   function updateActiveChatsList(chats) {
@@ -1107,7 +1254,6 @@ Here's the **simplified super admin** that works with pre-existing agent files:
           whatsapp: whatsapp,
           agentId: agent.id
         });
-        addActivityLog(`Assigned ${whatsapp} to ${agentName}`, 'user_assigned');
       }
     }
   }
@@ -1206,8 +1352,23 @@ Here's the **simplified super admin** that works with pre-existing agent files:
           whatsapp: whatsapp,
           agentId: agent.id
         });
-        addActivityLog(`Assigned ${whatsapp} to ${agentName}`, 'user_assigned');
       }
+    }
+  }
+  
+  function updateUserAssignment(data) {
+    // Update the user in the users list
+    const user = users.find(u => u.whatsapp === data.whatsapp);
+    if (user) {
+      user.assignedAgent = data.agentId;
+      updateUsersList(users);
+    }
+    
+    // Update active chats
+    const chat = activeChats.find(c => c.whatsapp === data.whatsapp);
+    if (chat) {
+      chat.agentId = data.agentId;
+      updateActiveChatsList(activeChats);
     }
   }
   
@@ -1223,23 +1384,6 @@ Here's the **simplified super admin** that works with pre-existing agent files:
     });
   }
   
-  function addActivityLog(message, type = 'info') {
-    const activity = {
-      message,
-      type,
-      timestamp: new Date().toISOString()
-    };
-    
-    const activityLogDiv = document.getElementById('activityLog');
-    const element = createActivityElement(activity);
-    activityLogDiv.insertBefore(element, activityLogDiv.firstChild);
-    
-    // Keep only 50 items
-    while (activityLogDiv.children.length > 50) {
-      activityLogDiv.removeChild(activityLogDiv.lastChild);
-    }
-  }
-  
   function createActivityElement(activity) {
     const div = document.createElement('div');
     div.className = 'activity-item';
@@ -1249,22 +1393,26 @@ Here's the **simplified super admin** that works with pre-existing agent files:
     let color = '#1a237e';
     
     switch(activity.type) {
-      case 'agent_updated': icon = '👤'; color = '#4CAF50'; break;
+      case 'super_admin_login': icon = '🔐'; color = '#4CAF50'; break;
+      case 'agent_created': icon = '🆕'; color = '#4CAF50'; break;
+      case 'agent_updated': icon = '✏️'; color = '#2196F3'; break;
+      case 'agent_deleted': icon = '🗑️'; color = '#f44336'; break;
       case 'agent_status': icon = '🔄'; color = '#2196F3'; break;
       case 'agent_muted': icon = '🔇'; color = '#ff9800'; break;
       case 'agent_unmuted': icon = '🔊'; color = '#4CAF50'; break;
-      case 'message': icon = '📨'; color = '#673ab7'; break;
+      case 'agent_login': icon = '👤'; color = '#4CAF50'; break;
+      case 'message_sent': icon = '📨'; color = '#673ab7'; break;
       case 'message_received': icon = '📩'; color = '#3f51b5'; break;
-      case 'message_sent': icon = '📤'; color = '#009688'; break;
       case 'user_assigned': icon = '👥'; color = '#ff5722'; break;
-      case 'system': icon = '⚙️'; color = '#9c27b0'; break;
+      case 'user_unassigned': icon = '🚫'; color = '#f44336'; break;
+      case 'chat_cleared': icon = '🗑️'; color = '#795548'; break;
     }
     
     div.style.borderLeftColor = color;
     div.innerHTML = `
       <div style="display: flex; align-items: flex-start; margin-bottom: 5px;">
         <span style="margin-right: 8px; font-size: 16px;">${icon}</span>
-        <span style="flex: 1;">${activity.message}</span>
+        <span style="flex: 1;">${activity.details ? JSON.stringify(activity.details) : activity.type}</span>
       </div>
       <div class="activity-time">
         ${time}
@@ -1308,6 +1456,7 @@ Here's the **simplified super admin** that works with pre-existing agent files:
   
   function closeModal() {
     document.getElementById('editAgentModal').style.display = 'none';
+    document.getElementById('editAgentPassword').value = '';
   }
   
   function logoutSuperAdmin() {
@@ -1320,9 +1469,14 @@ Here's the **simplified super admin** that works with pre-existing agent files:
   
   // Initialize on page load
   window.onload = function() {
-    console.log('Super Admin Panel Loading...');
+    debugLog('Super Admin Panel Loading...', 'info');
     checkSavedAuth();
     superPassword.focus();
+    
+    // Enable debug console if URL has debug parameter
+    if (window.location.search.includes('debug=true')) {
+      debugConsole.style.display = 'block';
+    }
   };
   
   // Allow pressing Enter to login
