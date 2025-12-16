@@ -3,7 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const path = require("path");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 const multer = require("multer");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
@@ -116,7 +116,7 @@ async function saveAgentToDB(agentId, agentData) {
     if (!agentsCollection) return false;
     
     await agentsCollection.updateOne(
-      { _id: agentId },
+      { _id: new ObjectId(agentId) },
       { $set: { ...agentData, updatedAt: new Date() } },
       { upsert: true }
     );
@@ -140,7 +140,7 @@ async function saveMessageToMongoDB(whatsapp, message) {
           $push: { messages: message },
           $set: { 
             lastUpdated: new Date(),
-            lastMessage: message.text,
+            lastMessage: message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
             lastMessageTime: message.timestamp
           }
         }
@@ -151,7 +151,7 @@ async function saveMessageToMongoDB(whatsapp, message) {
         messages: [message],
         createdAt: new Date(),
         lastUpdated: new Date(),
-        lastMessage: message.text,
+        lastMessage: message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
         lastMessageTime: message.timestamp
       });
     }
@@ -260,7 +260,7 @@ io.on("connection", (socket) => {
   console.log("New connection:", socket.id);
   users.set(socket.id, { type: 'unknown' });
 
-  // ===== SUPER ADMIN EVENTS (NEW FUNCTIONALITY) =====
+  // ===== SUPER ADMIN EVENTS =====
   socket.on("super_admin_login", async ({ password }) => {
     if (password === SUPER_ADMIN_PASSWORD) {
       users.set(socket.id, { type: 'super_admin' });
@@ -401,7 +401,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Save/Update agent credentials (KEEPING for backward compatibility, but agents are now auto-registered)
+  // Save/Update agent credentials
   socket.on("save_agent", async ({ name, id, password }) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'super_admin') return;
@@ -463,7 +463,7 @@ io.on("connection", (socket) => {
     socket.emit("agent_updated", { success: true });
   });
 
-  // Toggle agent mute status (NEW)
+  // Toggle agent mute status
   socket.on("toggle_agent_mute", async ({ agentId }) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'super_admin') return;
@@ -509,7 +509,7 @@ io.on("connection", (socket) => {
     io.to("super_admin").emit("agent_updated", { agentId });
   });
 
-  // Forward messages to agents (NEW)
+  // Forward messages to agents
   socket.on("forward_to_agents", (data) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'super_admin') return;
@@ -531,7 +531,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Get super admin data with ALL info (OLD + NEW)
+  // Get super admin data with ALL info
   socket.on("get_super_admin_data", async () => {
     const userData = users.get(socket.id);
     if (userData?.type === 'super_admin') {
@@ -565,7 +565,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ===== AGENT EVENTS (NEW FUNCTIONALITY) =====
+  // ===== AGENT EVENTS =====
   socket.on("agent_login", async ({ agentId, password }) => {
     const agent = agents.get(agentId);
     
@@ -626,7 +626,7 @@ io.on("connection", (socket) => {
     io.to("super_admin").emit("agent_updated", { agentId });
   });
 
-  // Agent sends message (UPDATED to fix inconsistent format)
+  // Agent sends message
   socket.on("agent_message", async (data) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'agent') return;
@@ -686,11 +686,16 @@ io.on("connection", (socket) => {
     });
   });
 
-  // ===== USER MESSAGES - FIXED VERSION =====
+  // ===== USER MESSAGES - SIMPLIFIED & FIXED VERSION =====
   socket.on("user_message", async (data) => {
+    console.log("📨 Received user_message event:", data);
+    
     // Ensure we have whatsapp/userId
     const whatsapp = data.whatsapp || data.userId;
-    if (!whatsapp) return;
+    if (!whatsapp) {
+      console.error("No whatsapp/userId provided");
+      return;
+    }
     
     // Create a clean message object
     const message = {
@@ -698,69 +703,87 @@ io.on("connection", (socket) => {
       userId: data.userId || whatsapp,
       message: data.message,
       timestamp: new Date().toISOString(),
-      id: `${whatsapp}_${Date.now()}`,
+      id: `${whatsapp}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique ID
       sender: "user",
-      type: data.type || "text",
-      originalMessageId: data.originalMessageId || null
+      type: data.type || "text"
     };
     
-    // Handle attachments properly
+    // Handle attachments - KEEP ORIGINAL ATTACHMENT DATA AS IS
     if (data.attachment) {
       message.attachment = data.attachment;
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // Save to MongoDB if connected - FIXED to include attachments
+    // Save to MongoDB
     if (conversationsCollection) {
       const dbMessage = {
         ...message,
         sender: 'user',
         text: data.message || '',
-        timestamp: new Date().toISOString()
+        timestamp: message.timestamp
       };
       
       if (data.attachment) {
         dbMessage.attachment = data.attachment;
-        dbMessage.text = data.message || `[${data.attachment.type || 'Attachment'}]`;
       }
       
       await saveMessageToMongoDB(whatsapp, dbMessage);
+      console.log("✓ Message saved to MongoDB");
     }
     
-    // Send to user's own socket (so they see their message)
+    // BROADCAST TO ALL RECIPIENTS IN ONE PLACE
+    // 1. Send to the user (confirmation) with full attachment data
     socket.emit("new_message", {
       ...message,
-      sender: "user"  // Explicitly set sender as user
+      sender: "user",
+      text: data.message || '',
+      attachment: data.attachment || null
     });
     
-    // Send ONLY ONCE to each recipient type
-    // 1. Send to super_admin room
-    io.to("super_admin").emit("user_message", message);
+    // 2. Create broadcast message with FULL ORIGINAL ATTACHMENT DATA
+    const broadcastMessage = {
+      ...message,
+      sender: "user",
+      text: data.message || '',
+      attachment: data.attachment || null, // KEEP ORIGINAL ATTACHMENT AS IS
+      originalAttachment: data.attachment ? {
+        ...data.attachment,
+        // Ensure full URL is included
+        url: data.attachment.url || `${data.attachment.path?.startsWith('http') ? data.attachment.path : `http://localhost:3000${data.attachment.path}`}`
+      } : null
+    };
     
-    // 2. Send to regular admin room
-    io.to("admin").emit("new_message", message);
+    // 3. Send to ALL recipients at once with ORIGINAL attachment
+    // Send to super_admin
+    io.to("super_admin").emit("user_message", broadcastMessage);
+    // Send to admin
+    io.to("admin").emit("new_message", broadcastMessage);
     
-    // 3. Send to all non-muted agents
+    // 4. Send to non-muted agents WITH ORIGINAL IMAGE ATTACHMENT
     const onlineAgents = [];
     agents.forEach((agent, agentId) => {
       if (!agent.muted && agent.socketId) {
-        io.to(agent.socketId).emit("user_message", message);
+        io.to(agent.socketId).emit("user_message", broadcastMessage);
         onlineAgents.push(agentId);
       }
     });
     
+    console.log(`📢 Broadcast to: Super Admin, Admin, and ${onlineAgents.length} agents`);
+    console.log(`📎 Attachment sent:`, data.attachment ? `Type: ${data.attachment.mimetype}, URL: ${data.attachment.url || data.attachment.path}` : 'No attachment');
+    
     // Update active chats
     activeChats.set(whatsapp, {
       whatsapp: whatsapp,
-      lastMessage: data.message || (data.attachment ? `[${data.attachment.type || 'Attachment'}]` : ''),
+      lastMessage: data.message || (data.attachment ? `[${data.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
       lastMessageTime: message.timestamp,
       unread: true
     });
     
     logActivity('user_message_received', {
       from: whatsapp,
-      messageType: message.type,
+      message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
       hasAttachment: !!data.attachment,
+      attachmentType: data.attachment?.mimetype || 'none',
       forwardedToAgents: onlineAgents.length
     });
   });
@@ -796,61 +819,89 @@ io.on("connection", (socket) => {
     console.log(`✓ Registered: ${whatsapp} with socket ${socket.id}`);
   });
 
-  // Send message (OLD - with attachments) - UPDATED to avoid duplicates
+  // LEGACY: send_message handler for backward compatibility
   socket.on("send_message", async ({ whatsapp, sender, text, agentId, agentName, attachment }) => {
-    if (!whatsapp || (!text && !attachment)) return;
-
-    const message = { 
-      sender: sender || "user", 
-      whatsapp, 
-      text: text || "",
-      timestamp: new Date().toISOString(),
-      agentId,
-      agentName,
-      read: sender === 'agent' || sender === 'admin'
-    };
-
-    if (attachment) {
-      message.attachment = attachment;
-      message.type = 'image'; // Add type field
-      console.log(`\n📎 Attachment sent from ${message.sender} to ${whatsapp}: ${attachment.filename}`);
-    } else {
-      console.log(`\n📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
-    }
-
-    // Save to MongoDB if connected
-    if (conversationsCollection) {
-      await saveMessageToMongoDB(whatsapp, message);
-    }
-
-    logActivity('message_sent', { 
-      whatsapp, 
-      sender: message.sender, 
-      hasAttachment: !!attachment 
-    });
-
-    // Send to user's room
-    io.to(whatsapp).emit("new_message", message);
+    console.log("⚠️ LEGACY send_message event received - converting to user_message");
     
-    // Send to appropriate recipients based on sender
-    if (message.sender === "user") {
-      // User messages go to super_admin and admin
-      io.to("super_admin").emit("user_message", {
+    if (!whatsapp) return;
+    
+    // Convert legacy format to user_message format
+    const userData = users.get(socket.id);
+    
+    // If sender is user, use user_message format
+    if (sender === "user" || !sender) {
+      socket.emit("user_message", {
         whatsapp: whatsapp,
         userId: whatsapp,
-        message: text,
-        timestamp: message.timestamp,
-        sender: "user"
+        message: text || '',
+        attachment: attachment || null
       });
-      io.to("admin").emit("new_message", message);
-    } else {
-      // Agent/Admin messages go to super_admin and admin
-      io.to("super_admin").emit("new_message", message);
-      io.to("admin").emit("new_message", message);
+    } 
+    // If sender is agent/admin, use agent_message format
+    else if (sender === "agent" || sender === "admin") {
+      const messageData = {
+        whatsapp: whatsapp,
+        message: text || '',
+        timestamp: new Date().toISOString()
+      };
+      
+      if (attachment) {
+        messageData.attachment = attachment;
+      }
+      
+      // Save to MongoDB
+      if (conversationsCollection) {
+        const message = {
+          sender: sender,
+          agentId: agentId || 'admin',
+          agentName: agentName || 'Admin',
+          text: text,
+          timestamp: new Date().toISOString(),
+          read: true
+        };
+        
+        if (attachment) {
+          message.attachment = attachment;
+        }
+        
+        await saveMessageToMongoDB(whatsapp, message);
+      }
+      
+      // Send to user
+      io.to(whatsapp).emit("new_message", {
+        sender: sender,
+        agentId: agentId,
+        agentName: agentName,
+        message: text,
+        whatsapp: whatsapp,
+        timestamp: new Date().toISOString(),
+        attachment: attachment || null
+      });
+      
+      // Send to super_admin and admin
+      io.to("super_admin").emit("new_message", {
+        sender: sender,
+        agentId: agentId,
+        agentName: agentName,
+        message: text,
+        whatsapp: whatsapp,
+        timestamp: new Date().toISOString(),
+        attachment: attachment || null
+      });
+      
+      io.to("admin").emit("new_message", {
+        sender: sender,
+        agentId: agentId,
+        agentName: agentName,
+        message: text,
+        whatsapp: whatsapp,
+        timestamp: new Date().toISOString(),
+        attachment: attachment || null
+      });
     }
   });
 
-  // Get messages (OLD)
+  // Get messages
   socket.on("get_messages", async ({ whatsapp, agentId, markAsRead = false }) => {
     try {
       if (!conversationsCollection) {
@@ -871,7 +922,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // NEW: Get existing users for agent interface
+  // Get existing users for agent interface
   socket.on("get_existing_users", async () => {
     try {
       if (!conversationsCollection) {
@@ -894,7 +945,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Clear chat (OLD)
+  // Clear chat
   socket.on("clear_chat", async ({ whatsapp }) => {
     try {
       if (conversationsCollection) {

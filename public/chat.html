@@ -183,19 +183,36 @@
     
     /* File upload styles */
     #fileInput { display: none; }
-        .file-upload-btn {
+    .file-upload-btn {
       background: transparent;
       color: #555;
       border: none;
       padding: 8px;
       cursor: pointer;
       font-size: 18px;
+      position: relative;
     }
 
     .file-upload-btn:hover {
       background:  #f0f0f0;
       border-radius: 50%;
     }
+    
+    .file-upload-label {
+      font-size: 11px;
+      color: #666;
+      text-align: center;
+      margin-top: 2px;
+      display: block;
+    }
+    
+    .file-upload-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
     .file-preview {
       display: inline-block;
       margin-left: 10px;
@@ -265,7 +282,7 @@
     .action-buttons {
       display: flex;
       gap: 10px;
-      align-items: center;
+      align-items: flex-end;
     }
   </style>
 </head>
@@ -307,9 +324,12 @@
     <div class="input-container">
       <input id="messageInput" placeholder="Type your message here..." style="flex: 1;">
       <div class="action-buttons">
-        <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-          📎
-        </button>
+        <div class="file-upload-container">
+          <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+            📎
+          </button>
+          <span class="file-upload-label">file upload</span>
+        </div>
         <button class="send-btn" onclick="sendMessage()">
           Send
         </button>
@@ -394,14 +414,16 @@
       content = formatAttachment(msg.attachment);
     }
     
+    const senderName = msg.sender === "user" ? "You" : (msg.agentName || "Support");
+    
     messageDiv.innerHTML = `
       <div class="message-header">
-        <span class="message-sender">${msg.sender === "user" ? "You" : (msg.agentName || msg.sender)}</span>
+        <span class="message-sender">${senderName}</span>
         <span class="message-time" title="${formatDateTime(msg.timestamp)}">
           ${formatTime(msg.timestamp)}
         </span>
       </div>
-      <div class="message-content">${msg.text || ''}</div>
+      <div class="message-content">${msg.text || msg.message || ''}</div>
       ${content}
       ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
     `;
@@ -414,12 +436,16 @@
 
   // Format attachment display - UPDATED to use url field
   function formatAttachment(attachment) {
-    const fileType = attachment.mimetype.split('/')[0];
+    if (!attachment) return '';
+    
+    const fileType = attachment.mimetype ? attachment.mimetype.split('/')[0] : 'file';
     let icon = '📄';
     let preview = '';
     
     // Use url if available, otherwise use path
     const fileUrl = attachment.url || attachment.path;
+    const fileName = attachment.originalname || attachment.filename || 'file';
+    const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
     
     if (fileType === 'image') {
       icon = '🖼️';
@@ -428,26 +454,24 @@
       icon = '🎬';
     } else if (fileType === 'audio') {
       icon = '🎵';
-    } else if (attachment.mimetype.includes('pdf')) {
+    } else if (attachment.mimetype && attachment.mimetype.includes('pdf')) {
       icon = '📕';
     }
-    
-    const fileSize = formatFileSize(attachment.size);
     
     return `
       <div class="attachment">
         <span class="file-icon">${icon}</span>
-        <a href="${fileUrl}" target="_blank" download="${attachment.originalname}">
-          ${attachment.originalname}
+        <a href="${fileUrl}" target="_blank" download="${fileName}">
+          ${fileName}
         </a>
-        <span style="color: #666; font-size: 11px; margin-left: 5px;">(${fileSize})</span>
+        ${fileSize ? `<span style="color: #666; font-size: 11px; margin-left: 5px;">(${fileSize})</span>` : ''}
         ${preview}
       </div>
     `;
   }
 
   function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -550,18 +574,22 @@
 
   function sendMessage() {
     const text = document.getElementById("messageInput").value.trim();
+    const fileInput = document.getElementById('fileInput');
     
     // If no text and no file, don't send
-    if (!text && !selectedFile) return;
+    if (!text && !fileInput.files.length) {
+      alert("Please enter a message or select a file");
+      return;
+    }
 
     // Store current time for duplicate message prevention
     lastMessageTime = Date.now();
 
     // If there's a file, upload it first
-    if (selectedFile) {
+    if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
-          console.log("Sending message with attachment:", fileInfo);
+          console.log("📤 Sending message with attachment:", fileInfo);
           
           // Show message immediately in chat
           const tempMsg = {
@@ -574,7 +602,7 @@
           };
           displayMessage(tempMsg);
           
-          // Send via user_message for agents to receive (PRIMARY)
+          // Send ONLY ONE event to backend
           socket.emit("user_message", {
             whatsapp: whatsapp,
             userId: whatsapp,
@@ -582,18 +610,9 @@
             attachment: fileInfo
           });
           
-          // Also send via send_message for backward compatibility
-          socket.emit("send_message", {
-            whatsapp: whatsapp,
-            sender: "user",
-            text: text,
-            attachment: fileInfo
-          });
-          
         } else {
           // File upload failed, send text only if exists
           if (text) {
-            // Show message immediately in chat
             const tempMsg = {
               sender: "user",
               whatsapp: whatsapp,
@@ -608,21 +627,17 @@
               userId: whatsapp,
               message: text
             });
-            
-            socket.emit("send_message", {
-              whatsapp: whatsapp,
-              sender: "user",
-              text: text
-            });
           }
         }
         
-        // Clear input
+        // Clear inputs
         document.getElementById("messageInput").value = "";
+        fileInput.value = "";
+        document.getElementById("filePreview").innerHTML = "";
       });
     } else {
       // No file, just send text
-      console.log("Sending message:", text);
+      console.log("📤 Sending text message:", text);
       
       // Show message immediately in chat
       const tempMsg = {
@@ -634,18 +649,11 @@
       };
       displayMessage(tempMsg);
       
-      // Send via user_message for agents to receive (PRIMARY)
+      // Send ONLY ONE event to backend
       socket.emit("user_message", {
         whatsapp: whatsapp,
         userId: whatsapp,
         message: text
-      });
-      
-      // Also send via send_message for backward compatibility
-      socket.emit("send_message", {
-        whatsapp: whatsapp,
-        sender: "user",
-        text: text
       });
 
       document.getElementById("messageInput").value = "";
@@ -656,6 +664,15 @@
   document.getElementById("messageInput").addEventListener("keypress", function(e) {
     if (e.key === "Enter") {
       sendMessage();
+    }
+  });
+
+  // Also listen for user_message events from backend (for consistency)
+  socket.on("user_message", (msg) => {
+    console.log("Received user_message from backend:", msg);
+    // This handles messages from other users or system notifications
+    if (msg.sender !== "user" || msg.whatsapp !== whatsapp) {
+      displayMessage(msg);
     }
   });
 </script>
