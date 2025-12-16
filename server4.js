@@ -225,6 +225,34 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
+// Test MongoDB route
+app.get("/test-mongo", async (req, res) => {
+  try {
+    if (!conversationsCollection) {
+      return res.json({ status: "MongoDB not connected" });
+    }
+    
+    const count = await conversationsCollection.countDocuments();
+    const recentMessages = await conversationsCollection.find({})
+      .sort({ lastUpdated: -1 })
+      .limit(5)
+      .toArray();
+    
+    res.json({
+      status: "MongoDB connected",
+      totalConversations: count,
+      recentConversations: recentMessages.map(c => ({
+        whatsapp: c.whatsapp,
+        messageCount: c.messages?.length || 0,
+        lastMessage: c.lastMessage,
+        lastUpdated: c.lastUpdated
+      }))
+    });
+  } catch (error) {
+    res.json({ status: "Error", error: error.message });
+  }
+});
+
 // ---- Socket.IO events ----
 io.on("connection", (socket) => {
   console.log("New connection:", socket.id);
@@ -491,13 +519,26 @@ io.on("connection", (socket) => {
     io.to("super_admin").emit("agent_updated", { agentId });
   });
 
-  // Agent sends message (NEW)
-  socket.on("agent_message", (data) => {
+  // Agent sends message (NEW) - FIXED to save to MongoDB
+  socket.on("agent_message", async (data) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'agent') return;
     
     const agent = agents.get(userData.agentId);
     if (!agent) return;
+    
+    // Save agent message to MongoDB if we have user context
+    if (data.whatsapp && conversationsCollection) {
+      const message = {
+        sender: 'agent',
+        agentId: userData.agentId,
+        agentName: agent.name,
+        text: data.message,
+        timestamp: new Date().toISOString(),
+        read: true
+      };
+      await saveMessageToMongoDB(data.whatsapp, message);
+    }
     
     // Broadcast to all Super Admins
     io.to("super_admin").emit("agent_message_received", {
@@ -514,10 +555,15 @@ io.on("connection", (socket) => {
     });
   });
 
-  // ===== USER MESSAGES (NEW + OLD) =====
+  // ===== USER MESSAGES (NEW + OLD) - FIXED to save to MongoDB =====
   socket.on("user_message", async (data) => {
+    // FIX: Use userId as whatsapp if whatsapp not provided
+    const whatsapp = data.whatsapp || data.userId;
+    if (!whatsapp) return;
+    
     const message = {
       ...data,
+      whatsapp: whatsapp, // Ensure whatsapp field exists
       timestamp: new Date().toISOString(),
       id: Date.now().toString(),
       sender: "user"
@@ -526,8 +572,8 @@ io.on("connection", (socket) => {
     userMessages.push(message);
     
     // Save to MongoDB if connected
-    if (conversationsCollection && data.whatsapp) {
-      await saveMessageToMongoDB(data.whatsapp, message);
+    if (conversationsCollection) {
+      await saveMessageToMongoDB(whatsapp, message);
     }
     
     // Send to all Super Admins (ALWAYS)
@@ -544,17 +590,15 @@ io.on("connection", (socket) => {
     io.to("admin").emit("new_message", message);
     
     // Update active chats
-    if (data.whatsapp) {
-      activeChats.set(data.whatsapp, {
-        whatsapp: data.whatsapp,
-        lastMessage: data.message,
-        lastMessageTime: message.timestamp,
-        unread: true
-      });
-    }
+    activeChats.set(whatsapp, {
+      whatsapp: whatsapp,
+      lastMessage: data.message,
+      lastMessageTime: message.timestamp,
+      unread: true
+    });
     
     logActivity('user_message_received', {
-      from: data.whatsapp || 'User',
+      from: whatsapp,
       message: data.message,
       forwardedTo: Array.from(agents.values()).filter(a => !a.muted && a.socketId).length
     });
@@ -636,9 +680,10 @@ io.on("connection", (socket) => {
         }
       });
       
-      // Send to Super Admin (NEW)
+      // Send to Super Admin (NEW) - Include whatsapp for proper saving
       io.to("super_admin").emit("user_message", {
         userId: whatsapp,
+        whatsapp: whatsapp,
         message: text,
         timestamp: message.timestamp
       });
@@ -674,6 +719,29 @@ io.on("connection", (socket) => {
     } catch (error) {
       console.error("Error fetching messages:", error);
       socket.emit("message_history", []);
+    }
+  });
+
+  // NEW: Get existing users for agent interface
+  socket.on("get_existing_users", async () => {
+    try {
+      if (!conversationsCollection) {
+        socket.emit("existing_users", []);
+        return;
+      }
+      
+      const conversations = await conversationsCollection.find({}).toArray();
+      const usersList = conversations.map(c => ({
+        whatsapp: c.whatsapp,
+        lastMessage: c.lastMessage,
+        lastMessageTime: c.lastUpdated,
+        messageCount: c.messages?.length || 0
+      }));
+      
+      socket.emit("existing_users", usersList);
+    } catch (error) {
+      console.error("Error fetching existing users:", error);
+      socket.emit("existing_users", []);
     }
   });
 
@@ -764,6 +832,7 @@ async function startServer() {
       console.log(`   /superadmin - Super admin panel`);
       console.log(`   /agent - Agent panel`);
       console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
+      console.log(`🔍 Test MongoDB: http://localhost:${PORT}/test-mongo`);
       console.log(`\n✅ System is ready with ALL functionality!`);
     });
   } catch (error) {
