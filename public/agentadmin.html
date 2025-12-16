@@ -8,11 +8,70 @@
     #users { margin-bottom: 10px; width: 300px; padding: 5px; }
     #messages { border: 1px solid #ccc; height: 300px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
     input, button { padding: 8px; font-size: 14px; margin-top: 5px; }
-    .message { margin: 5px 0; padding: 8px; border-radius: 5px; }
-    .user-message { background-color: #e3f2fd; text-align: left; }
-    .agent-message { background-color: #dcedc8; text-align: right; }
-    .info-message { background-color: #f0f0f0; color: #666; font-style: italic; text-align: center; }
-    .system-message { background-color: #ffecb3; color: #333; font-style: italic; text-align: center; }
+    
+    /* Updated message styles */
+    .message-container {
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 5px;
+    }
+    
+    .user-message { 
+      background-color: #e3f2fd; 
+      text-align: left;
+      margin-right: 40px;
+    }
+    
+    .agent-message { 
+      background-color: #dcedc8; 
+      text-align: right;
+      margin-left: 40px;
+    }
+    
+    .unread-message {
+      background-color: #fff8e1 !important;
+      border-left: 3px solid #ff9800;
+      font-weight: bold;
+    }
+    
+    .read-message {
+      opacity: 0.8;
+    }
+    
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    
+    .message-time {
+      font-size: 11px;
+      color: #666;
+      float: right;
+      margin-left: 10px;
+    }
+    
+    .unread-count {
+      background-color: #f44336;
+      color: white;
+      border-radius: 50%;
+      padding: 2px 6px;
+      font-size: 12px;
+      margin-left: 5px;
+    }
+    
+    .info-message { 
+      background-color: #f0f0f0; 
+      color: #666; 
+      font-style: italic; 
+      text-align: center; 
+    }
+    .system-message { 
+      background-color: #ffecb3; 
+      color: #333; 
+      font-style: italic; 
+      text-align: center; 
+    }
     
     /* Password overlay styles */
     #passwordOverlay {
@@ -159,6 +218,9 @@
   let selectedUser = "";
   let allUsers = new Set();
   
+  // ===== ADD THESE NEW VARIABLES =====
+  const unreadCounts = new Map();
+  
   // DOM elements
   const passwordOverlay = document.getElementById('passwordOverlay');
   const chatContainer = document.getElementById('chatContainer');
@@ -168,6 +230,43 @@
   const currentAgentNameSpan = document.getElementById('currentAgentName');
   const restrictionsDiv = document.getElementById('restrictions');
   const restrictionTextSpan = document.getElementById('restrictionText');
+  
+  // ===== ADD THESE NEW FUNCTIONS =====
+  function formatTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  
+  function formatDateTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString([], { 
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+  
+  function updateUnreadCount(whatsapp) {
+    if (!unreadCounts.has(whatsapp)) {
+      unreadCounts.set(whatsapp, 0);
+    }
+    unreadCounts.set(whatsapp, unreadCounts.get(whatsapp) + 1);
+    
+    const option = document.getElementById(`user-${whatsapp}`);
+    if (option) {
+      const count = unreadCounts.get(whatsapp);
+      option.innerHTML = `${whatsapp} ${count > 0 ? `<span class="unread-count">${count}</span>` : ''}`;
+    }
+  }
+  
+  function resetUnreadCount(whatsapp) {
+    unreadCounts.set(whatsapp, 0);
+    const option = document.getElementById(`user-${whatsapp}`);
+    if (option) {
+      option.innerHTML = whatsapp;
+    }
+  }
   
   // Check saved authentication
   function checkSavedAuth() {
@@ -326,11 +425,20 @@
       // Display message if this user is selected
       if (msg.whatsapp === selectedUser) {
         appendMessage(msg);
+        // Mark as read immediately if we're viewing this chat
+        if (msg.sender === "user" && !msg.read) {
+          socket.emit("mark_messages_read", { 
+            whatsapp: msg.whatsapp,
+            agentId: currentAgent.id 
+          });
+        }
       } else {
         // Highlight this user in dropdown
         highlightUserInDropdown(msg.whatsapp);
         if (msg.sender !== "agent") {
           addNotification(msg);
+          // Update unread count
+          updateUnreadCount(msg.whatsapp);
         }
       }
     });
@@ -352,6 +460,7 @@
       // Clear and repopulate dropdown with assigned users
       usersDropdown.innerHTML = '<option value="">-- Select a user --</option>';
       allUsers.clear();
+      unreadCounts.clear();
       
       users.forEach(whatsapp => {
         allUsers.add(whatsapp);
@@ -385,25 +494,29 @@
       }
     });
 
-    // Select a user
+    // ===== UPDATE THIS EVENT LISTENER =====
     usersDropdown.addEventListener("change", function() {
       const previousUser = selectedUser;
       selectedUser = this.value;
       console.log("Selected user:", selectedUser);
       
-      // Remove highlight from previous user
+      // Mark previous user's messages as read
       if (previousUser) {
         removeHighlightFromDropdown(previousUser);
+        resetUnreadCount(previousUser);
       }
       
       // Clear messages and load history for selected user
       messagesDiv.innerHTML = "";
       if (selectedUser) {
+        // Mark messages as read when opening chat
         socket.emit("get_messages", { 
           whatsapp: selectedUser,
-          agentId: currentAgent.id 
+          agentId: currentAgent.id,
+          markAsRead: true 
         });
-        addInfoMessage(`Now chatting with: ${selectedUser}`);
+        addInfoMessage(`Now chatting with: ${selectedUser} - ${new Date().toLocaleTimeString()}`);
+        resetUnreadCount(selectedUser);
       }
     });
     
@@ -461,18 +574,36 @@
     }
   }
 
+  // ===== UPDATE THIS FUNCTION =====
   function appendMessage(msg) {
     const div = document.createElement("div");
-    div.className = "message " + (msg.sender === "user" ? "user-message" : "agent-message");
-    div.textContent = `${msg.sender === 'agent' ? 'You' : 'User'}: ${msg.text}`;
-    div.title = new Date(msg.timestamp).toLocaleString();
+    div.className = "message-container " + 
+      (msg.sender === "user" ? "user-message" : "agent-message") +
+      (msg.read ? " read-message" : " unread-message");
+    
+    div.innerHTML = `
+      <div class="message-header">
+        <span>${msg.sender === 'agent' ? 'You' : 'User'}: ${msg.text.substring(0, 100)}${msg.text.length > 100 ? '...' : ''}</span>
+        <span class="message-time" title="${formatDateTime(msg.timestamp)}">
+          ${formatTime(msg.timestamp)}
+        </span>
+      </div>
+      ${msg.text.length > 100 ? `<div>${msg.text}</div>` : ''}
+      ${msg.read ? `<small style="color: #4CAF50;">✓ Read ${formatTime(msg.readAt)}</small>` : '<small style="color: #ff9800;">● Unread</small>'}
+    `;
+    
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    
+    // Update unread count for this user in dropdown
+    if (!msg.read && msg.sender === "user") {
+      updateUnreadCount(msg.whatsapp);
+    }
   }
 
   function addInfoMessage(text) {
     const div = document.createElement("div");
-    div.className = "message info-message";
+    div.className = "message-container info-message";
     div.textContent = text;
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -480,7 +611,7 @@
   
   function addSystemMessage(text) {
     const div = document.createElement("div");
-    div.className = "message system-message";
+    div.className = "message-container system-message";
     div.textContent = text;
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -488,8 +619,8 @@
 
   function addNotification(msg) {
     const div = document.createElement("div");
-    div.className = "message info-message";
-    div.textContent = `📨 New message from ${msg.whatsapp}: "${msg.text.substring(0, 30)}${msg.text.length > 30 ? '...' : ''}"`;
+    div.className = "message-container info-message";
+    div.textContent = `📨 New message from ${msg.whatsapp} at ${formatTime(msg.timestamp)}: "${msg.text.substring(0, 30)}${msg.text.length > 30 ? '...' : ''}"`;
     div.style.cursor = 'pointer';
     div.onclick = () => {
       usersDropdown.value = msg.whatsapp;
@@ -517,8 +648,14 @@
     socket.emit("send_message", message);
     document.getElementById("messageInput").value = "";
     
-    // Immediately show the message in the chat
-    appendMessage(message);
+    // Immediately show the message in the chat with timestamp
+    const msgWithTimestamp = {
+      ...message,
+      timestamp: new Date().toISOString(),
+      read: true,
+      sender: 'agent'
+    };
+    appendMessage(msgWithTimestamp);
   }
   
   function clearChat() {

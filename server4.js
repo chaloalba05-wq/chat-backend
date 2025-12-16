@@ -148,6 +148,7 @@ async function connectToMongoDB() {
     await conversationsCollection.createIndex({ whatsapp: 1 });
     await conversationsCollection.createIndex({ "messages.timestamp": 1 });
     await conversationsCollection.createIndex({ whatsapp: 1, "messages.timestamp": 1 });
+    await conversationsCollection.createIndex({ "messages.read": 1 });
     
     console.log("✓ Connected to MongoDB");
     return true;
@@ -163,6 +164,15 @@ async function saveMessageToMongoDB(whatsapp, message) {
     if (!conversationsCollection) {
       console.error("MongoDB not connected, message not saved");
       return false;
+    }
+    
+    // Add read status for user messages (default: unread)
+    if (message.sender === "user") {
+      message.read = false;
+    } else {
+      message.read = true; // Agent/admin messages are auto-read
+      message.readBy = message.sender;
+      message.readAt = new Date();
     }
     
     // Find or create conversation document
@@ -199,7 +209,40 @@ async function saveMessageToMongoDB(whatsapp, message) {
   }
 }
 
-async function getMessagesFromMongoDB(whatsapp, agentId = null) {
+// ===== ADD THIS NEW FUNCTION =====
+async function markMessagesAsRead(whatsapp, readerType, readerId = null) {
+  try {
+    if (!conversationsCollection) return false;
+    
+    const query = { whatsapp };
+    const update = {
+      $set: {
+        "messages.$[elem].read": true,
+        "messages.$[elem].readBy": readerType,
+        "messages.$[elem].readAt": new Date(),
+        ...(readerId && { "messages.$[elem].readerId": readerId })
+      }
+    };
+    
+    const options = {
+      arrayFilters: [
+        { 
+          "elem.sender": "user",
+          "elem.read": { $ne: true }
+        }
+      ]
+    };
+    
+    await conversationsCollection.updateOne(query, update, options);
+    return true;
+  } catch (error) {
+    console.error("Error marking messages as read:", error);
+    return false;
+  }
+}
+
+// ===== UPDATE THIS FUNCTION =====
+async function getMessagesFromMongoDB(whatsapp, agentId = null, markAsRead = false) {
   try {
     if (!conversationsCollection) {
       console.error("MongoDB not connected");
@@ -221,6 +264,13 @@ async function getMessagesFromMongoDB(whatsapp, agentId = null) {
       messages = messages.filter(msg => 
         msg.sender !== "agent" || msg.agentId === agentId
       );
+    }
+    
+    // Mark messages as read if requested
+    if (markAsRead && agentId) {
+      await markMessagesAsRead(whatsapp, 'agent', agentId);
+    } else if (markAsRead) {
+      await markMessagesAsRead(whatsapp, 'admin');
     }
     
     // Sort by timestamp (already sorted by MongoDB index)
@@ -274,7 +324,8 @@ io.on("connection", (socket) => {
           whatsapp: conv.whatsapp,
           assignedAgent: userAssignments.get(conv.whatsapp),
           messageCount: conv.messages?.length || 0,
-          lastMessage: conv.messages?.[conv.messages.length - 1]?.timestamp
+          lastMessage: conv.messages?.[conv.messages.length - 1]?.timestamp,
+          unreadCount: conv.messages?.filter(m => m.sender === 'user' && !m.read)?.length || 0
         }));
         
         const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
@@ -295,7 +346,9 @@ io.on("connection", (socket) => {
             totalAgents: agents.size,
             onlineAgents: Array.from(agents.values()).filter(a => a.isOnline).length,
             totalUsers: conversationsFromDB.length,
-            activeChats: conversationsFromDB.filter(conv => conv.messages?.length > 0).length
+            activeChats: conversationsFromDB.filter(conv => conv.messages?.length > 0).length,
+            unreadMessages: conversationsFromDB.reduce((sum, conv) => 
+              sum + (conv.messages?.filter(m => m.sender === 'user' && !m.read)?.length || 0), 0)
           }
         });
         
@@ -504,7 +557,8 @@ io.on("connection", (socket) => {
         whatsapp,
         sender: "system",
         text: `User ${whatsapp} has been assigned to you`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        read: true
       });
     }
     
@@ -699,8 +753,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Get message history
-  socket.on("get_messages", async ({ whatsapp, agentId }) => {
+  // ===== UPDATE THIS SOCKET HANDLER =====
+  socket.on("get_messages", async ({ whatsapp, agentId, markAsRead = false }) => {
     const userData = users.get(socket.id);
     
     // Check if agent is authorized to view these messages
@@ -712,8 +766,17 @@ io.on("connection", (socket) => {
       }
     }
     
-    const messages = await getMessagesFromMongoDB(whatsapp, agentId);
+    const messages = await getMessagesFromMongoDB(whatsapp, agentId, markAsRead);
     socket.emit("message_history", messages);
+  });
+
+  // ===== ADD THIS NEW SOCKET HANDLER =====
+  socket.on("mark_messages_read", async ({ whatsapp, agentId }) => {
+    if (agentId) {
+      await markMessagesAsRead(whatsapp, 'agent', agentId);
+    } else {
+      await markMessagesAsRead(whatsapp, 'admin');
+    }
   });
 
   // Clear chat
@@ -817,7 +880,7 @@ async function startServer() {
       console.log(`   /superadmin - Super admin panel`);
       console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
       console.log(`🗄️  MongoDB collection: conversations`);
-      console.log(`\n✅ System is ready!`);
+      console.log(`\n✅ System is ready with timestamp & read status tracking!`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
