@@ -3,18 +3,52 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const path = require("path");
+const { MongoClient } = require("mongodb");
+const multer = require("multer");
+const fs = require("fs");
+const { v4: uuidv4 } = require("uuid");
 
 // ===== SUPER ADMIN CONFIGURATION =====
 const SUPER_ADMIN_PASSWORD = "superadmin123"; // Change this!
 // =====================================
 
-// ---- In-memory storage ----
+// ===== MongoDB Configuration =====
+const MONGO_URI = "mongodb+srv://chaloalba05_db_user:lam08Xnkf8v0zV3W@albastuzbackup.frhubzf.mongodb.net/?appName=Albastuzbackup";
+const DB_NAME = "chat_system";
+// =================================
+
+// ===== File Upload Configuration =====
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: function (req, file, cb) {
+    const uniqueName = uuidv4() + path.extname(file.originalname);
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+// =====================================
+
+// ---- In-memory storage (for active connections) ----
 const users = new Map();          // socketId -> { whatsapp, type }
-const conversations = new Map();  // whatsapp -> messages[]
 const agents = new Map();         // agentId -> { name, password, restrictions, isOnline, socketId, lastSeen }
 const userAssignments = new Map(); // whatsapp -> agentId
 const agentUsers = new Map();     // agentId -> Set(whatsapp)
 const activityLog = [];           // Array of activity events
+
+// ---- MongoDB Collections ----
+let db;
+let conversationsCollection;
 
 // ---- Setup server ----
 const app = express();
@@ -35,6 +69,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use("/uploads", express.static(UPLOADS_DIR));
 
 // ---- Serve HTML files ----
 app.use(express.static(path.join(__dirname, "public")));
@@ -53,6 +88,32 @@ app.get("/agentadmin", (req, res) => {
 });
 app.get("/superadmin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "superadmin.html"));
+});
+
+// File upload endpoint
+app.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    const fileInfo = {
+      filename: req.file.filename,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      path: `/uploads/${req.file.filename}`,
+      uploadDate: new Date()
+    };
+
+    res.json({
+      success: true,
+      file: fileInfo
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ success: false, message: "Upload failed" });
+  }
 });
 
 // Helper function to log activity
@@ -75,13 +136,113 @@ function generateAgentId() {
   return 'agent_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// MongoDB Helper Functions
+async function connectToMongoDB() {
+  try {
+    const client = new MongoClient(MONGO_URI);
+    await client.connect();
+    db = client.db(DB_NAME);
+    conversationsCollection = db.collection("conversations");
+    
+    // Create indexes for better performance
+    await conversationsCollection.createIndex({ whatsapp: 1 });
+    await conversationsCollection.createIndex({ "messages.timestamp": 1 });
+    await conversationsCollection.createIndex({ whatsapp: 1, "messages.timestamp": 1 });
+    
+    console.log("✓ Connected to MongoDB");
+    return true;
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+    return false;
+  }
+}
+
+async function saveMessageToMongoDB(whatsapp, message) {
+  try {
+    // Find or create conversation document
+    const conversation = await conversationsCollection.findOne({ whatsapp });
+    
+    if (conversation) {
+      // Add message to existing conversation
+      await conversationsCollection.updateOne(
+        { whatsapp },
+        {
+          $push: {
+            messages: {
+              $each: [message],
+              $sort: { timestamp: 1 }
+            }
+          },
+          $set: { lastUpdated: new Date() }
+        }
+      );
+    } else {
+      // Create new conversation document
+      await conversationsCollection.insertOne({
+        whatsapp,
+        messages: [message],
+        createdAt: new Date(),
+        lastUpdated: new Date()
+      });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error saving message to MongoDB:", error);
+    return false;
+  }
+}
+
+async function getMessagesFromMongoDB(whatsapp, agentId = null) {
+  try {
+    const conversation = await conversationsCollection.findOne(
+      { whatsapp },
+      { projection: { messages: 1 } }
+    );
+    
+    if (!conversation || !conversation.messages) {
+      return [];
+    }
+    
+    // Filter messages by agent if specified
+    let messages = conversation.messages;
+    if (agentId) {
+      messages = messages.filter(msg => 
+        msg.sender !== "agent" || msg.agentId === agentId
+      );
+    }
+    
+    // Sort by timestamp (already sorted by MongoDB index)
+    return messages;
+  } catch (error) {
+    console.error("Error fetching messages from MongoDB:", error);
+    return [];
+  }
+}
+
+async function clearChatInMongoDB(whatsapp) {
+  try {
+    await conversationsCollection.updateOne(
+      { whatsapp },
+      { $set: { messages: [], lastUpdated: new Date() } }
+    );
+    return true;
+  } catch (error) {
+    console.error("Error clearing chat in MongoDB:", error);
+    return false;
+  }
+}
+
+// Initialize MongoDB connection
+connectToMongoDB();
+
 // ---- Socket.IO events ----
 io.on("connection", (socket) => {
   console.log("Incoming connection from:", socket.id);
   users.set(socket.id, { type: 'unknown' });
 
   // ===== SUPER ADMIN CONNECTION =====
-  socket.on("super_admin_login", ({ password }) => {
+  socket.on("super_admin_login", async ({ password }) => {
     if (password === SUPER_ADMIN_PASSWORD) {
       users.set(socket.id, { type: 'super_admin' });
       socket.join("super_admin");
@@ -89,37 +250,46 @@ io.on("connection", (socket) => {
       logActivity('super_admin_login', { socketId: socket.id });
       console.log("✓ Super Admin connected:", socket.id);
       
-      // Send initial data to super admin
-      const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
-        id,
-        name: agent.name,
-        isOnline: agent.isOnline,
-        socketId: agent.socketId,
-        lastSeen: agent.lastSeen,
-        restrictions: agent.restrictions,
-        userCount: agentUsers.get(id) ? agentUsers.get(id).size : 0
-      }));
-      
-      const allUsers = Array.from(conversations.keys()).map(whatsapp => ({
-        whatsapp,
-        assignedAgent: userAssignments.get(whatsapp),
-        messageCount: conversations.get(whatsapp)?.length || 0,
-        lastMessage: conversations.get(whatsapp)?.[conversations.get(whatsapp).length - 1]?.timestamp
-      }));
-      
-      socket.emit("super_admin_data", {
-        agents: agentsList,
-        users: allUsers,
-        activity: activityLog.slice(-100), // Last 100 activities
-        stats: {
-          totalAgents: agents.size,
-          onlineAgents: Array.from(agents.values()).filter(a => a.isOnline).length,
-          totalUsers: conversations.size,
-          activeChats: Array.from(conversations.values()).filter(msgs => msgs.length > 0).length
-        }
-      });
-      
-      socket.emit("super_admin_login_response", { success: true });
+      try {
+        // Get all conversations from MongoDB for stats
+        const conversationsFromDB = await conversationsCollection.find({}).toArray();
+        const allUsers = conversationsFromDB.map(conv => ({
+          whatsapp: conv.whatsapp,
+          assignedAgent: userAssignments.get(conv.whatsapp),
+          messageCount: conv.messages?.length || 0,
+          lastMessage: conv.messages?.[conv.messages.length - 1]?.timestamp
+        }));
+        
+        const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
+          id,
+          name: agent.name,
+          isOnline: agent.isOnline,
+          socketId: agent.socketId,
+          lastSeen: agent.lastSeen,
+          restrictions: agent.restrictions,
+          userCount: agentUsers.get(id) ? agentUsers.get(id).size : 0
+        }));
+        
+        socket.emit("super_admin_data", {
+          agents: agentsList,
+          users: allUsers,
+          activity: activityLog.slice(-100),
+          stats: {
+            totalAgents: agents.size,
+            onlineAgents: Array.from(agents.values()).filter(a => a.isOnline).length,
+            totalUsers: conversationsFromDB.length,
+            activeChats: conversationsFromDB.filter(conv => conv.messages?.length > 0).length
+          }
+        });
+        
+        socket.emit("super_admin_login_response", { success: true });
+      } catch (error) {
+        console.error("Error loading super admin data:", error);
+        socket.emit("super_admin_login_response", { 
+          success: false, 
+          message: "Error loading data from database" 
+        });
+      }
     } else {
       socket.emit("super_admin_login_response", { 
         success: false, 
@@ -129,7 +299,7 @@ io.on("connection", (socket) => {
   });
 
   // Super admin requests
-  socket.on("get_super_admin_data", () => {
+  socket.on("get_super_admin_data", async () => {
     const userData = users.get(socket.id);
     if (userData?.type === 'super_admin') {
       const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
@@ -312,8 +482,7 @@ io.on("connection", (socket) => {
     if (agent.socketId) {
       io.to(agent.socketId).emit("user_assigned", { whatsapp, agentId });
       
-      // Send message history if available
-      const messages = conversations.get(whatsapp) || [];
+      // Send system message
       io.to(agent.socketId).emit("new_message", {
         whatsapp,
         sender: "system",
@@ -415,15 +584,22 @@ io.on("connection", (socket) => {
   });
 
   // ===== REGULAR ADMIN CONNECTION =====
-  socket.on("admin_connect", () => {
+  socket.on("admin_connect", async () => {
     console.log("✓ Admin connected:", socket.id);
     users.set(socket.id, { type: 'admin' });
     socket.join("admin");
 
-    // Send all past conversations to admin
-    conversations.forEach((messages) => {
-      messages.forEach(msg => socket.emit("new_message", msg));
-    });
+    try {
+      // Send all past conversations to admin
+      const conversationsFromDB = await conversationsCollection.find({}).toArray();
+      conversationsFromDB.forEach(conv => {
+        if (conv.messages) {
+          conv.messages.forEach(msg => socket.emit("new_message", msg));
+        }
+      });
+    } catch (error) {
+      console.error("Error loading messages for admin:", error);
+    }
   });
 
   // ===== USER CONNECTION =====
@@ -432,38 +608,46 @@ io.on("connection", (socket) => {
 
     users.set(socket.id, { whatsapp, type: 'user' });
 
-    if (!conversations.has(whatsapp)) {
-      conversations.set(whatsapp, []);
-      logActivity('new_conversation', { whatsapp });
-      console.log(`✓ New conversation started for: ${whatsapp}`);
-    }
-
     socket.join(whatsapp);
     socket.emit("registered", { success: true });
     console.log(`✓ Registered: ${whatsapp} with socket ${socket.id}`);
   });
 
   // ===== MESSAGE HANDLING =====
-  socket.on("send_message", ({ whatsapp, sender, text, agentId, agentName }) => {
-    if (!whatsapp || !text) return;
+  socket.on("send_message", async ({ whatsapp, sender, text, agentId, agentName, attachment }) => {
+    if (!whatsapp || (!text && !attachment)) return;
 
     const message = { 
       sender: sender || "user", 
       whatsapp, 
-      text, 
+      text: text || "",
       timestamp: new Date().toISOString(),
       agentId,
       agentName
     };
 
-    console.log(`\n📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
-
-    if (!conversations.has(whatsapp)) {
-      conversations.set(whatsapp, []);
+    // Add attachment if present
+    if (attachment) {
+      message.attachment = attachment;
+      console.log(`\n📎 Attachment sent from ${message.sender} to ${whatsapp}: ${attachment.filename}`);
+    } else {
+      console.log(`\n📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
     }
 
-    conversations.get(whatsapp).push(message);
-    logActivity('message_sent', { whatsapp, sender: message.sender, agentId, agentName });
+    // Save to MongoDB
+    const savedToDB = await saveMessageToMongoDB(whatsapp, message);
+    if (!savedToDB) {
+      console.error("Failed to save message to MongoDB");
+      // Still send to users but log the error
+    }
+
+    logActivity('message_sent', { 
+      whatsapp, 
+      sender: message.sender, 
+      agentId, 
+      agentName,
+      hasAttachment: !!attachment 
+    });
 
     // Send to user's room
     io.to(whatsapp).emit("new_message", message);
@@ -493,9 +677,8 @@ io.on("connection", (socket) => {
   });
 
   // Get message history
-  socket.on("get_messages", ({ whatsapp, agentId }) => {
+  socket.on("get_messages", async ({ whatsapp, agentId }) => {
     const userData = users.get(socket.id);
-    const msgs = conversations.get(whatsapp) || [];
     
     // Check if agent is authorized to view these messages
     if (agentId) {
@@ -506,11 +689,12 @@ io.on("connection", (socket) => {
       }
     }
     
-    socket.emit("message_history", msgs);
+    const messages = await getMessagesFromMongoDB(whatsapp, agentId);
+    socket.emit("message_history", messages);
   });
 
   // Clear chat
-  socket.on("clear_chat", ({ whatsapp, agentId }) => {
+  socket.on("clear_chat", async ({ whatsapp, agentId }) => {
     const userData = users.get(socket.id);
     const agent = agents.get(agentId);
     
@@ -523,8 +707,8 @@ io.on("connection", (socket) => {
       return;
     }
     
-    if (conversations.has(whatsapp)) {
-      conversations.set(whatsapp, []);
+    const cleared = await clearChatInMongoDB(whatsapp);
+    if (cleared) {
       logActivity('chat_cleared', { whatsapp, by: agentId || 'admin' });
       
       socket.emit("clear_chat_response", { success: true });
@@ -535,6 +719,11 @@ io.on("connection", (socket) => {
         const agentSocket = agent?.socketId;
         if (agentSocket) io.to(agentSocket).emit("chat_cleared", { whatsapp });
       }
+    } else {
+      socket.emit("clear_chat_response", { 
+        success: false, 
+        message: "Failed to clear chat from database" 
+      });
     }
   });
 
@@ -585,4 +774,6 @@ server.listen(PORT, () => {
   console.log(`   /admin - Original admin panel`);
   console.log(`   /agentadmin - Agent admin panel`);
   console.log(`   /superadmin - Super admin panel`);
+  console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
+  console.log(`🗄️  MongoDB collection: conversations`);
 });

@@ -11,6 +11,61 @@
     .message { margin: 5px 0; padding: 8px; border-radius: 5px; }
     .user-message { background-color: #e3f2fd; text-align: right; }
     .other-message { background-color: #f5f5f5; }
+    
+    /* File upload styles */
+    #fileInput { display: none; }
+    .file-upload-btn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 5px;
+    }
+    .file-upload-btn:hover {
+      background: #45a049;
+    }
+    .file-preview {
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 12px;
+      color: #666;
+    }
+    .attachment {
+      display: block;
+      margin-top: 5px;
+      padding: 5px;
+      background: #f0f0f0;
+      border-radius: 3px;
+      border-left: 3px solid #4CAF50;
+    }
+    .attachment a {
+      color: #2196F3;
+      text-decoration: none;
+    }
+    .attachment a:hover {
+      text-decoration: underline;
+    }
+    .file-icon {
+      margin-right: 5px;
+    }
+    .upload-progress {
+      width: 100%;
+      background-color: #f3f3f3;
+      border-radius: 3px;
+      margin: 5px 0;
+    }
+    .progress-bar {
+      height: 20px;
+      background-color: #4CAF50;
+      border-radius: 3px;
+      text-align: center;
+      color: white;
+      line-height: 20px;
+      width: 0%;
+      transition: width 0.3s;
+    }
   </style>
 </head>
 <body>
@@ -27,6 +82,16 @@
   <div>
     <input id="messageInput" placeholder="Type your message" style="width: 300px;">
     <button onclick="sendMessage()">Send</button>
+    <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()">
+      📎 Attach File
+    </button>
+    <span id="filePreview" class="file-preview"></span>
+    <input type="file" id="fileInput" onchange="handleFileSelect()">
+  </div>
+  <div id="uploadProgress" style="display: none;">
+    <div class="upload-progress">
+      <div class="progress-bar" id="progressBar">0%</div>
+    </div>
   </div>
 </div>
 
@@ -34,6 +99,7 @@
 <script>
   const socket = io("https://chat-backend-p2b9.onrender.com");
   let whatsapp = "";
+  let selectedFile = null;
 
   socket.on("connect", () => {
     console.log("Connected to server with ID:", socket.id);
@@ -48,7 +114,17 @@
     const messagesDiv = document.getElementById("messages");
     const messageDiv = document.createElement("div");
     messageDiv.className = "message " + (msg.sender === "user" ? "user-message" : "other-message");
-    messageDiv.textContent = `${msg.sender}: ${msg.text}`;
+    
+    // Check if message has attachment
+    if (msg.attachment) {
+      messageDiv.innerHTML = `
+        <div>${msg.sender}: ${msg.text || ''}</div>
+        ${formatAttachment(msg.attachment)}
+      `;
+    } else {
+      messageDiv.textContent = `${msg.sender}: ${msg.text}`;
+    }
+    
     messagesDiv.appendChild(messageDiv);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
@@ -60,11 +136,59 @@
     messages.forEach(msg => {
       const messageDiv = document.createElement("div");
       messageDiv.className = "message " + (msg.sender === "user" ? "user-message" : "other-message");
-      messageDiv.textContent = `${msg.sender}: ${msg.text}`;
+      
+      // Check if message has attachment
+      if (msg.attachment) {
+        messageDiv.innerHTML = `
+          <div>${msg.sender}: ${msg.text || ''}</div>
+          ${formatAttachment(msg.attachment)}
+        `;
+      } else {
+        messageDiv.textContent = `${msg.sender}: ${msg.text}`;
+      }
+      
       messagesDiv.appendChild(messageDiv);
     });
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
+
+  function formatAttachment(attachment) {
+    const fileType = attachment.mimetype.split('/')[0];
+    let icon = '📄';
+    let preview = '';
+    
+    if (fileType === 'image') {
+      icon = '🖼️';
+      preview = `<br><img src="${attachment.path}" style="max-width: 200px; max-height: 150px; border-radius: 5px; margin-top: 5px;">`;
+    } else if (fileType === 'video') {
+      icon = '🎬';
+    } else if (fileType === 'audio') {
+      icon = '🎵';
+    } else if (attachment.mimetype.includes('pdf')) {
+      icon = '📕';
+    }
+    
+    const fileSize = formatFileSize(attachment.size);
+    
+    return `
+      <div class="attachment">
+        <span class="file-icon">${icon}</span>
+        <a href="${attachment.path}" target="_blank" download="${attachment.originalname}">
+          ${attachment.originalname}
+        </a>
+        <span style="color: #666; font-size: 11px; margin-left: 5px;">(${fileSize})</span>
+        ${preview}
+      </div>
+    `;
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
 
   function register() {
     whatsapp = document.getElementById("whatsapp").value.trim();
@@ -84,18 +208,119 @@
     socket.emit("get_messages", { whatsapp: whatsapp });
   }
 
-  function sendMessage() {
-    const text = document.getElementById("messageInput").value.trim();
-    if (!text) return;
+  function handleFileSelect() {
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    
+    if (fileInput.files.length > 0) {
+      selectedFile = fileInput.files[0];
+      filePreview.innerHTML = `📎 ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
+    } else {
+      selectedFile = null;
+      filePreview.innerHTML = '';
+    }
+  }
 
-    console.log("Sending message:", text);
-    socket.emit("send_message", {
-      whatsapp: whatsapp,
-      sender: "user",
-      text: text
+  function uploadFile(callback) {
+    if (!selectedFile) {
+      if (callback) callback(null);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    const xhr = new XMLHttpRequest();
+    const progressDiv = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('progressBar');
+
+    // Show progress bar
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
+
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const percentComplete = (e.loaded / e.total) * 100;
+        progressBar.style.width = percentComplete + '%';
+        progressBar.textContent = Math.round(percentComplete) + '%';
+      }
     });
 
-    document.getElementById("messageInput").value = "";
+    xhr.addEventListener('load', function() {
+      progressDiv.style.display = 'none';
+      
+      if (xhr.status === 200) {
+        const response = JSON.parse(xhr.responseText);
+        if (response.success && callback) {
+          callback(response.file);
+        } else {
+          alert('Upload failed: ' + (response.message || 'Unknown error'));
+          if (callback) callback(null);
+        }
+      } else {
+        alert('Upload failed with status: ' + xhr.status);
+        if (callback) callback(null);
+      }
+      
+      // Reset file input
+      document.getElementById('fileInput').value = '';
+      document.getElementById('filePreview').innerHTML = '';
+      selectedFile = null;
+    });
+
+    xhr.addEventListener('error', function() {
+      progressDiv.style.display = 'none';
+      alert('Upload failed. Please check your connection.');
+      if (callback) callback(null);
+    });
+
+    xhr.open('POST', '/upload');
+    xhr.send(formData);
+  }
+
+  function sendMessage() {
+    const text = document.getElementById("messageInput").value.trim();
+    
+    // If no text and no file, don't send
+    if (!text && !selectedFile) return;
+
+    // If there's a file, upload it first
+    if (selectedFile) {
+      uploadFile(function(fileInfo) {
+        if (fileInfo) {
+          console.log("Sending message with attachment:", fileInfo);
+          socket.emit("send_message", {
+            whatsapp: whatsapp,
+            sender: "user",
+            text: text,
+            attachment: fileInfo
+          });
+        } else {
+          // File upload failed, send text only if exists
+          if (text) {
+            socket.emit("send_message", {
+              whatsapp: whatsapp,
+              sender: "user",
+              text: text
+            });
+          }
+        }
+        
+        // Clear input
+        document.getElementById("messageInput").value = "";
+      });
+    } else {
+      // No file, just send text
+      console.log("Sending message:", text);
+      socket.emit("send_message", {
+        whatsapp: whatsapp,
+        sender: "user",
+        text: text
+      });
+
+      document.getElementById("messageInput").value = "";
+    }
   }
 
   // Allow sending message with Enter key
