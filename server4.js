@@ -9,7 +9,7 @@ const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 
 // ===== SUPER ADMIN CONFIGURATION =====
-const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN"; // Change this!
+const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN"; // Change this if needed
 // =====================================
 
 // ===== MongoDB Configuration =====
@@ -153,12 +153,18 @@ async function connectToMongoDB() {
     return true;
   } catch (error) {
     console.error("MongoDB connection error:", error);
+    // Don't crash the server, just log the error
     return false;
   }
 }
 
 async function saveMessageToMongoDB(whatsapp, message) {
   try {
+    if (!conversationsCollection) {
+      console.error("MongoDB not connected, message not saved");
+      return false;
+    }
+    
     // Find or create conversation document
     const conversation = await conversationsCollection.findOne({ whatsapp });
     
@@ -195,6 +201,11 @@ async function saveMessageToMongoDB(whatsapp, message) {
 
 async function getMessagesFromMongoDB(whatsapp, agentId = null) {
   try {
+    if (!conversationsCollection) {
+      console.error("MongoDB not connected");
+      return [];
+    }
+    
     const conversation = await conversationsCollection.findOne(
       { whatsapp },
       { projection: { messages: 1 } }
@@ -222,6 +233,11 @@ async function getMessagesFromMongoDB(whatsapp, agentId = null) {
 
 async function clearChatInMongoDB(whatsapp) {
   try {
+    if (!conversationsCollection) {
+      console.error("MongoDB not connected");
+      return false;
+    }
+    
     await conversationsCollection.updateOne(
       { whatsapp },
       { $set: { messages: [], lastUpdated: new Date() } }
@@ -232,9 +248,6 @@ async function clearChatInMongoDB(whatsapp) {
     return false;
   }
 }
-
-// Initialize MongoDB connection
-connectToMongoDB();
 
 // ---- Socket.IO events ----
 io.on("connection", (socket) => {
@@ -252,7 +265,11 @@ io.on("connection", (socket) => {
       
       try {
         // Get all conversations from MongoDB for stats
-        const conversationsFromDB = await conversationsCollection.find({}).toArray();
+        let conversationsFromDB = [];
+        if (conversationsCollection) {
+          conversationsFromDB = await conversationsCollection.find({}).toArray();
+        }
+        
         const allUsers = conversationsFromDB.map(conv => ({
           whatsapp: conv.whatsapp,
           assignedAgent: userAssignments.get(conv.whatsapp),
@@ -590,13 +607,15 @@ io.on("connection", (socket) => {
     socket.join("admin");
 
     try {
-      // Send all past conversations to admin
-      const conversationsFromDB = await conversationsCollection.find({}).toArray();
-      conversationsFromDB.forEach(conv => {
-        if (conv.messages) {
-          conv.messages.forEach(msg => socket.emit("new_message", msg));
-        }
-      });
+      if (conversationsCollection) {
+        // Send all past conversations to admin
+        const conversationsFromDB = await conversationsCollection.find({}).toArray();
+        conversationsFromDB.forEach(conv => {
+          if (conv.messages) {
+            conv.messages.forEach(msg => socket.emit("new_message", msg));
+          }
+        });
+      }
     } catch (error) {
       console.error("Error loading messages for admin:", error);
     }
@@ -634,11 +653,15 @@ io.on("connection", (socket) => {
       console.log(`\n📨 Message from ${message.sender} to ${whatsapp}: "${text}"`);
     }
 
-    // Save to MongoDB
-    const savedToDB = await saveMessageToMongoDB(whatsapp, message);
-    if (!savedToDB) {
-      console.error("Failed to save message to MongoDB");
-      // Still send to users but log the error
+    // Save to MongoDB if connected
+    if (conversationsCollection) {
+      const savedToDB = await saveMessageToMongoDB(whatsapp, message);
+      if (!savedToDB) {
+        console.error("Failed to save message to MongoDB");
+        // Still send to users but log the error
+      }
+    } else {
+      console.log("⚠️ MongoDB not connected, message not saved to database");
     }
 
     logActivity('message_sent', { 
@@ -707,22 +730,29 @@ io.on("connection", (socket) => {
       return;
     }
     
-    const cleared = await clearChatInMongoDB(whatsapp);
-    if (cleared) {
-      logActivity('chat_cleared', { whatsapp, by: agentId || 'admin' });
-      
-      socket.emit("clear_chat_response", { success: true });
-      
-      // Notify all parties
-      io.to(whatsapp).emit("chat_cleared", { whatsapp });
-      if (agentId) {
-        const agentSocket = agent?.socketId;
-        if (agentSocket) io.to(agentSocket).emit("chat_cleared", { whatsapp });
+    if (conversationsCollection) {
+      const cleared = await clearChatInMongoDB(whatsapp);
+      if (cleared) {
+        logActivity('chat_cleared', { whatsapp, by: agentId || 'admin' });
+        
+        socket.emit("clear_chat_response", { success: true });
+        
+        // Notify all parties
+        io.to(whatsapp).emit("chat_cleared", { whatsapp });
+        if (agentId) {
+          const agentSocket = agent?.socketId;
+          if (agentSocket) io.to(agentSocket).emit("chat_cleared", { whatsapp });
+        }
+      } else {
+        socket.emit("clear_chat_response", { 
+          success: false, 
+          message: "Failed to clear chat from database" 
+        });
       }
     } else {
       socket.emit("clear_chat_response", { 
         success: false, 
-        message: "Failed to clear chat from database" 
+        message: "Database not connected" 
       });
     }
   });
@@ -764,16 +794,36 @@ io.on("connection", (socket) => {
   }, 60000); // Every minute
 });
 
-// ---- Start server ----
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
-  console.log(`📁 Available routes:`);
-  console.log(`   /chat - User chat interface`);
-  console.log(`   /admin - Original admin panel`);
-  console.log(`   /agentadmin - Agent admin panel`);
-  console.log(`   /superadmin - Super admin panel`);
-  console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
-  console.log(`🗄️  MongoDB collection: conversations`);
-});
+// Initialize MongoDB connection and start server
+async function startServer() {
+  const PORT = process.env.PORT || 3000;
+  
+  try {
+    const mongoConnected = await connectToMongoDB();
+    if (!mongoConnected) {
+      console.error("❌ Failed to connect to MongoDB. Server will still run but messages won't be saved.");
+    } else {
+      console.log("✓ MongoDB connected successfully");
+    }
+
+    // Start the server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
+      console.log(`📁 Available routes:`);
+      console.log(`   /chat - User chat interface`);
+      console.log(`   /admin - Original admin panel`);
+      console.log(`   /agentadmin - Agent admin panel`);
+      console.log(`   /superadmin - Super admin panel`);
+      console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
+      console.log(`🗄️  MongoDB collection: conversations`);
+      console.log(`\n✅ System is ready!`);
+    });
+  } catch (error) {
+    console.error("❌ Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();

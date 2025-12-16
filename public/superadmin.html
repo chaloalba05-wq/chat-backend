@@ -544,10 +544,6 @@
   
   // DOM Elements
   const loginOverlay = document.getElementById('loginOverlay');
- <!-- Continue from where we left off in superadmin.html -->
-
-  // DOM Elements
-  const loginOverlay = document.getElementById('loginOverlay');
   const dashboard = document.getElementById('dashboard');
   const superPassword = document.getElementById('superPassword');
   const loginError = document.getElementById('loginError');
@@ -901,7 +897,7 @@
     
     // Refresh data for the tab
     if (tabName === 'users') {
-      // Could implement user list refresh here
+      socket.emit('get_super_admin_data');
     }
   }
   
@@ -973,4 +969,107 @@
   
   function updateAgent() {
     const agentId = document.getElementById('editAgentId').value;
-    const name =
+    const name = document.getElementById('editAgentName').value.trim();
+    const password = document.getElementById('editAgentPassword').value;
+    
+    const restrictions = {};
+    if (document.getElementById('editRestrictMaxUsers').checked) {
+      restrictions.maxUsers = parseInt(document.getElementById('editMaxUsers').value) || 10;
+    }
+    if (document.getElementById('editRestrictDelete').checked) {
+      restrictions.canDelete = false;
+    }
+    if (document.getElementById('editRestrictClear').checked) {
+      restrictions.canClear = false;
+    }
+    if (document.getElementById('editRestrictAssign').checked) {
+      restrictions.canAssign = false;
+    }
+    
+    socket.emit('update_agent', { 
+      agentId, 
+      name: name || undefined, 
+      password: password || undefined, 
+      restrictions 
+    });
+    
+    closeModal();
+  }
+  
+  function deleteAgent() {
+    const agentId = document.getElementById('editAgentId').value;
+    if (confirm('Are you sure you want to delete this agent?')) {
+      socket.emit('delete_agent', { agentId });
+      closeModal();
+    }
+  }
+  
+  function deleteAgentPrompt(agentId, agentName) {
+    if (confirm(`Are you sure you want to delete agent "${agentName}"?`)) {
+      socket.emit('delete_agent', { agentId });
+    }
+  }
+  
+  function assignUserPrompt(whatsapp) {
+    document.getElementById('assignUserModal').style.display = 'flex';
+    document.getElementById('assignUserWhatsapp').value = whatsapp;
+    
+    // Populate agent select
+    const select = document.getElementById('assignAgentSelect');
+    select.innerHTML = '<option value="">-- Select Agent --</option>';
+    
+    agents.forEach(agent => {
+      const option = document.createElement('option');
+      option.value = agent.id;
+      option.textContent = `${agent.name} (${agent.isOnline ? 'Online' : 'Offline'})`;
+      select.appendChild(option);
+    });
+  }
+  
+  function updateAgentSelect() {
+    const select = document.getElementById('assignAgentSelect');
+    select.innerHTML = '<option value="">-- Select Agent --</option>';
+    
+    agents.forEach(agent => {
+      const option = document.createElement('option');
+      option.value = agent.id;
+      option.textContent = `${agent.name} (${agent.isOnline ? 'Online' : 'Offline'})`;
+      select.appendChild(option);
+    });
+  }
+  
+  function assignUserToAgent() {
+    const whatsapp = document.getElementById('assignUserWhatsapp').value;
+    const agentId = document.getElementById('assignAgentSelect').value;
+    
+    if (!agentId) {
+      alert('Please select an agent');
+      return;
+    }
+    
+    socket.emit('assign_user', { whatsapp, agentId });
+    closeModal();
+  }
+  
+  function unassignUser() {
+    const whatsapp = document.getElementById('assignUserWhatsapp').value;
+    socket.emit('assign_user', { whatsapp, agentId: null });
+    closeModal();
+  }
+  
+  function closeModal() {
+    document.getElementById('editAgentModal').style.display = 'none';
+    document.getElementById('assignUserModal').style.display = 'none';
+  }
+  
+  function logoutSuperAdmin() {
+    sessionStorage.removeItem('superAdminAuthenticated');
+    location.reload();
+  }
+  
+  // Check for saved authentication on page load
+  checkSavedAuth();
+  
+  // Focus password input on load
+  superPassword.focus();
+</script>
