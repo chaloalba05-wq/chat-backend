@@ -9,7 +9,7 @@ const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 
 // ===== SUPER ADMIN CONFIGURATION =====
-const SUPER_ADMIN_PASSWORD = "superadmin123"; // Change this!
+const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN"; // Change this!
 // =====================================
 
 // ===== MongoDB Configuration =====
