@@ -34,42 +34,41 @@
     input, button { font-size: 16px; }
     button { cursor: pointer; }
 
-    /* Debug console */
-    #debugConsole {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      width: 300px;
-      height: 200px;
-      background: rgba(0,0,0,0.8);
-      color: #00ff00;
-      font-family: monospace;
-      font-size: 12px;
+    .agent-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       padding: 10px;
-      overflow-y: auto;
+      border: 1px solid #ddd;
+      margin: 5px 0;
       border-radius: 5px;
-      z-index: 9999;
-      display: none;
+      background: white;
     }
 
-    #toggleDebug {
-      position: fixed;
-      bottom: 220px;
-      right: 10px;
-      padding: 5px 10px;
-      background: #333;
-      color: white;
+    .muted { opacity: 0.6; background: #f5f5f5; }
+    
+    .toggle-btn {
+      padding: 5px 15px;
       border: none;
-      border-radius: 3px;
+      border-radius: 4px;
       cursor: pointer;
-      z-index: 10000;
     }
+    
+    .mute-btn { background: #ff4444; color: white; }
+    .unmute-btn { background: #4CAF50; color: white; }
+    
+    .chat-message {
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 5px;
+      background: #e3f2fd;
+    }
+    
+    .user-message { background: #f1f8e9; }
+    .super-message { background: #e8eaf6; }
   </style>
 </head>
 <body>
-
-<div id="debugConsole"></div>
-<button id="toggleDebug" onclick="toggleDebug()">🐛 Debug</button>
 
 <!-- Login Overlay -->
 <div id="loginOverlay">
@@ -86,214 +85,234 @@
     <div style="margin-top: 20px; font-size: 12px; color: #888;">
       <em>Server URL: <span id="serverUrl">https://chat-backend-p2b9.onrender.com</span></em>
     </div>
-    <div style="margin-top: 10px; font-size: 12px; color: #666;">
-      <button onclick="testConnection()" style="padding: 5px 10px; background: #666; color: white; border: none; border-radius: 3px;">
-        Test Connection
-      </button>
-    </div>
   </div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-  let isSuperAdminAuthenticated = false;
   let socket = null;
   let agents = [];
-  let activeChats = [];
-  let users = [];
-  let activityLogs = [];
+  let activeMessages = [];
 
+  // DOM Elements
   const loginOverlay = document.getElementById('loginOverlay');
-  const dashboard = document.createElement('div');
   const superPassword = document.getElementById('superPassword');
   const loginError = document.getElementById('loginError');
-  const debugConsole = document.getElementById('debugConsole');
 
-  function debugLog(message, type='info') {
-    const timestamp = new Date().toLocaleTimeString();
-    const color = type==='error' ? '#ff4444' : type==='success' ? '#44ff44' : type==='warning' ? '#ffaa00' : '#ffffff';
-    const logEntry = document.createElement('div');
-    logEntry.style.color = color;
-    logEntry.textContent = `[${timestamp}] ${message}`;
-    debugConsole.appendChild(logEntry);
-    debugConsole.scrollTop = debugConsole.scrollHeight;
-    console.log(`[SuperAdmin] ${message}`);
-  }
-
-  function toggleDebug() {
-    debugConsole.style.display = debugConsole.style.display==='none'?'block':'none';
-  }
-
-  function testConnection() {
-    debugLog('Testing connection to server...', 'info');
-    loginError.textContent='Testing connection...';
-    const testSocket = io("https://chat-backend-p2b9.onrender.com",{transports:['websocket','polling'],timeout:5000});
-    testSocket.on('connect',()=>{debugLog('✅ Connection test successful!','success');loginError.textContent='✅ Connection successful!';loginError.style.color='#4CAF50';testSocket.disconnect();});
-    testSocket.on('connect_error',(error)=>{debugLog(`❌ Connection failed: ${error.message}`,'error');loginError.textContent=`Connection failed: ${error.message}`;loginError.style.color='#f44336';});
-    setTimeout(()=>{if(!testSocket.connected){debugLog('⚠️ Connection test timeout','warning');loginError.textContent='Connection timeout. Server may be offline.';loginError.style.color='#ff9800';}},5000);
-  }
-
+  // Login function
   function loginSuperAdmin() {
     const password = superPassword.value.trim();
-    if(!password){loginError.textContent='Please enter password';loginError.style.color='#f44336';return;}
-    debugLog('Attempting login...','info');loginError.textContent='Connecting to server...';loginError.style.color='#2196F3';
-
-    if(!socket){
-      debugLog('Creating new socket connection...','info');
-      socket = io("https://chat-backend-p2b9.onrender.com",{transports:['websocket','polling'],reconnection:true,reconnectionAttempts:3,reconnectionDelay:1000,timeout:10000});
-      socket.on('connect',()=>{debugLog('✅ Socket connected with ID: '+socket.id,'success');loginError.textContent='Connected to server. Logging in...';});
-      socket.on('connect_error',(error)=>{debugLog(`❌ Connection error: ${error.message}`,'error');loginError.textContent=`Connection error: ${error.message}`;loginError.style.color='#f44336';});
-      socket.on('disconnect',(reason)=>{debugLog(`🔌 Disconnected: ${reason}`,'warning');if(isSuperAdminAuthenticated){debugLog('Attempting to reconnect...','info');}});
+    if (!password) {
+      loginError.textContent = 'Please enter password';
+      return;
     }
 
-    debugLog('Sending login request...','info');
-    socket.emit('super_admin_login',{password});
+    // Connect to server
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling']
+    });
 
-    const loginTimeout = setTimeout(()=>{if(!isSuperAdminAuthenticated){debugLog('⚠️ Login timeout - no response from server','warning');loginError.textContent='Login timeout. Server may be busy.';loginError.style.color='#ff9800';}},10000);
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      socket.emit('super_admin_login', { password });
+    });
 
-    socket.once('super_admin_login_response',(response)=>{
-      clearTimeout(loginTimeout);
-      if(response.success){
-        debugLog('✅ Login successful!','success');
-        sessionStorage.setItem('superAdminAuthenticated','true');
-        loginOverlay.style.display='none';
-        dashboard.style.display='block';
-        isSuperAdminAuthenticated=true;
-        initializeSuperAdmin();
-        socket.emit('get_agent_files');
-      }else{
-        debugLog(`❌ Login failed: ${response.message||'Unknown error'}`,'error');
-        loginError.textContent=response.message||'Login failed. Check password.';
-        loginError.style.color='#f44336';
-        superPassword.value='';superPassword.focus();
+    socket.on('super_admin_login_response', (response) => {
+      if (response.success) {
+        loginOverlay.style.display = 'none';
+        initializeDashboard();
+        loadAgents();
+      } else {
+        loginError.textContent = response.message || 'Login failed';
       }
+    });
+
+    socket.on('connect_error', (error) => {
+      loginError.textContent = `Connection error: ${error.message}`;
     });
   }
 
-  function initializeSuperAdmin() {
-    debugLog('Initializing Super Admin dashboard...','info');
-    // Socket listeners and broadcasting to agent admins will be added in next chunk
-  }
-</script>
-<script>
-  function initializeSuperAdmin() {
-    // Create dashboard container
+  // Initialize dashboard
+  function initializeDashboard() {
+    const dashboard = document.createElement('div');
     dashboard.className = 'container';
     dashboard.innerHTML = `
       <h1>Super Admin Dashboard</h1>
-      <hr>
-      <div style="display:flex; gap:20px; flex-wrap:wrap;">
-        <!-- Agents Section -->
-        <div style="flex:1; min-width:300px;">
-          <h2>Agents</h2>
-          <ul id="agentsList" style="list-style:none; padding:0; border:1px solid #ccc; border-radius:5px; max-height:400px; overflow-y:auto;"></ul>
-          <input type="text" id="newAgentName" placeholder="Agent Name" style="width:70%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;">
-          <input type="text" id="newAgentId" placeholder="Agent ID" style="width:70%; padding:10px; margin-top:10px; border-radius:5px; border:1px solid #ccc;">
-          <button onclick="addAgent()" style="padding:10px 15px; margin-top:10px; background:#1a237e; color:white; border:none; border-radius:5px;">Add Agent</button>
+      <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 20px;">
+        
+        <!-- Agents Management -->
+        <div>
+          <h2>Agents Management</h2>
+          <div id="agentsList" style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;"></div>
+          
+          <div style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+            <h3>Add/Edit Agent</h3>
+            <input type="text" id="agentName" placeholder="Agent Name" 
+                   style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="text" id="agentId" placeholder="Agent ID" 
+                   style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="password" id="agentPassword" placeholder="Agent Password" 
+                   style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <button onclick="saveAgent()" 
+                    style="width: 100%; padding: 10px; background: #1a237e; color: white; border: none; border-radius: 4px; margin-top: 10px;">
+              Save Agent
+            </button>
+          </div>
         </div>
 
-        <!-- Active Chats Section -->
-        <div style="flex:2; min-width:400px;">
-          <h2>Active Chats</h2>
-          <div id="chatContainer" style="border:1px solid #ccc; border-radius:5px; max-height:500px; overflow-y:auto; padding:10px;"></div>
-          <input type="text" id="superMessageInput" placeholder="Type message..." style="width:80%; padding:10px; border-radius:5px; border:1px solid #ccc; margin-top:10px;">
-          <button onclick="sendSuperMessage()" style="padding:10px 15px; margin-top:10px; background:#388e3c; color:white; border:none; border-radius:5px;">Send</button>
+        <!-- Messages Panel -->
+        <div>
+          <h2>Messages</h2>
+          <div id="messagesContainer" style="height: 500px; overflow-y: auto; background: white; border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px;"></div>
+          
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="messageInput" placeholder="Type a message..." 
+                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <button onclick="sendMessage()" 
+                    style="padding: 10px 20px; background: #388e3c; color: white; border: none; border-radius: 4px;">
+              Send
+            </button>
+          </div>
         </div>
       </div>
-      <hr>
-      <h3>Activity Logs</h3>
-      <div id="activityLog" style="border:1px solid #ccc; border-radius:5px; max-height:200px; overflow-y:auto; padding:10px;"></div>
     `;
+
     document.body.appendChild(dashboard);
 
-    // Request current agents list
-    socket.emit('request_agents');
-    socket.on('agents_list', (list) => {
-      agents = list;
+    // Setup socket listeners
+    setupSocketListeners();
+  }
+
+  // Load agents from server
+  function loadAgents() {
+    socket.emit('get_agents');
+  }
+
+  // Setup socket listeners
+  function setupSocketListeners() {
+    // Listen for agents list
+    socket.on('agents_list', (agentList) => {
+      agents = agentList;
       renderAgents();
     });
 
-    // Listen for messages from users
-    socket.on('user_message', handleUserMessage);
-    socket.on('user_image', handleUserImage);
+    // Listen for user messages
+    socket.on('user_message', (data) => {
+      addMessage(data.userId || 'User', data.message, 'user');
+      
+      // Forward to all non-muted agents
+      socket.emit('forward_to_agents', {
+        type: 'user_message',
+        data: data,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Listen for agent status updates
+    socket.on('agent_updated', () => {
+      loadAgents(); // Reload agents list
+    });
   }
 
+  // Render agents list
   function renderAgents() {
     const agentsList = document.getElementById('agentsList');
     agentsList.innerHTML = '';
+    
     agents.forEach(agent => {
-      const li = document.createElement('li');
-      li.style.padding = '8px';
-      li.style.borderBottom = '1px solid #ddd';
-      li.textContent = `${agent.name} (${agent.id})`;
-      agentsList.appendChild(li);
+      const agentDiv = document.createElement('div');
+      agentDiv.className = `agent-item ${agent.muted ? 'muted' : ''}`;
+      agentDiv.innerHTML = `
+        <div>
+          <strong>${agent.name}</strong><br>
+          <small>ID: ${agent.id}</small>
+        </div>
+        <button class="toggle-btn ${agent.muted ? 'unmute-btn' : 'mute-btn'}" 
+                onclick="toggleAgentMute('${agent.id}')">
+          ${agent.muted ? 'Unmute' : 'Mute'}
+        </button>
+      `;
+      agentsList.appendChild(agentDiv);
     });
   }
 
-  function addAgent() {
-    const name = document.getElementById('newAgentName').value.trim();
-    const id = document.getElementById('newAgentId').value.trim();
-    if(!name || !id){ debugLog('Cannot add agent without name or ID','warning'); return; }
-    socket.emit('add_agent', {name, id});
-    debugLog(`Agent added: ${name} (${id})`, 'success');
-    agents.push({name, id});
-    renderAgents();
-    document.getElementById('newAgentName').value = '';
-    document.getElementById('newAgentId').value = '';
-  }
-
-  function handleUserMessage(msg) {
-    // msg: {from: userId, content: message}
-    activeChats.push(msg);
-    renderChats();
-    debugLog(`New message from ${msg.from}: ${msg.content}`, 'info');
-    broadcastToAgents(msg);
-  }
-
-  function handleUserImage(msg) {
-    // msg: {from: userId, imageURL: string}
-    activeChats.push(msg);
-    renderChats();
-    debugLog(`New image from ${msg.from}`, 'info');
-    broadcastToAgents(msg);
-  }
-
-  function renderChats() {
-    const chatContainer = document.getElementById('chatContainer');
-    chatContainer.innerHTML = '';
-    activeChats.forEach(chat => {
-      const div = document.createElement('div');
-      div.style.padding = '5px';
-      div.style.borderBottom = '1px solid #eee';
-      if(chat.content){
-        div.textContent = `${chat.from}: ${chat.content}`;
-      } else if(chat.imageURL){
-        const img = document.createElement('img');
-        img.src = chat.imageURL;
-        img.style.maxWidth = '200px';
-        img.style.display = 'block';
-        div.appendChild(document.createTextNode(`${chat.from}:`));
-        div.appendChild(img);
-      }
-      chatContainer.appendChild(div);
+  // Save/Update agent
+  function saveAgent() {
+    const name = document.getElementById('agentName').value.trim();
+    const id = document.getElementById('agentId').value.trim();
+    const password = document.getElementById('agentPassword').value.trim();
+    
+    if (!name || !id || !password) {
+      alert('Please fill all fields');
+      return;
+    }
+    
+    socket.emit('save_agent', {
+      name: name,
+      id: id,
+      password: password
     });
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    
+    // Clear form
+    document.getElementById('agentName').value = '';
+    document.getElementById('agentId').value = '';
+    document.getElementById('agentPassword').value = '';
   }
 
-  function sendSuperMessage() {
-    const input = document.getElementById('superMessageInput');
+  // Toggle agent mute status
+  function toggleAgentMute(agentId) {
+    socket.emit('toggle_agent_mute', { agentId: agentId });
+  }
+
+  // Add message to display
+  function addMessage(sender, content, type = 'user') {
+    const messagesContainer = document.getElementById('messagesContainer');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${type}-message`;
+    messageDiv.innerHTML = `
+      <strong>${sender}:</strong> ${content}<br>
+      <small>${new Date().toLocaleTimeString()}</small>
+    `;
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  // Send message from Super Admin
+  function sendMessage() {
+    const input = document.getElementById('messageInput');
     const message = input.value.trim();
-    if(!message) return;
-    // Broadcast to all agents
-    const msgObj = {from: 'SuperAdmin', content: message};
-    socket.emit('super_message', msgObj);
-    debugLog(`SuperAdmin sent: ${message}`, 'success');
+    
+    if (!message) return;
+    
+    // Add to display
+    addMessage('Super Admin', message, 'super');
+    
+    // Broadcast to all non-muted agents
+    socket.emit('forward_to_agents', {
+      type: 'super_message',
+      data: {
+        from: 'Super Admin',
+        message: message
+      },
+      timestamp: new Date().toISOString()
+    });
+    
     input.value = '';
+    input.focus();
   }
 
-  function broadcastToAgents(msg) {
-    // Forward message to all connected agent admins
-    socket.emit('broadcast_to_agents', msg);
-  }
+  // Auto-login if already authenticated
+  window.addEventListener('load', () => {
+    const savedPassword = localStorage.getItem('superAdminPassword');
+    if (savedPassword) {
+      superPassword.value = savedPassword;
+    }
+  });
 
+  // Enter key for login
+  superPassword.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') loginSuperAdmin();
+  });
 </script>
+</body>
+</html>
