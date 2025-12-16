@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Super Admin Panel</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    
+    /* Login overlay */
+    #loginOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    
+    #loginContainer {
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    
+    #loginContainer h1 {
+      margin-top: 0;
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    #superPassword {
+      width: 100%;
+      padding: 15px;
+      margin: 20px 0;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    
+    #loginError {
+      color: #d32f2f;
+      margin: 10px 0;
+      min-height: 20px;
+    }
+    
+    /* Dashboard */
+    #dashboard { display: none; }
+    
+    .header {
+      background: #333;
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    
+    .header h1 { margin: 0; }
+    .header .subtitle { color: #aaa; margin-top: 5px; }
+    
+    .logout-btn {
+      float: right;
+      background: #f44336;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    
+    /* Panels */
+    .panels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .panel {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .panel h2 {
+      margin-top: 0;
+      border-bottom: 2px solid #4CAF50;
+      padding-bottom: 10px;
+      color: #333;
+    }
+    
+    /* Agent Management */
+    .agent-list {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 15px;
+    }
+    
+    .agent-item {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin-bottom: 10px;
+      background: #fafafa;
+    }
+    
+    .agent-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .agent-name {
+      font-weight: bold;
+      font-size: 16px;
+    }
+    
+    .agent-status {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    
+    .status-online { background-color: #4CAF50; }
+    .status-offline { background-color: #f44336; }
+    .status-away { background-color: #ff9800; }
+    
+    .agent-controls button {
+      margin-left: 5px;
+      padding: 3px 8px;
+      font-size: 12px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    
+    .btn-edit { background: #2196F3; color: white; }
+    .btn-delete { background: #f44336; color: white; }
+    .btn-assign { background: #4CAF50; color: white; }
+    
+    .restrictions {
+      font-size: 12px;
+      color: #666;
+      background: #fff3cd;
+      padding: 8px;
+      border-radius: 3px;
+      margin-top: 10px;
+    }
+    
+    /* User Management */
+    .user-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .user-item {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: white;
+    }
+    
+    .user-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .user-whatsapp {
+      font-family: monospace;
+      font-weight: bold;
+    }
+    
+    .assigned-agent {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    /* Form styles */
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #555;
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+    }
+    
+    .checkbox-item input {
+      margin-right: 5px;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    
+    .btn-primary {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #2196F3;
+      color: white;
+    }
+    
+    .btn-danger {
+      background: #f44336;
+      color: white;
+    }
+    
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-card {
+      background: white;
+      padding: 15px;
+      border-radius: 5px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .stat-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+    
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1001;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .close-modal {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+    }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #ddd;
+      margin-bottom: 20px;
+    }
+    
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-size: 14px;
+      font-weight: bold;
+      color: #666;
+    }
+    
+    .tab.active {
+      border-bottom: 2px solid #4CAF50;
+      color: #4CAF50;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login Overlay -->
+<div id="loginOverlay">
+  <div id="loginContainer">
+    <h1>Super Admin Access</h1>
+    <p>Enter super admin password:</p>
+    <input type="password" id="superPassword" placeholder="Super Admin Password" autocomplete="off">
+    <div id="loginError"></div>
+    <button onclick="loginSuperAdmin()" style="width: 100%; padding: 15px; background: #333; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 10px;">
+      Access Super Admin Panel
+    </button>
+    <div style="margin-top: 20px; font-size: 12px; color: #666;">
+      <em>Default password: "superadmin123" - Change in server code</em>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard" class="container">
+  <div class="header">
+    <button class="logout-btn" onclick="logoutSuperAdmin()">Logout</button>
+    <h1>Super Admin Dashboard</h1>
+    <div class="subtitle">Manage Agents & Monitor Activity</div>
+  </div>
+  
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-number" id="totalAgents">0</div>
+      <div class="stat-label">Total Agents</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="onlineAgents">0</div>
+      <div class="stat-label">Online Agents</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="totalUsers">0</div>
+      <div class="stat-label">Total Users</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="activeChats">0</div>
+      <div class="stat-label">Active Chats</div>
+    </div>
+  </div>
+  
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('agents')">Agent Management</button>
+    <button class="tab" onclick="showTab('users')">User Management</button>
+    <button class="tab" onclick="showTab('activity')">Activity Log</button>
+  </div>
+  
+  <!-- Agent Management Tab -->
+  <div id="agentsTab" class="tab-content">
+    <div class="panels">
+      <div class="panel">
+        <h2>Create New Agent</h2>
+        <form id="createAgentForm">
+          <div class="form-group">
+            <label>Agent Name:</label>
+            <input type="text" class="form-control" id="newAgentName" required>
+          </div>
+          <div class="form-group">
+            <label>Password:</label>
+            <input type="password" class="form-control" id="newAgentPassword" required>
+          </div>
+          <div class="form-group">
+            <label>Confirm Password:</label>
+            <input type="password" class="form-control" id="newAgentConfirmPassword" required>
+          </div>
+          <div class="form-group">
+            <label>Restrictions:</label>
+            <div class="checkbox-group">
+              <label class="checkbox-item">
+                <input type="checkbox" id="restrictMaxUsers"> Limit Users:
+                <input type="number" id="maxUsers" min="1" max="100" value="10" style="width: 60px; margin-left: 5px;" disabled>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="restrictDelete"> Prevent Message Deletion
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="restrictClear"> Prevent Chat Clearing
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="restrictAssign"> Prevent Self-Assignment
+              </label>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="createAgent()">Create Agent</button>
+        </form>
+      </div>
+      
+      <div class="panel">
+        <h2>Active Agents</h2>
+        <div class="agent-list" id="agentList">
+          <!-- Agents will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- User Management Tab -->
+  <div id="usersTab" class="tab-content" style="display: none;">
+    <div class="panel">
+      <h2>All Users</h2>
+      <div class="user-list" id="userList">
+        <!-- Users will be loaded here -->
+      </div>
+    </div>
+  </div>
+  
+  <!-- Activity Log Tab -->
+  <div id="activityTab" class="tab-content" style="display: none;">
+    <div class="panel">
+      <h2>Recent Activity</h2>
+      <div id="activityLog">
+        <!-- Activity logs will be loaded here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Agent Modal -->
+<div id="editAgentModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Edit Agent</h2>
+      <button class="close-modal" onclick="closeModal()">×</button>
+    </div>
+    <form id="editAgentForm">
+      <input type="hidden" id="editAgentId">
+      <div class="form-group">
+        <label>Agent Name:</label>
+        <input type="text" class="form-control" id="editAgentName" required>
+      </div>
+      <div class="form-group">
+        <label>New Password (leave blank to keep current):</label>
+        <input type="password" class="form-control" id="editAgentPassword">
+      </div>
+      <div class="form-group">
+        <label>Restrictions:</label>
+        <div class="checkbox-group">
+          <label class="checkbox-item">
+            <input type="checkbox" id="editRestrictMaxUsers"> Limit Users:
+            <input type="number" id="editMaxUsers" min="1" max="100" value="10" style="width: 60px; margin-left: 5px;">
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="editRestrictDelete"> Prevent Message Deletion
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="editRestrictClear"> Prevent Chat Clearing
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="editRestrictAssign"> Prevent Self-Assignment
+          </label>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn btn-primary" onclick="updateAgent()">Update Agent</button>
+        <button type="button" class="btn btn-danger" onclick="deleteAgent()">Delete Agent</button>
+        <button type="button" class="btn" onclick="closeModal()" style="background: #ddd;">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Assign User Modal -->
+<div id="assignUserModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Assign User to Agent</h2>
+      <button class="close-modal" onclick="closeModal()">×</button>
+    </div>
+    <div class="form-group">
+      <label>User (WhatsApp Number):</label>
+      <input type="text" class="form-control" id="assignUserWhatsapp" readonly>
+    </div>
+    <div class="form-group">
+      <label>Select Agent:</label>
+      <select class="form-control" id="assignAgentSelect">
+        <!-- Agents will be populated here -->
+      </select>
+    </div>
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button type="button" class="btn btn-primary" onclick="assignUserToAgent()">Assign</button>
+      <button type="button" class="btn btn-danger" onclick="unassignUser()">Unassign</button>
+      <button type="button" class="btn" onclick="closeModal()" style="background: #ddd;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+  // Super Admin state
+  let isSuperAdminAuthenticated = false;
+  let socket = null;
+  let agents = [];
+  let users = [];
+  let activityLogs = [];
+  let currentTab = 'agents';
+  
+  // DOM Elements
+  const loginOverlay = document.getElementById('loginOverlay');
+ <!-- Continue from where we left off in superadmin.html -->
+
+  // DOM Elements
+  const loginOverlay = document.getElementById('loginOverlay');
+  const dashboard = document.getElementById('dashboard');
+  const superPassword = document.getElementById('superPassword');
+  const loginError = document.getElementById('loginError');
+  
+  // Check saved authentication
+  function checkSavedAuth() {
+    const savedAuth = sessionStorage.getItem('superAdminAuthenticated');
+    if (savedAuth === 'true') {
+      initializeSuperAdmin();
+    }
+  }
+  
+  // Super admin login
+  function loginSuperAdmin() {
+    const password = superPassword.value.trim();
+    
+    if (!socket) {
+      socket = io("https://chat-backend-p2b9.onrender.com");
+    }
+    
+    socket.emit('super_admin_login', { password });
+    
+    socket.once('super_admin_login_response', (response) => {
+      if (response.success) {
+        sessionStorage.setItem('superAdminAuthenticated', 'true');
+        loginOverlay.style.display = 'none';
+        dashboard.style.display = 'block';
+        initializeSuperAdmin();
+      } else {
+        loginError.textContent = response.message || 'Invalid password';
+        superPassword.value = '';
+        superPassword.focus();
+      }
+    });
+  }
+  
+  // Initialize super admin panel
+  function initializeSuperAdmin() {
+    if (!socket) {
+      socket = io("https://chat-backend-p2b9.onrender.com");
+    }
+    
+    // Request initial data
+    socket.emit('get_super_admin_data');
+    
+    // Listen for updates
+    socket.on('super_admin_data', (data) => {
+      updateDashboard(data);
+    });
+    
+    socket.on('super_admin_update', (data) => {
+      updateAgentsList(data.agents);
+      updateActivityLog(data.activity);
+    });
+    
+    socket.on('agent_created', (agent) => {
+      addAgentToList(agent);
+      updateStats();
+    });
+    
+    socket.on('agent_updated', (agent) => {
+      updateAgentInList(agent);
+    });
+    
+    socket.on('agent_deleted', ({ agentId }) => {
+      removeAgentFromList(agentId);
+      updateStats();
+    });
+    
+    socket.on('agent_status_change', ({ agentId, isOnline, socketId }) => {
+      updateAgentStatus(agentId, isOnline, socketId);
+    });
+    
+    socket.on('new_message', (message) => {
+      addActivityLog({
+        type: 'new_message',
+        details: {
+          whatsapp: message.whatsapp,
+          sender: message.sender,
+          text: message.text.substring(0, 50) + (message.text.length > 50 ? '...' : ''),
+          agentName: message.agentName
+        },
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    // Set up event listeners for form controls
+    setupFormListeners();
+    
+    // Request updates every 10 seconds
+    setInterval(() => {
+      socket.emit('get_super_admin_data');
+    }, 10000);
+  }
+  
+  // Setup form listeners
+  function setupFormListeners() {
+    // Max users restriction toggle
+    document.getElementById('restrictMaxUsers').addEventListener('change', function() {
+      document.getElementById('maxUsers').disabled = !this.checked;
+    });
+    
+    document.getElementById('editRestrictMaxUsers').addEventListener('change', function() {
+      document.getElementById('editMaxUsers').disabled = !this.checked;
+    });
+    
+    // Enter key for login
+    superPassword.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') loginSuperAdmin();
+    });
+  }
+  
+  // Update dashboard with data
+  function updateDashboard(data) {
+    updateStats(data.stats);
+    updateAgentsList(data.agents);
+    updateUsersList(data.users);
+    updateActivityLog(data.activity);
+  }
+  
+  // Update statistics
+  function updateStats(stats) {
+    if (stats) {
+      document.getElementById('totalAgents').textContent = stats.totalAgents;
+      document.getElementById('onlineAgents').textContent = stats.onlineAgents;
+      document.getElementById('totalUsers').textContent = stats.totalUsers;
+      document.getElementById('activeChats').textContent = stats.activeChats;
+    }
+  }
+  
+  // Update agents list
+  function updateAgentsList(agentsList) {
+    agents = agentsList;
+    const agentListDiv = document.getElementById('agentList');
+    agentListDiv.innerHTML = '';
+    
+    agentsList.forEach(agent => {
+      agentListDiv.appendChild(createAgentElement(agent));
+    });
+    
+    // Update agent select in assign modal
+    updateAgentSelect();
+  }
+  
+  function createAgentElement(agent) {
+    const div = document.createElement('div');
+    div.className = 'agent-item';
+    div.id = `agent-${agent.id}`;
+    
+    div.innerHTML = `
+      <div class="agent-header">
+        <div>
+          <span class="agent-status ${agent.isOnline ? 'status-online' : 'status-offline'}"></span>
+          <span class="agent-name">${agent.name}</span>
+          <span style="font-size: 12px; color: #666; margin-left: 10px;">
+            ${agent.isOnline ? 'Online' : 'Offline'} | Users: ${agent.userCount}
+          </span>
+        </div>
+        <div class="agent-controls">
+          <button class="btn-edit" onclick="editAgent('${agent.id}')">Edit</button>
+          <button class="btn-delete" onclick="deleteAgentPrompt('${agent.id}', '${agent.name}')">Delete</button>
+        </div>
+      </div>
+      ${agent.restrictions && Object.keys(agent.restrictions).length > 0 ? `
+        <div class="restrictions">
+          Restrictions: ${formatRestrictions(agent.restrictions)}
+        </div>
+      ` : ''}
+    `;
+    
+    return div;
+  }
+  
+  function formatRestrictions(restrictions) {
+    const parts = [];
+    if (restrictions.maxUsers) parts.push(`Max users: ${restrictions.maxUsers}`);
+    if (restrictions.canDelete === false) parts.push('No delete');
+    if (restrictions.canClear === false) parts.push('No clear');
+    if (restrictions.canAssign === false) parts.push('No self-assign');
+    return parts.join(', ');
+  }
+  
+  function addAgentToList(agent) {
+    const agentListDiv = document.getElementById('agentList');
+    agentListDiv.appendChild(createAgentElement(agent));
+  }
+  
+  function updateAgentInList(agent) {
+    const agentDiv = document.getElementById(`agent-${agent.id}`);
+    if (agentDiv) {
+      const agentObj = agents.find(a => a.id === agent.id);
+      if (agentObj) {
+        Object.assign(agentObj, agent);
+        agentDiv.innerHTML = `
+          <div class="agent-header">
+            <div>
+              <span class="agent-status ${agentObj.isOnline ? 'status-online' : 'status-offline'}"></span>
+              <span class="agent-name">${agentObj.name}</span>
+              <span style="font-size: 12px; color: #666; margin-left: 10px;">
+                ${agentObj.isOnline ? 'Online' : 'Offline'} | Users: ${agentObj.userCount || 0}
+              </span>
+            </div>
+            <div class="agent-controls">
+              <button class="btn-edit" onclick="editAgent('${agentObj.id}')">Edit</button>
+              <button class="btn-delete" onclick="deleteAgentPrompt('${agentObj.id}', '${agentObj.name}')">Delete</button>
+            </div>
+          </div>
+          ${agentObj.restrictions && Object.keys(agentObj.restrictions).length > 0 ? `
+            <div class="restrictions">
+              Restrictions: ${formatRestrictions(agentObj.restrictions)}
+            </div>
+          ` : ''}
+        `;
+      }
+    }
+  }
+  
+  function updateAgentStatus(agentId, isOnline, socketId) {
+    const agentDiv = document.getElementById(`agent-${agentId}`);
+    if (agentDiv) {
+      const statusSpan = agentDiv.querySelector('.agent-status');
+      const statusText = agentDiv.querySelector('.agent-header span span');
+      
+      if (statusSpan) {
+        statusSpan.className = `agent-status ${isOnline ? 'status-online' : 'status-offline'}`;
+      }
+      
+      if (statusText) {
+        statusText.textContent = `${isOnline ? 'Online' : 'Offline'} | Users: ${agents.find(a => a.id === agentId)?.userCount || 0}`;
+      }
+    }
+  }
+  
+  function removeAgentFromList(agentId) {
+    const agentDiv = document.getElementById(`agent-${agentId}`);
+    if (agentDiv) {
+      agentDiv.remove();
+    }
+  }
+  
+  // Update users list
+  function updateUsersList(usersList) {
+    users = usersList;
+    const userListDiv = document.getElementById('userList');
+    userListDiv.innerHTML = '';
+    
+    usersList.forEach(user => {
+      userListDiv.appendChild(createUserElement(user));
+    });
+  }
+  
+  function createUserElement(user) {
+    const div = document.createElement('div');
+    div.className = 'user-item';
+    
+    const assignedAgent = agents.find(a => a.id === user.assignedAgent);
+    
+    div.innerHTML = `
+      <div class="user-header">
+        <span class="user-whatsapp">${user.whatsapp}</span>
+        <button class="btn-assign" onclick="assignUserPrompt('${user.whatsapp}')">
+          ${assignedAgent ? 'Reassign' : 'Assign'}
+        </button>
+      </div>
+      <div class="assigned-agent">
+        ${assignedAgent ? `Assigned to: ${assignedAgent.name}` : 'Unassigned'}
+        | Messages: ${user.messageCount}
+        ${user.lastMessage ? `| Last: ${new Date(user.lastMessage).toLocaleTimeString()}` : ''}
+      </div>
+    `;
+    
+    return div;
+  }
+  
+  // Update activity log
+  function updateActivityLog(activities) {
+    const activityLogDiv = document.getElementById('activityLog');
+    activityLogDiv.innerHTML = '';
+    
+    activities.forEach(activity => {
+      const div = document.createElement('div');
+      div.className = 'user-item';
+      div.style.fontSize = '13px';
+      
+      let details = '';
+      if (activity.details) {
+        if (activity.type === 'new_message') {
+          details = `${activity.details.sender} to ${activity.details.whatsapp}: "${activity.details.text}"`;
+        } else if (activity.type === 'agent_login') {
+          details = `${activity.details.agentName} logged in`;
+        } else if (activity.type === 'user_assigned') {
+          details = `${activity.details.whatsapp} assigned to ${activity.details.agentName}`;
+        } else {
+          details = JSON.stringify(activity.details);
+        }
+      }
+      
+      div.innerHTML = `
+        <strong>${activity.type.replace(/_/g, ' ')}</strong><br>
+        ${details}<br>
+        <small>${new Date(activity.timestamp).toLocaleString()}</small>
+      `;
+      
+      activityLogDiv.appendChild(div);
+    });
+  }
+  
+  function addActivityLog(activity) {
+    const activityLogDiv = document.getElementById('activityLog');
+    const div = document.createElement('div');
+    div.className = 'user-item';
+    div.style.fontSize = '13px';
+    
+    let details = '';
+    if (activity.details) {
+      if (activity.type === 'new_message') {
+        details = `${activity.details.sender} to ${activity.details.whatsapp}: "${activity.details.text}"`;
+      } else {
+        details = JSON.stringify(activity.details);
+      }
+    }
+    
+    div.innerHTML = `
+      <strong>${activity.type.replace(/_/g, ' ')}</strong><br>
+      ${details}<br>
+      <small>${new Date(activity.timestamp).toLocaleString()}</small>
+    `;
+    
+    activityLogDiv.insertBefore(div, activityLogDiv.firstChild);
+    
+    // Keep only 20 items visible
+    while (activityLogDiv.children.length > 20) {
+      activityLogDiv.removeChild(activityLogDiv.lastChild);
+    }
+  }
+  
+  // Tab management
+  function showTab(tabName) {
+    currentTab = tabName;
+    
+    // Update tab buttons
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Show selected tab content
+    document.getElementById('agentsTab').style.display = tabName === 'agents' ? 'block' : 'none';
+    document.getElementById('usersTab').style.display = tabName === 'users' ? 'block' : 'none';
+    document.getElementById('activityTab').style.display = tabName === 'activity' ? 'block' : 'none';
+    
+    // Refresh data for the tab
+    if (tabName === 'users') {
+      // Could implement user list refresh here
+    }
+  }
+  
+  // Create new agent
+  function createAgent() {
+    const name = document.getElementById('newAgentName').value.trim();
+    const password = document.getElementById('newAgentPassword').value;
+    const confirmPassword = document.getElementById('newAgentConfirmPassword').value;
+    
+    if (!name || !password) {
+      alert('Please enter agent name and password');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+    
+    const restrictions = {};
+    
+    if (document.getElementById('restrictMaxUsers').checked) {
+      restrictions.maxUsers = parseInt(document.getElementById('maxUsers').value) || 10;
+    }
+    
+    if (document.getElementById('restrictDelete').checked) {
+      restrictions.canDelete = false;
+    }
+    
+    if (document.getElementById('restrictClear').checked) {
+      restrictions.canClear = false;
+    }
+    
+    if (document.getElementById('restrictAssign').checked) {
+      restrictions.canAssign = false;
+    }
+    
+    socket.emit('create_agent', { name, password, restrictions });
+    
+    // Clear form
+    document.getElementById('newAgentName').value = '';
+    document.getElementById('newAgentPassword').value = '';
+    document.getElementById('newAgentConfirmPassword').value = '';
+    document.getElementById('restrictMaxUsers').checked = false;
+    document.getElementById('maxUsers').disabled = true;
+    document.getElementById('restrictDelete').checked = false;
+    document.getElementById('restrictClear').checked = false;
+    document.getElementById('restrictAssign').checked = false;
+  }
+  
+  // Edit agent
+  function editAgent(agentId) {
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent) return;
+    
+    document.getElementById('editAgentModal').style.display = 'flex';
+    document.getElementById('editAgentId').value = agentId;
+    document.getElementById('editAgentName').value = agent.name;
+    
+    // Set restriction checkboxes
+    const restrictions = agent.restrictions || {};
+    document.getElementById('editRestrictMaxUsers').checked = !!restrictions.maxUsers;
+    document.getElementById('editMaxUsers').value = restrictions.maxUsers || 10;
+    document.getElementById('editMaxUsers').disabled = !restrictions.maxUsers;
+    document.getElementById('editRestrictDelete').checked = restrictions.canDelete === false;
+    document.getElementById('editRestrictClear').checked = restrictions.canClear === false;
+    document.getElementById('editRestrictAssign').checked = restrictions.canAssign === false;
+  }
+  
+  function updateAgent() {
+    const agentId = document.getElementById('editAgentId').value;
+    const name =
