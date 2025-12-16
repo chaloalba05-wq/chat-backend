@@ -32,7 +32,93 @@
     
     /* Login */
     .login { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: flex; justify-content: center; align-items: center; }
-    .login-box { width: 300px; padding: 30px; border: 1px solid #ddd; border-radius: 5px; text-align: center; }
+    .login-box { width: 350px; padding: 30px; border: 1px solid #ddd; border-radius: 8px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    
+    /* Agent Info Section */
+    .agent-info-section {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      border-left: 4px solid #1976d2;
+    }
+    
+    .agent-info-title {
+      font-weight: bold;
+      color: #1976d2;
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+    
+    .agent-details {
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #e0e0e0;
+      margin-bottom: 10px;
+    }
+    
+    .agent-field {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+    
+    .agent-label {
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .agent-value {
+      color: #1976d2;
+      font-weight: bold;
+    }
+    
+    .note {
+      font-size: 12px;
+      color: #666;
+      font-style: italic;
+      margin-top: 10px;
+    }
+    
+    /* File info */
+    .file-info {
+      background: #e8f5e9;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #c8e6c9;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    
+    .mute-status {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    
+    .muted { background: #ffcdd2; color: #c62828; }
+    .unmuted { background: #c8e6c9; color: #2e7d32; }
+    
+    /* Login header */
+    .login-header {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    
+    .login-title {
+      font-size: 24px;
+      color: #1976d2;
+      margin-bottom: 5px;
+    }
+    
+    .login-subtitle {
+      color: #666;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -40,11 +126,53 @@
 <!-- Login Screen -->
 <div id="loginScreen" class="login">
   <div class="login-box">
-    <h3>Agent Login</h3>
-    <input type="text" id="agentId" placeholder="Agent ID" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
-    <input type="password" id="agentPass" placeholder="Password" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
-    <div id="loginError" style="color: red; margin: 10px 0; font-size: 14px;"></div>
-    <button onclick="login()" style="width: 100%; padding: 10px; background: #1976d2; color: white; border: none; border-radius: 4px;">Login</button>
+    <div class="login-header">
+      <div class="login-title">Agent Login</div>
+      <div class="login-subtitle">This agent is permanently registered</div>
+    </div>
+    
+    <!-- Agent Information Section -->
+    <div class="agent-info-section">
+      <div class="agent-info-title">📋 Agent Configuration</div>
+      <div class="file-info">
+        📁 <strong>Agent File:</strong> <span id="agentFileName">Loading...</span>
+      </div>
+      <div class="agent-details">
+        <div class="agent-field">
+          <span class="agent-label">Agent ID:</span>
+          <span class="agent-value" id="displayAgentId">Loading...</span>
+        </div>
+        <div class="agent-field">
+          <span class="agent-label">Agent Name:</span>
+          <span class="agent-value" id="displayAgentName">Loading...</span>
+        </div>
+        <div class="agent-field">
+          <span class="agent-label">Status:</span>
+          <span id="agentStatus" class="mute-status unmuted">⚡ Ready</span>
+        </div>
+      </div>
+      <div class="note">
+        This agent account is permanently created on the server. Login with credentials below.
+      </div>
+    </div>
+    
+    <!-- Login Form -->
+    <input type="text" id="agentId" placeholder="Enter Agent ID" 
+           style="width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 4px; font-size: 14px;">
+    <input type="password" id="agentPass" placeholder="Enter Password" 
+           style="width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 4px; font-size: 14px;">
+    
+    <div id="loginError" style="color: #d32f2f; margin: 10px 0; font-size: 14px; min-height: 20px;"></div>
+    
+    <button onclick="login()" 
+            style="width: 100%; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer;">
+      🔓 Login as Agent
+    </button>
+    
+    <div style="margin-top: 20px; font-size: 12px; color: #666; text-align: left;">
+      <div><strong>Note:</strong> This agent is automatically registered on the server.</div>
+      <div style="margin-top: 5px;">Credentials are hardcoded in this HTML file for permanent access.</div>
+    </div>
   </div>
 </div>
 
@@ -54,8 +182,12 @@
   <!-- Sidebar: User List -->
   <div class="sidebar">
     <div style="padding: 15px; border-bottom: 1px solid #ddd; background: #f9f9f9;">
-      <strong>Chats</strong>
-      <div id="agentName" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <strong>Chats</strong>
+        <span id="muteIndicator" class="mute-status unmuted">⚡ Active</span>
+      </div>
+      <div id="agentNameDisplay" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
+      <div id="connectionStatus" style="font-size: 11px; color: #4CAF50; margin-top: 2px;">● Connected</div>
     </div>
     <div id="userList">
       <!-- Users will appear here -->
@@ -69,6 +201,7 @@
     <div style="padding: 15px; border-bottom: 1px solid #ddd; background: white;">
       <strong id="currentUser">Select a user to chat</strong>
       <div id="userInfo" style="font-size: 12px; color: #666; margin-top: 2px;">Click on a user from the left</div>
+      <div id="whatsappNumber" style="font-size: 11px; color: #1976d2; margin-top: 2px;"></div>
     </div>
     
     <!-- Messages -->
@@ -86,10 +219,83 @@
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
+  // ================================================
+  // AGENT CONFIGURATION - EDIT THESE VALUES
+  // ================================================
+  const AGENT_CONFIG = {
+    id: "agent1_" + Math.floor(Math.random() * 1000), // Unique ID for this agent
+    name: "Agent Support1", // Display name
+    password: "agent123", // Login password
+    filename: window.location.pathname.split('/').pop() || "agentX.html" // Auto-detect filename
+  };
+  // ================================================
+
   let socket = null;
   let currentAgent = null;
   let selectedUser = null;
   let users = new Map(); // Store users and their messages
+  let isMuted = false;
+  
+  // Detect current filename
+  function getCurrentFileName() {
+    const path = window.location.pathname;
+    return path.split('/').pop() || "agentX.html";
+  }
+
+  // Initialize on page load
+  window.onload = function() {
+    const fileName = getCurrentFileName();
+    AGENT_CONFIG.filename = fileName;
+    
+    // Display agent info
+    document.getElementById('agentFileName').textContent = fileName;
+    document.getElementById('displayAgentId').textContent = AGENT_CONFIG.id;
+    document.getElementById('displayAgentName').textContent = AGENT_CONFIG.name;
+    
+    // Pre-fill login fields
+    document.getElementById('agentId').value = AGENT_CONFIG.id;
+    
+    // Connect to server to register agent
+    registerAgentOnServer();
+  };
+
+  // Register this agent on the server
+  function registerAgentOnServer() {
+    console.log("Registering agent on server:", AGENT_CONFIG);
+    
+    // Create a temporary connection to register the agent
+    const tempSocket = io("https://chat-backend-p2b9.onrender.com");
+    
+    tempSocket.on('connect', () => {
+      console.log("Connected for registration");
+      
+      // Send agent registration to super admin
+      tempSocket.emit('register_permanent_agent', {
+        id: AGENT_CONFIG.id,
+        name: AGENT_CONFIG.name,
+        password: AGENT_CONFIG.password,
+        filename: AGENT_CONFIG.filename
+      });
+      
+      // Close the connection after registration
+      setTimeout(() => {
+        tempSocket.disconnect();
+        console.log("Agent registration completed");
+      }, 2000);
+    });
+    
+    tempSocket.on('agent_registered', (response) => {
+      console.log("Agent registration response:", response);
+      document.getElementById('agentStatus').textContent = "✅ Registered";
+      document.getElementById('agentStatus').className = "mute-status unmuted";
+    });
+    
+    tempSocket.on('connect_error', (error) => {
+      console.error("Registration connection error:", error);
+      document.getElementById('agentStatus').textContent = "⚠️ Registration Failed";
+      document.getElementById('agentStatus').className = "mute-status muted";
+    });
+  }
 
   // Login
   function login() {
@@ -97,46 +303,164 @@
     const pass = document.getElementById('agentPass').value.trim();
     
     if (!id || !pass) {
-      document.getElementById('loginError').textContent = 'Enter ID and password';
+      document.getElementById('loginError').textContent = 'Please enter both ID and password';
+      return;
+    }
+    
+    // Verify credentials match hardcoded values
+    if (id !== AGENT_CONFIG.id) {
+      document.getElementById('loginError').textContent = 'Invalid Agent ID';
+      return;
+    }
+    
+    if (pass !== AGENT_CONFIG.password) {
+      document.getElementById('loginError').textContent = 'Invalid password';
       return;
     }
     
     socket = io("https://chat-backend-p2b9.onrender.com");
     
     socket.on('connect', () => {
-      socket.emit('agent_login', { agentId: id, password: pass });
+      console.log("Connected to server, logging in...");
+      document.getElementById('connectionStatus').textContent = "● Connecting...";
+      socket.emit('agent_login', { 
+        agentId: AGENT_CONFIG.id, 
+        password: AGENT_CONFIG.password 
+      });
     });
     
     socket.on('agent_login_response', (res) => {
       if (res.success) {
-        currentAgent = { id: id, name: res.name };
+        currentAgent = { 
+          id: AGENT_CONFIG.id, 
+          name: res.name || AGENT_CONFIG.name,
+          muted: res.muted || false
+        };
+        
+        isMuted = res.muted || false;
+        updateMuteStatus();
+        
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').style.display = 'flex';
-        document.getElementById('agentName').textContent = res.name;
+        document.getElementById('agentNameDisplay').textContent = currentAgent.name;
+        document.getElementById('connectionStatus').textContent = "● Connected";
+        document.getElementById('connectionStatus').style.color = "#4CAF50";
+        
         setupListeners();
+        loadExistingUsers();
+        
+        console.log("Logged in as:", currentAgent.name);
+        
       } else {
         document.getElementById('loginError').textContent = res.message || 'Login failed';
+        document.getElementById('connectionStatus').textContent = "● Connection Failed";
+        document.getElementById('connectionStatus').style.color = "#f44336";
       }
     });
+    
+    socket.on('connect_error', (error) => {
+      document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
+      document.getElementById('connectionStatus').textContent = "● Connection Error";
+      document.getElementById('connectionStatus').style.color = "#f44336";
+    });
+    
+    socket.on('disconnect', () => {
+      document.getElementById('connectionStatus').textContent = "● Disconnected";
+      document.getElementById('connectionStatus').style.color = "#ff9800";
+    });
+  }
+
+  // Update mute status display
+  function updateMuteStatus() {
+    const muteIndicator = document.getElementById('muteIndicator');
+    const sendBtn = document.getElementById('sendBtn');
+    const messageInput = document.getElementById('messageInput');
+    
+    if (isMuted) {
+      muteIndicator.textContent = "🔇 Muted";
+      muteIndicator.className = "mute-status muted";
+      if (sendBtn) sendBtn.disabled = true;
+      if (messageInput) {
+        messageInput.disabled = true;
+        messageInput.placeholder = "Account is muted by Super Admin";
+      }
+    } else {
+      muteIndicator.textContent = "⚡ Active";
+      muteIndicator.className = "mute-status unmuted";
+      if (sendBtn && selectedUser) sendBtn.disabled = false;
+      if (messageInput && selectedUser) {
+        messageInput.disabled = false;
+        messageInput.placeholder = "Type message...";
+      }
+    }
   }
 
   // Setup socket listeners
   function setupListeners() {
     // Listen for user messages
     socket.on('user_message', (data) => {
-      addUserMessage(data.userId || 'User', data.message, data);
+      const whatsapp = data.whatsapp || data.userId || 'User';
+      addUserMessage(whatsapp, data.message || data.text, data);
     });
     
-    // Listen for messages with attachments
+    // Listen for all messages
     socket.on('new_message', (msg) => {
       if (msg.sender === 'user') {
-        addUserMessage(msg.whatsapp || 'User', msg.text || msg.message, msg);
+        const whatsapp = msg.whatsapp || 'User';
+        addUserMessage(whatsapp, msg.text || msg.message, msg);
       }
     });
     
-    // Listen for Super Admin messages
-    socket.on('super_message', (data) => {
-      addUserMessage('Super Admin', data.message, data);
+    // Listen for forwarded messages from super admin
+    socket.on('forwarded_message', (data) => {
+      if (data.type === 'user_message' && data.data) {
+        const whatsapp = data.data.whatsapp || data.data.userId || 'User';
+        addUserMessage(whatsapp, data.data.message, data.data);
+      } else if (data.type === 'broadcast' && data.data) {
+        // Handle broadcast messages from super admin
+        addUserMessage('Super Admin', data.data.message, data);
+      }
+    });
+    
+    // Listen for mute status updates from super admin
+    socket.on('mute_status', (data) => {
+      if (data.agentId === AGENT_CONFIG.id) {
+        isMuted = data.muted;
+        updateMuteStatus();
+        
+        // Show notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+          position: fixed; top: 20px; right: 20px; 
+          padding: 15px; background: ${isMuted ? '#ffcdd2' : '#c8e6c9'}; 
+          color: ${isMuted ? '#c62828' : '#2e7d32'}; border-radius: 5px; 
+          z-index: 1000; border: 1px solid ${isMuted ? '#ef9a9a' : '#a5d6a7'};
+          font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        `;
+        notification.textContent = isMuted ? '🔇 Account muted by Super Admin' : '🔊 Account unmuted by Super Admin';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+      }
+    });
+  }
+
+  // Load existing users from server
+  function loadExistingUsers() {
+    socket.emit('get_existing_users');
+    
+    socket.on('existing_users', (usersList) => {
+      console.log("Loaded existing users:", usersList);
+      usersList.forEach(user => {
+        if (!users.has(user.whatsapp)) {
+          users.set(user.whatsapp, {
+            name: user.whatsapp,
+            lastMsg: user.lastMessage || 'No messages yet',
+            time: user.lastMessageTime || new Date().toISOString(),
+            messages: []
+          });
+        }
+      });
+      updateUserList();
     });
   }
 
@@ -146,8 +470,8 @@
     if (!users.has(userId)) {
       users.set(userId, {
         name: userId,
-        lastMsg: message,
-        time: new Date().toISOString(),
+        lastMsg: message || '[Attachment]',
+        time: data.timestamp || new Date().toISOString(),
         messages: []
       });
     }
@@ -156,9 +480,10 @@
     user.messages.push({
       text: message,
       time: data.timestamp || new Date().toISOString(),
-      image: data.attachment || data.imageURL
+      sender: data.sender || 'user',
+      attachment: data.attachment
     });
-    user.lastMsg = message;
+    user.lastMsg = message || '[Attachment]';
     user.time = data.timestamp || new Date().toISOString();
     
     // Update user list
@@ -173,16 +498,38 @@
   // Update user list UI
   function updateUserList() {
     const userList = document.getElementById('userList');
+    
+    // Sort users by last message time (newest first)
+    const sortedUsers = Array.from(users.entries())
+      .sort((a, b) => new Date(b[1].time) - new Date(a[1].time));
+    
     userList.innerHTML = '';
     
-    users.forEach((user, userId) => {
+    if (sortedUsers.length === 0) {
+      userList.innerHTML = `
+        <div style="padding: 40px; text-align: center; color: #666;">
+          <div style="font-size: 48px; margin-bottom: 20px;">👤</div>
+          <h4>No conversations yet</h4>
+          <p style="font-size: 12px;">Users will appear here when they send messages</p>
+        </div>
+      `;
+      return;
+    }
+    
+    sortedUsers.forEach(([userId, user]) => {
       const div = document.createElement('div');
       div.className = `user ${selectedUser === userId ? 'active' : ''}`;
       div.onclick = () => selectUser(userId);
       
+      const time = new Date(user.time).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
       div.innerHTML = `
         <div class="user-name">${user.name}</div>
         <div class="user-preview">${user.lastMsg}</div>
+        <div style="font-size: 10px; color: #999; text-align: right; margin-top: 2px;">${time}</div>
       `;
       
       userList.appendChild(div);
@@ -195,12 +542,19 @@
     const user = users.get(userId);
     
     document.getElementById('currentUser').textContent = user.name;
-    document.getElementById('userInfo').textContent = 'Last message: ' + new Date(user.time).toLocaleTimeString();
+    document.getElementById('userInfo').textContent = `Last message: ${new Date(user.time).toLocaleTimeString()}`;
+    document.getElementById('whatsappNumber').textContent = `WhatsApp: ${userId}`;
     
-    // Enable input
-    document.getElementById('messageInput').disabled = false;
-    document.getElementById('sendBtn').disabled = false;
-    document.getElementById('messageInput').focus();
+    // Enable input if not muted
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    
+    if (!isMuted) {
+      messageInput.disabled = false;
+      sendBtn.disabled = false;
+      messageInput.placeholder = "Type message...";
+      messageInput.focus();
+    }
     
     // Show messages
     showMessages();
@@ -220,9 +574,22 @@
       div.className = `msg ${msg.sender === 'agent' ? 'agent' : 'user'}`;
       
       let content = msg.text || '';
-      if (msg.image) {
-        const imgUrl = msg.image.path || msg.image;
-        content += `<br><img src="${imgUrl}" class="msg-img">`;
+      if (msg.attachment) {
+        const fileType = msg.attachment.mimetype?.split('/')[0];
+        let icon = '📄';
+        let preview = '';
+        
+        if (fileType === 'image') {
+          icon = '🖼️';
+          const imgUrl = msg.attachment.url || msg.attachment.path;
+          preview = `<br><img src="${imgUrl}" class="msg-img">`;
+        } else if (fileType === 'video') icon = '🎬';
+        else if (fileType === 'audio') icon = '🎵';
+        else if (msg.attachment.mimetype?.includes('pdf')) icon = '📕';
+        
+        const fileName = msg.attachment.originalname || msg.attachment.filename;
+        const fileUrl = msg.attachment.url || msg.attachment.path;
+        content += `<br><div style="margin-top: 5px;">${icon} <a href="${fileUrl}" target="_blank">${fileName}</a>${preview}</div>`;
       }
       
       div.innerHTML = content + `<div style="font-size: 11px; color: #666; margin-top: 3px;">${formatTime(msg.time)}</div>`;
@@ -235,6 +602,11 @@
 
   // Send message
   function sendMessage() {
+    if (isMuted) {
+      alert("Your account is muted by Super Admin. You cannot send messages.");
+      return;
+    }
+    
     const input = document.getElementById('messageInput');
     const text = input.value.trim();
     if (!text || !selectedUser) return;
@@ -249,9 +621,19 @@
     
     // Send to server
     socket.emit('agent_message', {
+      whatsapp: selectedUser,
+      message: text,
       agentId: currentAgent.id,
-      agentName: currentAgent.name,
-      message: text
+      agentName: currentAgent.name
+    });
+    
+    // Also send via send_message for backward compatibility
+    socket.emit('send_message', {
+      whatsapp: selectedUser,
+      sender: 'agent',
+      text: text,
+      agentId: currentAgent.id,
+      agentName: currentAgent.name
     });
     
     // Update UI

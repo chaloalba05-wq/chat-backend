@@ -275,7 +275,8 @@ io.on("connection", (socket) => {
         name: agent.name,
         muted: agent.muted || false,
         isOnline: agent.socketId ? true : false,
-        socketId: agent.socketId
+        socketId: agent.socketId,
+        filename: agent.filename || null
       }));
       
       socket.emit("super_admin_login_response", { success: true });
@@ -290,6 +291,100 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ===== PERMANENT AGENT REGISTRATION =====
+  socket.on("register_permanent_agent", async (data) => {
+    const { id, name, password, filename } = data;
+    
+    if (!id || !name || !password) {
+      socket.emit("agent_registered", { 
+        success: false, 
+        message: "Missing required fields" 
+      });
+      return;
+    }
+    
+    try {
+      // Check if agent already exists
+      const existingAgent = agents.get(id);
+      
+      if (existingAgent) {
+        // Update existing agent with new data if needed
+        if (!existingAgent.filename && filename) {
+          existingAgent.filename = filename;
+        }
+        
+        socket.emit("agent_registered", { 
+          success: true, 
+          message: "Agent already exists",
+          agentId: id
+        });
+        
+        logActivity('agent_updated', { 
+          agentId: id, 
+          name: name,
+          filename: filename || existingAgent.filename 
+        });
+      } else {
+        // Create new permanent agent
+        agents.set(id, {
+          name,
+          password,
+          muted: false,
+          socketId: null,
+          filename: filename || null,
+          createdAt: new Date(),
+          lastSeen: null
+        });
+        
+        // Initialize agent users set
+        if (!agentUsers.has(id)) {
+          agentUsers.set(id, new Set());
+        }
+        
+        // Save to MongoDB
+        await saveAgentToDB(id, {
+          name,
+          password,
+          muted: false,
+          filename: filename || null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        socket.emit("agent_registered", { 
+          success: true, 
+          message: "Agent registered successfully",
+          agentId: id
+        });
+        
+        logActivity('permanent_agent_created', { 
+          agentId: id, 
+          name: name,
+          filename: filename || 'no file'
+        });
+      }
+      
+      // Notify Super Admin if connected
+      const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
+        id,
+        name: agent.name,
+        muted: agent.muted || false,
+        isOnline: agent.socketId ? true : false,
+        socketId: agent.socketId,
+        filename: agent.filename || null
+      }));
+      
+      io.to("super_admin").emit("agents_list", agentsList);
+      
+    } catch (error) {
+      console.error("Error registering permanent agent:", error);
+      socket.emit("agent_registered", { 
+        success: false, 
+        message: "Registration failed" 
+      });
+    }
+  });
+
   // Get agents list
   socket.on("get_agents", () => {
     const userData = users.get(socket.id);
@@ -299,13 +394,14 @@ io.on("connection", (socket) => {
         name: agent.name,
         muted: agent.muted || false,
         isOnline: agent.socketId ? true : false,
-        socketId: agent.socketId
+        socketId: agent.socketId,
+        filename: agent.filename || null
       }));
       socket.emit("agents_list", agentsList);
     }
   });
 
-  // Save/Update agent credentials (NEW)
+  // Save/Update agent credentials (KEEPING for backward compatibility, but agents are now auto-registered)
   socket.on("save_agent", async ({ name, id, password }) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'super_admin') return;
@@ -359,7 +455,8 @@ io.on("connection", (socket) => {
       name: agent.name,
       muted: agent.muted || false,
       isOnline: agent.socketId ? true : false,
-      socketId: agent.socketId
+      socketId: agent.socketId,
+      filename: agent.filename || null
     }));
     
     io.to("super_admin").emit("agents_list", agentsList);
@@ -404,7 +501,8 @@ io.on("connection", (socket) => {
       name: agent.name,
       muted: agent.muted || false,
       isOnline: agent.socketId ? true : false,
-      socketId: agent.socketId
+      socketId: agent.socketId,
+      filename: agent.filename || null
     }));
     
     io.to("super_admin").emit("agents_list", agentsList);
@@ -444,6 +542,7 @@ io.on("connection", (socket) => {
           muted: agent.muted || false,
           isOnline: agent.socketId ? true : false,
           socketId: agent.socketId,
+          filename: agent.filename || null,
           userCount: agentUsers.get(id) ? agentUsers.get(id).size : 0
         }));
         
@@ -473,7 +572,7 @@ io.on("connection", (socket) => {
     if (!agent) {
       socket.emit("agent_login_response", {
         success: false,
-        message: "Agent not found"
+        message: "Agent not found. Please refresh the agent page to auto-register."
       });
       return;
     }
@@ -500,7 +599,12 @@ io.on("connection", (socket) => {
     agent.lastSeen = new Date();
     users.set(socket.id, { type: 'agent', agentId });
     
-    logActivity('agent_login', { agentId, name: agent.name, socketId: socket.id });
+    logActivity('agent_login', { 
+      agentId, 
+      name: agent.name, 
+      socketId: socket.id,
+      filename: agent.filename || 'no file'
+    });
     
     socket.emit("agent_login_response", {
       success: true,
@@ -514,7 +618,8 @@ io.on("connection", (socket) => {
       name: agent.name,
       muted: agent.muted || false,
       isOnline: agent.socketId ? true : false,
-      socketId: agent.socketId
+      socketId: agent.socketId,
+      filename: agent.filename || null
     }));
     
     io.to("super_admin").emit("agents_list", agentsList);
@@ -528,6 +633,14 @@ io.on("connection", (socket) => {
     
     const agent = agents.get(userData.agentId);
     if (!agent) return;
+    
+    // Check if agent is muted
+    if (agent.muted) {
+      socket.emit("agent_message_error", {
+        message: "Cannot send messages while muted"
+      });
+      return;
+    }
     
     // Save agent message to MongoDB if we have user context
     if (data.whatsapp && conversationsCollection) {
@@ -870,6 +983,7 @@ async function startServer() {
       console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
       console.log(`🔍 Test MongoDB: http://localhost:${PORT}/test-mongo`);
       console.log(`\n✅ System is ready with ALL functionality!`);
+      console.log(`🔧 Permanent Agent System: Agents auto-register via agentX.html files`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

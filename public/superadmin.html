@@ -4,8 +4,16 @@
   <meta charset="UTF-8">
   <title>Super Admin Panel</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f0f2f5; }
-    .container { max-width: 1200px; margin: 0 auto; }
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 20px; 
+      background: #f0f2f5; 
+    }
+    
+    .container { 
+      max-width: 1200px; 
+      margin: 0 auto; 
+    }
 
     /* Login overlay */
     #loginOverlay {
@@ -31,51 +39,299 @@
       width: 90%;
     }
 
-    input, button, select { font-size: 16px; }
-    button { cursor: pointer; }
+    input, button, select { 
+      font-size: 16px; 
+    }
+    
+    button { 
+      cursor: pointer; 
+    }
 
+    /* Dashboard Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    /* Panel Styles */
+    .panel {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    /* Agents List */
     .agent-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px;
-      border: 1px solid #ddd;
-      margin: 5px 0;
-      border-radius: 5px;
+      padding: 12px 15px;
+      border: 1px solid #e0e0e0;
+      margin: 8px 0;
+      border-radius: 8px;
       background: white;
+      transition: all 0.3s ease;
     }
 
-    .muted { opacity: 0.6; background: #f5f5f5; }
-    
-    .toggle-btn {
-      padding: 5px 15px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
+    .agent-item:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transform: translateY(-2px);
+    }
+
+    .agent-item.muted { 
+      opacity: 0.7; 
+      background: #f8f9fa; 
+      border-left: 4px solid #dc3545;
+    }
+
+    .agent-item.online { 
+      border-left: 4px solid #28a745;
+    }
+
+    .agent-item.offline { 
+      border-left: 4px solid #6c757d;
     }
     
-    .mute-btn { background: #ff4444; color: white; }
-    .unmute-btn { background: #4CAF50; color: white; }
-    
-    .chat-message {
-      padding: 8px;
-      margin: 5px 0;
-      border-radius: 5px;
-      background: #e3f2fd;
+    /* Agent Info */
+    .agent-info {
+      flex: 1;
     }
-    
-    .user-message { background: #f1f8e9; }
-    .super-message { background: #e8eaf6; }
-    
-    .status-badge {
+
+    .agent-name {
+      font-weight: bold;
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .agent-id {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .agent-file {
+      font-size: 12px;
+      color: #007bff;
+      background: #e7f3ff;
       padding: 2px 6px;
       border-radius: 3px;
+      display: inline-block;
+    }
+
+    /* Status Badges */
+    .status-badge {
+      padding: 3px 8px;
+      border-radius: 12px;
       font-size: 11px;
-      margin-left: 5px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 8px;
     }
     
-    .online { background: #4CAF50; color: white; }
-    .offline { background: #9E9E9E; color: white; }
+    .online-badge { 
+      background: #28a745; 
+      color: white; 
+    }
+    
+    .offline-badge { 
+      background: #6c757d; 
+      color: white; 
+    }
+    
+    .muted-badge { 
+      background: #dc3545; 
+      color: white; 
+    }
+
+    /* Toggle Buttons */
+    .toggle-btn {
+      padding: 6px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      min-width: 80px;
+    }
+    
+    .mute-btn { 
+      background: #dc3545; 
+      color: white; 
+    }
+    
+    .mute-btn:hover { 
+      background: #c82333; 
+    }
+    
+    .unmute-btn { 
+      background: #28a745; 
+      color: white; 
+    }
+    
+    .unmute-btn:hover { 
+      background: #218838; 
+    }
+
+    /* Messages Panel */
+    .messages-container {
+      height: 500px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .chat-message {
+      padding: 10px 15px;
+      margin: 10px 0;
+      border-radius: 10px;
+      border-left: 4px solid #007bff;
+      background: #f8f9fa;
+    }
+
+    .user-message { 
+      border-left-color: #28a745; 
+      background: #e8f5e9; 
+    }
+    
+    .agent-message { 
+      border-left-color: #ffc107; 
+      background: #fff8e1; 
+    }
+    
+    .super-message { 
+      border-left-color: #6f42c1; 
+      background: #e9ecef; 
+    }
+
+    /* Activity Log */
+    .activity-log {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+
+    .activity-entry {
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .activity-time {
+      color: #999;
+      font-size: 11px;
+      margin-right: 8px;
+    }
+
+    /* Stats Cards */
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .stat-number {
+      font-size: 28px;
+      font-weight: bold;
+      color: #007bff;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+    }
+
+    /* Input Styles */
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .message-input {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .message-input:focus {
+      border-color: #007bff;
+      outline: none;
+    }
+
+    .send-btn {
+      padding: 12px 25px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    .send-btn:hover {
+      background: #0056b3;
+    }
+
+    /* Header Styles */
+    .header {
+      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .header-subtitle {
+      color: rgba(255,255,255,0.8);
+      margin-top: 5px;
+      font-size: 14px;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
   </style>
 </head>
 <body>
@@ -83,17 +339,17 @@
 <!-- Login Overlay -->
 <div id="loginOverlay">
   <div id="loginContainer">
-    <h1 style="margin-bottom: 30px; color: #333;">🔐 Super Admin</h1>
-    <p style="color: #666; margin-bottom: 20px;">Enter super admin password:</p>
-    <input type="password" id="superPassword" placeholder="Password" autocomplete="off" 
+    <h1 style="margin-bottom: 30px; color: #333;">🔐 Super Admin Dashboard</h1>
+    <p style="color: #666; margin-bottom: 20px;">Enter super admin password to access monitoring panel:</p>
+    <input type="password" id="superPassword" placeholder="Super Admin Password" autocomplete="off" 
            style="width: 100%; padding: 15px; margin-bottom: 15px; border: 2px solid #ddd; border-radius: 5px;">
     <div id="loginError" style="color: #d32f2f; margin: 10px 0; min-height: 20px;"></div>
     <button onclick="loginSuperAdmin()" 
-            style="width: 100%; padding: 15px; background: #1a237e; color: white; border: none; border-radius: 5px; margin-top: 10px;">
-      Access Dashboard
+            style="width: 100%; padding: 15px; background: #1a237e; color: white; border: none; border-radius: 5px; margin-top: 10px; font-weight: bold;">
+      🔓 Access Monitoring Panel
     </button>
     <div style="margin-top: 20px; font-size: 12px; color: #888;">
-      <em>Server URL: <span id="serverUrl">https://chat-backend-p2b9.onrender.com</span></em>
+      <em>Monitoring Dashboard | Server: <span id="serverUrl">https://chat-backend-p2b9.onrender.com</span></em>
     </div>
   </div>
 </div>
@@ -102,8 +358,7 @@
 <script>
   let socket = null;
   let agents = [];
-  let activeMessages = [];
-  let existingAgentFiles = [];
+  let activityLog = [];
 
   // DOM Elements
   const loginOverlay = document.getElementById('loginOverlay');
@@ -114,7 +369,7 @@
   function loginSuperAdmin() {
     const password = superPassword.value.trim();
     if (!password) {
-      loginError.textContent = 'Please enter password';
+      loginError.textContent = 'Please enter super admin password';
       return;
     }
 
@@ -124,7 +379,7 @@
     });
 
     socket.on('connect', () => {
-      console.log('Connected to server');
+      console.log('Connected to server as Super Admin');
       socket.emit('super_admin_login', { password });
     });
 
@@ -133,9 +388,10 @@
         loginOverlay.style.display = 'none';
         initializeDashboard();
         loadAgents();
-        getExistingAgentFiles();
+        loadActivityLog();
+        loadStats();
       } else {
-        loginError.textContent = response.message || 'Login failed';
+        loginError.textContent = response.message || 'Invalid super admin password';
       }
     });
 
@@ -149,151 +405,106 @@
     const dashboard = document.createElement('div');
     dashboard.className = 'container';
     dashboard.innerHTML = `
-      <h1>Super Admin Dashboard</h1>
-      <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 20px;">
+      <div class="header">
+        <h1>Super Admin Monitoring Dashboard</h1>
+        <div class="header-subtitle">Live monitoring of agents and conversations | View-only mode</div>
+      </div>
+      
+      <!-- Statistics Cards -->
+      <div class="stats-container" id="statsContainer">
+        <div class="stat-card">
+          <div class="stat-number" id="totalAgents">0</div>
+          <div class="stat-label">Total Agents</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="onlineAgents">0</div>
+          <div class="stat-label">Online Agents</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="mutedAgents">0</div>
+          <div class="stat-label">Muted Agents</div>
+        </div>
+      </div>
+      
+      <div class="dashboard-grid">
         
-        <!-- Agents Management -->
+        <!-- Agents Monitoring Panel -->
         <div>
-          <h2>Agents Management</h2>
-          <div id="agentsList" style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;"></div>
+          <div class="panel">
+            <h2>🔍 Agents Monitoring</h2>
+            <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+              Monitor agent status and mute/unmute as needed. Agents are created via individual agent files.
+            </p>
+            <div id="agentsList" style="max-height: 500px; overflow-y: auto; margin-top: 15px;"></div>
+          </div>
           
-          <div style="background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
-            <h3>Add/Edit Agent</h3>
-            <input type="text" id="agentName" placeholder="Agent Name" 
-                   style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
-            <input type="text" id="agentId" placeholder="Agent ID (for login)" 
-                   style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
-            <input type="password" id="agentPassword" placeholder="Agent Password" 
-                   style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
-            
-            <div style="margin: 10px 0;">
-              <label style="display: block; margin-bottom: 5px; font-size: 14px; color: #666;">
-                Assign to file (optional):
-              </label>
-              <select id="agentFilename" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                <option value="">-- No specific file --</option>
-                <option value="agent1.html">agent1.html</option>
-                <option value="agent2.html">agent2.html</option>
-                <option value="agent3.html">agent3.html</option>
-                <option value="agent4.html">agent4.html</option>
-                <option value="agent5.html">agent5.html</option>
-                <option value="agent6.html">agent6.html</option>
-                <option value="agent7.html">agent7.html</option>
-                <option value="agent8.html">agent8.html</option>
-                <option value="agent9.html">agent9.html</option>
-                <option value="agent10.html">agent10.html</option>
-              </select>
-              <div id="fileStatus" style="font-size: 12px; margin-top: 5px; color: #666;"></div>
+          <!-- Activity Log Panel -->
+          <div class="panel">
+            <h3>📋 System Activity</h3>
+            <div class="activity-log" id="activityLog">
+              <div style="padding: 20px; text-align: center; color: #999;">
+                Loading activity log...
+              </div>
             </div>
-            
-            <button onclick="saveAgent()" 
-                    style="width: 100%; padding: 10px; background: #1a237e; color: white; border: none; border-radius: 4px; margin-top: 10px;">
-              Save Agent
-            </button>
           </div>
         </div>
 
-        <!-- Messages Panel -->
+        <!-- Messages & Communication Panel -->
         <div>
-          <h2>Messages</h2>
-          <div id="messagesContainer" style="height: 500px; overflow-y: auto; background: white; border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px;"></div>
-          
-          <div style="display: flex; gap: 10px;">
-            <input type="text" id="messageInput" placeholder="Type a message..." 
-                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-            <button onclick="sendMessage()" 
-                    style="padding: 10px 20px; background: #388e3c; color: white; border: none; border-radius: 4px;">
-              Send
-            </button>
-          </div>
-          
-          <!-- Activity Log -->
-          <div style="margin-top: 20px; background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
-            <h3>Recent Activity</h3>
-            <div id="activityLog" style="max-height: 150px; overflow-y: auto; margin-top: 10px;"></div>
+          <div class="panel">
+            <h2>💬 Live Conversations</h2>
+            <div class="messages-container" id="messagesContainer">
+              <div style="padding: 20px; text-align: center; color: #999;">
+                Waiting for messages...
+              </div>
+            </div>
+            
+            <div class="input-group">
+              <input type="text" id="messageInput" placeholder="Type broadcast message to all agents..." class="message-input">
+              <button onclick="sendBroadcastMessage()" class="send-btn">
+                📢 Broadcast
+              </button>
+            </div>
+            <p style="color: #666; font-size: 12px; margin-top: 10px;">
+              <em>Messages will be sent to all non-muted agents</em>
+            </p>
           </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(dashboard);
-
-    // Setup socket listeners
     setupSocketListeners();
-    
-    // Setup filename selector change event
-    setTimeout(() => {
-      const filenameSelect = document.getElementById('agentFilename');
-      if (filenameSelect) {
-        filenameSelect.addEventListener('change', checkFileStatus);
-      }
-    }, 100);
-  }
-
-  // Check if selected file is already assigned
-  function checkFileStatus() {
-    const filenameSelect = document.getElementById('agentFilename');
-    const fileStatus = document.getElementById('fileStatus');
-    const selectedFile = filenameSelect.value;
-    
-    if (!selectedFile) {
-      fileStatus.innerHTML = '';
-      return;
-    }
-    
-    // Check if any agent is already using this file
-    const agentUsingFile = agents.find(agent => agent.filename === selectedFile);
-    
-    if (agentUsingFile) {
-      fileStatus.innerHTML = `⚠️ This file is already assigned to: <strong>${agentUsingFile.name}</strong>`;
-      fileStatus.style.color = '#f44336';
-    } else {
-      fileStatus.innerHTML = `✅ File is available for assignment`;
-      fileStatus.style.color = '#4CAF50';
-    }
-  }
-
-  // Load agents from server
-  function loadAgents() {
-    socket.emit('get_agents');
-  }
-
-  // Get existing agent files from server
-  function getExistingAgentFiles() {
-    socket.emit('get_agent_files');
   }
 
   // Setup socket listeners
   function setupSocketListeners() {
-    // Listen for agents list
+    // Listen for agents list updates
     socket.on('agents_list', (agentList) => {
       agents = agentList;
       renderAgents();
-    });
-
-    // Listen for agent files list
-    socket.on('agent_files_list', (files) => {
-      existingAgentFiles = files;
-      updateFilenameDropdown();
+      updateStats();
     });
 
     // Listen for user messages
     socket.on('user_message', (data) => {
-      addMessage(data.userId || 'User', data.message, 'user');
-      logActivity(`User message: ${data.message}`);
-      
-      // Forward to all non-muted agents
-      socket.emit('forward_to_agents', {
-        type: 'user_message',
-        data: data,
-        timestamp: new Date().toISOString()
-      });
+      addMessage(data.userId || data.whatsapp || 'User', data.message || data.text, 'user', data.attachment);
+      logActivity(`📨 New user message from ${data.userId || data.whatsapp}`);
     });
 
     // Listen for agent messages
-    socket.on('agent_message_received', (data) => {
-      addMessage(data.agentName, data.message, 'agent');
-      logActivity(`${data.agentName}: ${data.message}`);
+    socket.on('new_message', (data) => {
+      if (data.sender === 'agent') {
+        addMessage(data.agentName || 'Agent', data.message || data.text, 'agent', data.attachment);
+        logActivity(`💬 ${data.agentName || 'Agent'} sent a message`);
+      }
+    });
+
+    // Listen for forwarded messages
+    socket.on('forwarded_message', (data) => {
+      if (data.type === 'user_message') {
+        addMessage('User', data.data.message, 'user');
+      }
     });
 
     // Listen for activity updates
@@ -303,190 +514,276 @@
       });
     });
 
-    // Listen for agent status updates
-    socket.on('agent_updated', () => {
-      loadAgents(); // Reload agents list
+    // Listen for super admin data
+    socket.on('super_admin_data', (data) => {
+      updateStats(data.stats);
+      if (data.activity) {
+        activityLog = data.activity;
+        renderActivityLog();
+      }
     });
   }
 
-  // Update filename dropdown with existing files
-  function updateFilenameDropdown() {
-    const filenameSelect = document.getElementById('agentFilename');
-    if (!filenameSelect) return;
-    
-    // Save current selection
-    const currentSelection = filenameSelect.value;
-    
-    // Clear existing options except the first one
-    while (filenameSelect.options.length > 1) {
-      filenameSelect.remove(1);
-    }
-    
-    // Add existing agent files
-    existingAgentFiles.forEach(file => {
-      const option = document.createElement('option');
-      option.value = file;
-      option.textContent = file;
-      filenameSelect.appendChild(option);
-    });
-    
-    // Add custom files if they don't exist
-    for (let i = 1; i <= 10; i++) {
-      const filename = `agent${i}.html`;
-      if (!existingAgentFiles.includes(filename)) {
-        const option = document.createElement('option');
-        option.value = filename;
-        option.textContent = filename;
-        filenameSelect.appendChild(option);
-      }
-    }
-    
-    // Restore selection if still valid
-    if (currentSelection && Array.from(filenameSelect.options).some(opt => opt.value === currentSelection)) {
-      filenameSelect.value = currentSelection;
+  // Load agents
+  function loadAgents() {
+    socket.emit('get_agents');
+  }
+
+  // Load activity log
+  function loadActivityLog() {
+    socket.emit('get_super_admin_data');
+  }
+
+  // Load stats
+  function loadStats() {
+    socket.emit('get_super_admin_data');
+  }
+
+  // Update statistics
+  function updateStats(stats) {
+    if (!stats) {
+      const onlineCount = agents.filter(a => a.isOnline).length;
+      const mutedCount = agents.filter(a => a.muted).length;
+      
+      document.getElementById('totalAgents').textContent = agents.length;
+      document.getElementById('onlineAgents').textContent = onlineCount;
+      document.getElementById('mutedAgents').textContent = mutedCount;
+    } else {
+      document.getElementById('totalAgents').textContent = stats.totalAgents || agents.length;
+      document.getElementById('onlineAgents').textContent = stats.onlineAgents || 0;
+      document.getElementById('mutedAgents').textContent = stats.mutedAgents || 0;
     }
   }
 
   // Render agents list
   function renderAgents() {
     const agentsList = document.getElementById('agentsList');
-    agentsList.innerHTML = '';
     
     if (agents.length === 0) {
-      agentsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No agents yet. Add your first agent above.</div>';
+      agentsList.innerHTML = `
+        <div style="padding: 40px; text-align: center; color: #666;">
+          <div style="font-size: 48px; margin-bottom: 20px;">👤</div>
+          <h3>No Agents Found</h3>
+          <p>Agents will appear here when they connect via their individual agent files.</p>
+          <p style="font-size: 12px; color: #999; margin-top: 10px;">
+            Each agent has their own HTML file (agent1.html, agent2.html, etc.)<br>
+            with hardcoded credentials.
+          </p>
+        </div>
+      `;
       return;
     }
     
+    agentsList.innerHTML = '';
+    
     agents.forEach(agent => {
       const agentDiv = document.createElement('div');
-      agentDiv.className = `agent-item ${agent.muted ? 'muted' : ''}`;
+      agentDiv.className = `agent-item ${agent.muted ? 'muted' : ''} ${agent.isOnline ? 'online' : 'offline'}`;
       
       const statusBadge = agent.isOnline 
-        ? `<span class="status-badge online">Online</span>`
-        : `<span class="status-badge offline">Offline</span>`;
+        ? `<span class="status-badge online-badge">● Online</span>`
+        : `<span class="status-badge offline-badge">○ Offline</span>`;
       
-      const fileInfo = agent.filename 
-        ? `<br><small style="color: #666;">File: ${agent.filename}</small>`
+      const muteBadge = agent.muted 
+        ? `<span class="status-badge muted-badge">🔇 Muted</span>`
         : '';
       
       agentDiv.innerHTML = `
-        <div style="flex: 1;">
-          <strong>${agent.name}</strong> ${statusBadge}
-          <br>
-          <small style="color: #666;">ID: ${agent.id}</small>
-          ${fileInfo}
-          ${agent.muted ? '<br><small style="color: #f44336;">🔇 Muted</small>' : ''}
+        <div class="agent-info">
+          <div class="agent-name">
+            ${agent.name}
+            ${statusBadge}
+            ${muteBadge}
+          </div>
+          <div class="agent-id">ID: ${agent.id}</div>
+          ${agent.filename ? `<div class="agent-file">📄 ${agent.filename}</div>` : ''}
+          ${agent.socketId ? `<div style="font-size: 11px; color: #999; margin-top: 3px;">Socket: ${agent.socketId.substring(0, 8)}...</div>` : ''}
         </div>
         <div>
           <button class="toggle-btn ${agent.muted ? 'unmute-btn' : 'mute-btn'}" 
                   onclick="toggleAgentMute('${agent.id}')">
-            ${agent.muted ? 'Unmute' : 'Mute'}
+            ${agent.muted ? '🔊 Unmute' : '🔇 Mute'}
           </button>
         </div>
       `;
       agentsList.appendChild(agentDiv);
     });
-    
-    // Update file status after rendering
-    setTimeout(checkFileStatus, 100);
-  }
-
-  // Save/Update agent
-  function saveAgent() {
-    const name = document.getElementById('agentName').value.trim();
-    const id = document.getElementById('agentId').value.trim();
-    const password = document.getElementById('agentPassword').value.trim();
-    const filename = document.getElementById('agentFilename').value;
-    
-    if (!name || !id || !password) {
-      alert('Please fill all required fields: Name, ID, and Password');
-      return;
-    }
-    
-    socket.emit('save_agent', {
-      name: name,
-      id: id,
-      password: password,
-      filename: filename || undefined
-    });
-    
-    // Clear form
-    document.getElementById('agentName').value = '';
-    document.getElementById('agentId').value = '';
-    document.getElementById('agentPassword').value = '';
-    document.getElementById('agentFilename').value = '';
-    document.getElementById('fileStatus').innerHTML = '';
   }
 
   // Toggle agent mute status
   function toggleAgentMute(agentId) {
     socket.emit('toggle_agent_mute', { agentId: agentId });
+    
+    // Update local state immediately
+    const agent = agents.find(a => a.id === agentId);
+    if (agent) {
+      agent.muted = !agent.muted;
+      renderAgents();
+      updateStats();
+      logActivity(`🔧 ${agent.muted ? 'Muted' : 'Unmuted'} agent: ${agent.name}`);
+    }
   }
 
   // Add message to display
-  function addMessage(sender, content, type = 'user') {
+  function addMessage(sender, content, type = 'user', attachment = null) {
     const messagesContainer = document.getElementById('messagesContainer');
+    
+    // Clear "waiting" message if present
+    if (messagesContainer.children.length === 1 && messagesContainer.children[0].innerText.includes('Waiting')) {
+      messagesContainer.innerHTML = '';
+    }
+    
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${type}-message`;
+    
+    let attachmentHtml = '';
+    if (attachment) {
+      const fileType = attachment.mimetype?.split('/')[0];
+      let icon = '📄';
+      if (fileType === 'image') icon = '🖼️';
+      else if (fileType === 'video') icon = '🎬';
+      else if (fileType === 'audio') icon = '🎵';
+      
+      const fileUrl = attachment.url || attachment.path;
+      attachmentHtml = `
+        <div style="margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+          ${icon} <a href="${fileUrl}" target="_blank" style="color: #007bff; text-decoration: none;">
+            ${attachment.originalname || attachment.filename}
+          </a>
+          ${fileType === 'image' ? `<br><img src="${fileUrl}" style="max-width: 150px; margin-top: 5px; border-radius: 4px;">` : ''}
+        </div>
+      `;
+    }
+    
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
     messageDiv.innerHTML = `
-      <strong>${sender}:</strong> ${content}<br>
-      <small>${new Date().toLocaleTimeString()}</small>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <strong>${sender}</strong>
+        <small style="color: #999;">${time}</small>
+      </div>
+      <div>${content || ''}</div>
+      ${attachmentHtml}
     `;
+    
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
   // Log activity
   function logActivity(text) {
-    const activityLog = document.getElementById('activityLog');
-    if (!activityLog) return;
+    const activityLogContainer = document.getElementById('activityLog');
+    if (!activityLogContainer) return;
+    
+    // Clear "loading" message if present
+    if (activityLogContainer.children.length === 1 && activityLogContainer.children[0].innerText.includes('Loading')) {
+      activityLogContainer.innerHTML = '';
+    }
     
     const logEntry = document.createElement('div');
-    logEntry.style.padding = '5px 0';
-    logEntry.style.borderBottom = '1px solid #eee';
-    logEntry.style.fontSize = '12px';
-    logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${text}`;
+    logEntry.className = 'activity-entry';
     
-    activityLog.appendChild(logEntry);
-    activityLog.scrollTop = activityLog.scrollHeight;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    
+    logEntry.innerHTML = `
+      <span class="activity-time">[${time}]</span>
+      ${text}
+    `;
+    
+    activityLogContainer.insertBefore(logEntry, activityLogContainer.firstChild);
+    
+    // Limit to 50 entries
+    if (activityLogContainer.children.length > 50) {
+      activityLogContainer.removeChild(activityLogContainer.lastChild);
+    }
   }
 
-  // Send message from Super Admin
-  function sendMessage() {
+  // Render activity log
+  function renderActivityLog() {
+    const activityLogContainer = document.getElementById('activityLog');
+    if (!activityLogContainer) return;
+    
+    activityLogContainer.innerHTML = '';
+    
+    // Show latest 20 activities
+    const recentActivities = activityLog.slice(-20).reverse();
+    
+    if (recentActivities.length === 0) {
+      activityLogContainer.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: #999;">
+          No recent activity
+        </div>
+      `;
+      return;
+    }
+    
+    recentActivities.forEach(activity => {
+      const logEntry = document.createElement('div');
+      logEntry.className = 'activity-entry';
+      
+      const time = new Date(activity.timestamp).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      let activityText = activity.type;
+      if (activity.details) {
+        if (typeof activity.details === 'object') {
+          activityText += ': ' + Object.entries(activity.details)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+        } else {
+          activityText += ': ' + activity.details;
+        }
+      }
+      
+      logEntry.innerHTML = `
+        <span class="activity-time">[${time}]</span>
+        ${activityText}
+      `;
+      
+      activityLogContainer.appendChild(logEntry);
+    });
+  }
+
+  // Send broadcast message to all agents
+  function sendBroadcastMessage() {
     const input = document.getElementById('messageInput');
     const message = input.value.trim();
     
-    if (!message) return;
+    if (!message) {
+      alert('Please enter a message to broadcast');
+      return;
+    }
     
     // Add to display
-    addMessage('Super Admin', message, 'super');
-    logActivity(`You: ${message}`);
+    addMessage('Super Admin (Broadcast)', message, 'super');
+    logActivity(`📢 Broadcast message sent to all agents`);
     
-    // Broadcast to all non-muted agents
+    // Send to all non-muted agents
     socket.emit('forward_to_agents', {
-      type: 'super_message',
+      type: 'broadcast',
       data: {
         from: 'Super Admin',
-        message: message
-      },
-      timestamp: new Date().toISOString()
+        message: message,
+        timestamp: new Date().toISOString()
+      }
     });
     
     input.value = '';
     input.focus();
   }
 
-  // Auto-login if already authenticated
-  window.addEventListener('load', () => {
-    const savedPassword = localStorage.getItem('superAdminPassword');
-    if (savedPassword) {
-      superPassword.value = savedPassword;
-    }
-  });
-
   // Enter key for login
   superPassword.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') loginSuperAdmin();
+  });
+
+  // Enter key for message input
+  document.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && e.target.id === 'messageInput') {
+      sendBroadcastMessage();
+    }
   });
 </script>
 </body>
