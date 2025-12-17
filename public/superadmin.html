@@ -2,84 +2,123 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Super Admin Panel</title>
   <style>
+    /* ===== GLOBAL STYLES ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
     body { 
-      font-family: Arial, sans-serif; 
-      margin: 20px; 
-      background: #f0f2f5; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+      background: #f0f2f5;
+      color: #333;
+      line-height: 1.4;
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
     
     .container { 
       max-width: 1200px; 
-      margin: 0 auto; 
+      margin: 0 auto;
+      padding: 0 16px;
+      width: 100%;
     }
 
-    /* Login overlay */
+    /* ===== LOGIN OVERLAY ===== */
     #loginOverlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.9);
+      background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
       display: flex;
       justify-content: center;
       align-items: center;
       z-index: 1000;
+      padding: 20px;
     }
 
     #loginContainer {
       background: white;
-      padding: 40px;
-      border-radius: 10px;
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+      padding: clamp(24px, 5vw, 40px);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       text-align: center;
       max-width: 400px;
-      width: 90%;
+      width: 100%;
     }
 
+    /* ===== INPUT & BUTTON STYLES ===== */
     input, button, select { 
       font-size: 16px; 
     }
     
     button { 
       cursor: pointer; 
+      transition: all 0.2s ease;
     }
 
-    /* Dashboard Grid */
+    button:active {
+      transform: scale(0.98);
+    }
+
+    /* ===== DASHBOARD GRID ===== */
     .dashboard-grid {
       display: grid;
-      grid-template-columns: 1fr 2fr;
+      grid-template-columns: 1fr;
       gap: 20px;
       margin-top: 20px;
     }
 
-    /* Panel Styles */
+    @media (min-width: 992px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr 2fr;
+      }
+    }
+
+    /* ===== PANEL STYLES ===== */
     .panel {
       background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      padding: clamp(16px, 3vw, 20px);
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       margin-bottom: 20px;
     }
 
-    /* Agents List */
+    /* ===== AGENTS LIST ===== */
     .agent-item {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 15px;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
       border: 1px solid #e0e0e0;
-      margin: 8px 0;
-      border-radius: 8px;
+      margin: 12px 0;
+      border-radius: 10px;
       background: white;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
+    }
+
+    @media (min-width: 768px) {
+      .agent-item {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
     }
 
     .agent-item:hover {
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      transform: translateY(-1px);
     }
 
     .agent-item.muted { 
@@ -99,39 +138,49 @@
     /* Agent Info */
     .agent-info {
       flex: 1;
+      min-width: 0;
     }
 
     .agent-name {
-      font-weight: bold;
-      font-size: 16px;
+      font-weight: 600;
+      font-size: clamp(15px, 2vw, 16px);
       color: #333;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .agent-id {
-      font-size: 13px;
+      font-size: clamp(12px, 1.5vw, 13px);
       color: #666;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      word-break: break-word;
     }
 
     .agent-file {
-      font-size: 12px;
+      font-size: clamp(11px, 1.5vw, 12px);
       color: #007bff;
       background: #e7f3ff;
-      padding: 2px 6px;
-      border-radius: 3px;
+      padding: 4px 8px;
+      border-radius: 4px;
       display: inline-block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     /* Status Badges */
     .status-badge {
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 12px;
-      font-size: 11px;
-      font-weight: bold;
+      font-size: clamp(10px, 1.5vw, 11px);
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-left: 8px;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
     }
     
     .online-badge { 
@@ -151,13 +200,25 @@
 
     /* Toggle Buttons */
     .toggle-btn {
-      padding: 6px 15px;
+      padding: 10px 20px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
-      font-weight: bold;
+      font-weight: 600;
       transition: all 0.3s ease;
-      min-width: 80px;
+      min-width: 100px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    @media (max-width: 767px) {
+      .toggle-btn {
+        width: 100%;
+        min-width: 0;
+      }
     }
     
     .mute-btn { 
@@ -178,81 +239,121 @@
       background: #218838; 
     }
 
-    /* Messages Panel - FIXED FOR VERTICAL MESSAGES */
+    /* ===== MESSAGES PANEL ===== */
     .messages-container {
-      height: 500px;
+      height: clamp(300px, 50vh, 500px);
       overflow-y: auto;
       background: white;
       border: 1px solid #ddd;
       border-radius: 10px;
-      padding: 15px;
-      margin-bottom: 20px;
+      padding: 16px;
+      margin-bottom: 16px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
     }
 
     .chat-message {
-      padding: 10px 15px;
-      margin: 5px 0;
-      border-radius: 10px;
+      padding: 14px;
+      border-radius: 12px;
       border-left: 4px solid #007bff;
       background: #f8f9fa;
-      display: block;
       width: 100%;
       box-sizing: border-box;
-      clear: both;
-      position: relative;
       word-wrap: break-word;
       word-break: break-word;
       overflow-wrap: break-word;
+      animation: fadeIn 0.3s ease;
+      transition: all 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .user-message { 
       border-left-color: #28a745; 
       background: #e8f5e9; 
-      margin-right: 15%;
     }
     
     .agent-message { 
       border-left-color: #ffc107; 
       background: #fff8e1; 
-      margin-left: 15%;
     }
     
     .super-message { 
       border-left-color: #6f42c1; 
       background: #e9ecef; 
-      margin-left: 10%;
-      margin-right: 10%;
     }
 
-    /* Activity Log */
+    /* Message delete button */
+    .delete-message-btn {
+      float: right;
+      background: transparent;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 8px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .delete-message-btn:hover {
+      background: #ffebee;
+      color: #d32f2f;
+    }
+
+    /* ===== ACTIVITY LOG ===== */
     .activity-log {
-      max-height: 200px;
+      max-height: clamp(150px, 30vh, 200px);
       overflow-y: auto;
-      margin-top: 10px;
+      margin-top: 12px;
+      padding-right: 8px;
     }
 
     .activity-entry {
-      padding: 8px 0;
+      padding: 10px 0;
       border-bottom: 1px solid #eee;
-      font-size: 13px;
+      font-size: clamp(12px, 1.5vw, 13px);
       color: #666;
     }
 
     .activity-time {
       color: #999;
-      font-size: 11px;
+      font-size: clamp(10px, 1.5vw, 11px);
       margin-right: 8px;
+      white-space: nowrap;
     }
 
-    /* Stats Cards */
+    /* ===== STATS CARDS ===== */
     .stats-container {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 15px;
+      grid-template-columns: repeat(1, 1fr);
+      gap: 12px;
       margin-bottom: 20px;
+    }
+
+    @media (min-width: 576px) {
+      .stats-container {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (min-width: 768px) {
+      .stats-container {
+        grid-template-columns: repeat(3, 1fr);
+      }
     }
 
     .stat-card {
@@ -260,78 +361,101 @@
       padding: 20px;
       border-radius: 10px;
       text-align: center;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: transform 0.2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
     }
 
     .stat-number {
-      font-size: 28px;
-      font-weight: bold;
+      font-size: clamp(24px, 4vw, 28px);
+      font-weight: 700;
       color: #007bff;
       margin-bottom: 5px;
     }
 
     .stat-label {
-      font-size: 14px;
+      font-size: clamp(13px, 1.5vw, 14px);
       color: #666;
     }
 
-    /* Input Styles */
+    /* ===== INPUT STYLES ===== */
     .input-group {
       display: flex;
-      gap: 10px;
+      flex-direction: column;
+      gap: 12px;
       margin-top: 15px;
+    }
+
+    @media (min-width: 576px) {
+      .input-group {
+        flex-direction: row;
+      }
     }
 
     .message-input {
       flex: 1;
-      padding: 12px;
+      padding: 14px;
       border: 2px solid #ddd;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: clamp(14px, 1.5vw, 16px);
+      min-height: 50px;
     }
 
     .message-input:focus {
       border-color: #007bff;
       outline: none;
+      box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
     }
 
     .send-btn {
-      padding: 12px 25px;
+      padding: 14px 25px;
       background: #007bff;
       color: white;
       border: none;
       border-radius: 8px;
-      font-weight: bold;
+      font-weight: 600;
       transition: background 0.3s;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
     }
 
     .send-btn:hover {
       background: #0056b3;
     }
 
-    /* Header Styles */
+    /* ===== HEADER STYLES ===== */
     .header {
       background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
       color: white;
-      padding: 25px;
-      border-radius: 10px;
+      padding: clamp(20px, 4vw, 25px);
+      border-radius: 12px;
       margin-bottom: 20px;
+      margin-top: 16px;
     }
 
     .header h1 {
       margin: 0;
-      font-size: 28px;
+      font-size: clamp(22px, 3.5vw, 28px);
+      font-weight: 600;
+      line-height: 1.2;
     }
 
     .header-subtitle {
-      color: rgba(255,255,255,0.8);
-      margin-top: 5px;
-      font-size: 14px;
+      color: rgba(255,255,255,0.85);
+      margin-top: 8px;
+      font-size: clamp(13px, 1.5vw, 14px);
     }
 
-    /* Scrollbar Styling */
+    /* ===== SCROLLBAR STYLING ===== */
     ::-webkit-scrollbar {
-      width: 8px;
+      width: 6px;
     }
 
     ::-webkit-scrollbar-track {
@@ -347,6 +471,117 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #555;
     }
+
+    /* ===== LOADING STATES ===== */
+    .loading-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: #999;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* ===== EMPTY STATES ===== */
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: #666;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    /* ===== MOBILE-SPECIFIC ADJUSTMENTS ===== */
+    @media (max-width: 767px) {
+      #loginContainer h1 {
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+      
+      .panel h2 {
+        font-size: 18px;
+      }
+      
+      .panel h3 {
+        font-size: 16px;
+      }
+      
+      .chat-message {
+        padding: 12px;
+      }
+      
+      .agent-item {
+        padding: 14px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 0 12px;
+      }
+      
+      .panel {
+        padding: 14px;
+      }
+      
+      .header {
+        padding: 16px;
+      }
+      
+      .header h1 {
+        font-size: 20px;
+      }
+      
+      .messages-container {
+        padding: 12px;
+      }
+    }
+
+    /* ===== SAFE AREA SUPPORT ===== */
+    @supports (padding: max(0px)) {
+      body {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+      }
+    }
+
+    /* ===== UTILITY CLASSES ===== */
+    .text-truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .flex-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gap-2 { gap: 8px; }
+    .gap-4 { gap: 16px; }
+
+    .mb-2 { margin-bottom: 8px; }
+    .mb-4 { margin-bottom: 16px; }
+    .mt-2 { margin-top: 8px; }
+    .mt-4 { margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -354,16 +589,22 @@
 <!-- Login Overlay -->
 <div id="loginOverlay">
   <div id="loginContainer">
-    <h1 style="margin-bottom: 30px; color: #333;">🔐 Super Admin Dashboard</h1>
-    <p style="color: #666; margin-bottom: 20px;">Enter super admin password to access monitoring panel:</p>
+    <h1 style="margin-bottom: clamp(20px, 4vw, 30px); color: #333;">🔐 Super Admin Dashboard</h1>
+    <p style="color: #666; margin-bottom: clamp(16px, 3vw, 20px); font-size: clamp(14px, 1.5vw, 16px);">
+      Enter super admin password to access monitoring panel:
+    </p>
     <input type="password" id="superPassword" placeholder="Super Admin Password" autocomplete="off" 
-           style="width: 100%; padding: 15px; margin-bottom: 15px; border: 2px solid #ddd; border-radius: 5px;">
-    <div id="loginError" style="color: #d32f2f; margin: 10px 0; min-height: 20px;"></div>
+           style="width: 100%; padding: clamp(12px, 2vw, 15px); margin-bottom: clamp(12px, 2vw, 15px); 
+                  border: 2px solid #ddd; border-radius: 8px; font-size: clamp(14px, 1.5vw, 16px);">
+    <div id="loginError" style="color: #d32f2f; margin: clamp(8px, 1.5vw, 10px) 0; min-height: 20px; 
+                               font-size: clamp(12px, 1.5vw, 14px);"></div>
     <button onclick="loginSuperAdmin()" 
-            style="width: 100%; padding: 15px; background: #1a237e; color: white; border: none; border-radius: 5px; margin-top: 10px; font-weight: bold;">
+            style="width: 100%; padding: clamp(12px, 2vw, 15px); background: #1a237e; color: white; 
+                   border: none; border-radius: 8px; margin-top: clamp(8px, 1.5vw, 10px); font-weight: 600;
+                   font-size: clamp(14px, 1.5vw, 16px);">
       🔓 Access Monitoring Panel
     </button>
-    <div style="margin-top: 20px; font-size: 12px; color: #888;">
+    <div style="margin-top: clamp(16px, 3vw, 20px); font-size: clamp(11px, 1.5vw, 12px); color: #888;">
       <em>Monitoring Dashboard | Server: <span id="serverUrl">https://chat-backend-p2b9.onrender.com</span></em>
     </div>
   </div>
@@ -375,6 +616,7 @@
   let agents = [];
   let activityLog = [];
   let displayedMessageIds = new Set(); // Track displayed messages to prevent duplicates
+  let messages = new Map(); // Store messages by ID for deletion handling
 
   // DOM Elements
   const loginOverlay = document.getElementById('loginOverlay');
@@ -448,18 +690,19 @@
         <div>
           <div class="panel">
             <h2>🔍 Agents Monitoring</h2>
-            <p style="color: #666; margin-bottom: 15px; font-size: 14px;">
+            <p style="color: #666; margin-bottom: 15px; font-size: clamp(13px, 1.5vw, 14px);">
               Monitor agent status and mute/unmute as needed. Agents are created via individual agent files.
             </p>
-            <div id="agentsList" style="max-height: 500px; overflow-y: auto; margin-top: 15px;"></div>
+            <div id="agentsList" style="max-height: clamp(300px, 50vh, 500px); overflow-y: auto; margin-top: 15px;"></div>
           </div>
           
           <!-- Activity Log Panel -->
           <div class="panel">
             <h3>📋 System Activity</h3>
             <div class="activity-log" id="activityLog">
-              <div style="padding: 20px; text-align: center; color: #999;">
-                Loading activity log...
+              <div class="loading-state">
+                <div class="loading-spinner"></div>
+                <div>Loading activity log...</div>
               </div>
             </div>
           </div>
@@ -470,8 +713,12 @@
           <div class="panel">
             <h2>💬 Live Conversations</h2>
             <div class="messages-container" id="messagesContainer">
-              <div style="padding: 20px; text-align: center; color: #999;">
-                Waiting for messages...
+              <div class="empty-state">
+                <div class="empty-icon">💭</div>
+                <div>Waiting for messages...</div>
+                <p style="font-size: 12px; color: #999; margin-top: 8px;">
+                  All user and agent messages will appear here
+                </p>
               </div>
             </div>
             
@@ -481,7 +728,7 @@
                 📢 Broadcast
               </button>
             </div>
-            <p style="color: #666; font-size: 12px; margin-top: 10px;">
+            <p style="color: #666; font-size: clamp(11px, 1.5vw, 12px); margin-top: 10px;">
               <em>Messages will be sent to all non-muted agents</em>
             </p>
           </div>
@@ -491,9 +738,15 @@
 
     document.body.appendChild(dashboard);
     setupSocketListeners();
+    
+    // Focus on message input after setup
+    setTimeout(() => {
+      const messageInput = document.getElementById('messageInput');
+      if (messageInput) messageInput.focus();
+    }, 500);
   }
 
-  // Setup socket listeners - FIXED TO PREVENT DUPLICATES
+  // Setup socket listeners - ENHANCED FOR NEW SERVER FEATURES
   function setupSocketListeners() {
     // Listen for agents list updates
     socket.on('agents_list', (agentList) => {
@@ -502,10 +755,12 @@
       updateStats();
     });
 
-    // === FIXED: LISTEN FOR ALL MESSAGES IN ONE PLACE ===
+    // ================================================
+    // ENHANCED: Handle ALL message types properly
+    // ================================================
     socket.on('new_message', (data) => {
       // Generate unique ID for this message to prevent duplicates
-      const messageId = generateMessageId(data);
+      const messageId = data.id || generateMessageId(data);
       
       // Check if we've already displayed this message
       if (displayedMessageIds.has(messageId)) {
@@ -515,25 +770,32 @@
       
       // Add to displayed messages tracking
       displayedMessageIds.add(messageId);
+      messages.set(messageId, data);
       
       // Clean up old message IDs (keep only last 100)
       if (displayedMessageIds.size > 100) {
         const iterator = displayedMessageIds.values();
         for (let i = 0; i < 50; i++) {
-          displayedMessageIds.delete(iterator.next().value);
+          const oldId = iterator.next().value;
+          displayedMessageIds.delete(oldId);
+          messages.delete(oldId);
         }
       }
       
       // Handle user messages
       if (data.sender === 'user') {
-        addMessage(data.userId || data.whatsapp || 'User', data.message || data.text, 'user', data.attachment);
-        logActivity(`📨 New user message from ${data.userId || data.whatsapp}`);
+        const whatsapp = data.whatsapp || data.userId || 'User';
+        const message = data.message || data.text || '';
+        addMessage(whatsapp, message, 'user', data.attachment, data.id || messageId);
+        logActivity(`📨 New user message from ${whatsapp}`);
       }
       
       // Handle agent messages
-      else if (data.sender === 'agent') {
-        addMessage(data.agentName || 'Agent', data.message || data.text, 'agent', data.attachment);
-        logActivity(`💬 ${data.agentName || 'Agent'} sent a message`);
+      else if (data.sender === 'agent' || data.sender === 'admin') {
+        const senderName = data.agentName || data.sender || 'Agent';
+        const message = data.message || data.text || '';
+        addMessage(senderName, message, 'agent', data.attachment, data.id || messageId);
+        logActivity(`💬 ${senderName} sent a message`);
       }
     });
 
@@ -549,6 +811,32 @@
         addMessage('User', data.data.message, 'user');
         logActivity(`📨 Forwarded user message`);
       }
+    });
+
+    // ================================================
+    // NEW: Listen for message deletion events
+    // ================================================
+    socket.on('message_deleted', (data) => {
+      console.log('🗑️ Message deletion received:', data);
+      
+      // Try to find and remove the message from display
+      if (data.messageId) {
+        removeMessageById(data.messageId);
+      }
+      
+      logActivity(`🗑️ Message deleted: ${data.messageId || 'Unknown'}`);
+    });
+
+    // ================================================
+    // NEW: Listen for chat deletion events
+    // ================================================
+    socket.on('chat_deleted', (data) => {
+      console.log('🗑️ Chat deletion received:', data);
+      
+      // Remove all messages from this chat
+      removeMessagesByWhatsapp(data.whatsapp);
+      
+      logActivity(`🗑️ Chat deleted for: ${data.whatsapp}`);
     });
 
     // Listen for activity updates
@@ -579,6 +867,57 @@
     const messageContent = data.message || data.text || '';
     
     return `${sender}_${whatsapp}_${timestamp}_${messageContent.substring(0, 20)}`;
+  }
+
+  // Remove message by ID
+  function removeMessageById(messageId) {
+    const messagesContainer = document.getElementById('messagesContainer');
+    if (!messagesContainer) return;
+    
+    // Find message element with this ID
+    const messageElement = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageElement) {
+      // Add fade out animation
+      messageElement.style.opacity = '0.5';
+      messageElement.style.textDecoration = 'line-through';
+      messageElement.style.backgroundColor = '#ffebee';
+      
+      // Remove after animation
+      setTimeout(() => {
+        if (messageElement.parentNode) {
+          messageElement.parentNode.removeChild(messageElement);
+        }
+      }, 1000);
+      
+      // Remove from tracking
+      displayedMessageIds.delete(messageId);
+      messages.delete(messageId);
+    }
+  }
+
+  // Remove all messages from a specific WhatsApp number
+  function removeMessagesByWhatsapp(whatsapp) {
+    const messagesContainer = document.getElementById('messagesContainer');
+    if (!messagesContainer) return;
+    
+    // Find all messages from this WhatsApp
+    const messageElements = messagesContainer.querySelectorAll('.chat-message');
+    messageElements.forEach(element => {
+      const senderElement = element.querySelector('strong');
+      if (senderElement && senderElement.textContent === whatsapp) {
+        // Add fade out animation
+        element.style.opacity = '0.5';
+        element.style.textDecoration = 'line-through';
+        element.style.backgroundColor = '#ffebee';
+        
+        // Remove after animation
+        setTimeout(() => {
+          if (element.parentNode) {
+            element.parentNode.removeChild(element);
+          }
+        }, 1000);
+      }
+    });
   }
 
   // Load agents
@@ -618,8 +957,8 @@
     
     if (agents.length === 0) {
       agentsList.innerHTML = `
-        <div style="padding: 40px; text-align: center; color: #666;">
-          <div style="font-size: 48px; margin-bottom: 20px;">👤</div>
+        <div class="empty-state">
+          <div class="empty-icon">👤</div>
           <h3>No Agents Found</h3>
           <p>Agents will appear here when they connect via their individual agent files.</p>
           <p style="font-size: 12px; color: #999; margin-top: 10px;">
@@ -645,18 +984,25 @@
         ? `<span class="status-badge muted-badge">🔇 Muted</span>`
         : '';
       
+      // Truncate socket ID for mobile
+      const socketDisplay = agent.socketId 
+        ? `<div style="font-size: 11px; color: #999; margin-top: 3px;" class="text-truncate">Socket: ${agent.socketId.substring(0, 8)}...</div>`
+        : '';
+      
       agentDiv.innerHTML = `
         <div class="agent-info">
           <div class="agent-name">
-            ${agent.name}
-            ${statusBadge}
-            ${muteBadge}
+            <span>${agent.name}</span>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;">
+              ${statusBadge}
+              ${muteBadge}
+            </div>
           </div>
           <div class="agent-id">ID: ${agent.id}</div>
-          ${agent.filename ? `<div class="agent-file">📄 ${agent.filename}</div>` : ''}
-          ${agent.socketId ? `<div style="font-size: 11px; color: #999; margin-top: 3px;">Socket: ${agent.socketId.substring(0, 8)}...</div>` : ''}
+          ${agent.filename ? `<div class="agent-file text-truncate" title="${agent.filename}">📄 ${agent.filename}</div>` : ''}
+          ${socketDisplay}
         </div>
-        <div>
+        <div style="min-width: 100px;">
           <button class="toggle-btn ${agent.muted ? 'unmute-btn' : 'mute-btn'}" 
                   onclick="toggleAgentMute('${agent.id}')">
             ${agent.muted ? '🔊 Unmute' : '🔇 Mute'}
@@ -681,8 +1027,8 @@
     }
   }
 
-  // Add message to display - UPDATED FOR VERTICAL LAYOUT
-  function addMessage(sender, content, type = 'user', attachment = null) {
+  // Add message to display - ENHANCED WITH DELETE SUPPORT
+  function addMessage(sender, content, type = 'user', attachment = null, messageId = null) {
     const messagesContainer = document.getElementById('messagesContainer');
     
     // Clear "waiting" message if present
@@ -692,6 +1038,11 @@
     
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${type}-message`;
+    
+    // Add message ID for deletion tracking
+    if (messageId) {
+      messageDiv.setAttribute('data-message-id', messageId);
+    }
     
     let attachmentHtml = '';
     if (attachment) {
@@ -703,28 +1054,67 @@
       
       const fileUrl = attachment.url || attachment.path;
       attachmentHtml = `
-        <div style="margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.5); border-radius: 6px;">
+        <div style="margin-top: 8px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 8px; font-size: 14px;">
           ${icon} <a href="${fileUrl}" target="_blank" style="color: #007bff; text-decoration: none;">
             ${attachment.originalname || attachment.filename}
           </a>
-          ${fileType === 'image' ? `<br><img src="${fileUrl}" style="max-width: 150px; margin-top: 5px; border-radius: 4px;">` : ''}
+          ${fileType === 'image' ? `<br><img src="${fileUrl}" style="max-width: 100%; max-height: 150px; margin-top: 8px; border-radius: 6px;">` : ''}
         </div>
       `;
     }
     
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
+    // Add delete button for super admin (only for messages with IDs)
+    const deleteButton = messageId ? `
+      <button class="delete-message-btn" onclick="deleteMessage('${messageId}', '${sender}')" title="Delete message">
+        🗑️
+      </button>
+    ` : '';
+    
     messageDiv.innerHTML = `
-      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-        <strong>${sender}</strong>
-        <small style="color: #999;">${time}</small>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <strong style="font-size: 14px;">${sender}</strong>
+          ${deleteButton}
+        </div>
+        <small style="color: #999; font-size: 12px;">${time}</small>
       </div>
-      <div>${content || ''}</div>
+      <div style="font-size: 14px; line-height: 1.5;">${content || ''}</div>
       ${attachmentHtml}
     `;
     
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  // Delete message (Super Admin only)
+  function deleteMessage(messageId, sender) {
+    if (!confirm(`Delete this message from ${sender}?\n\nThis will delete it for everyone.`)) {
+      return;
+    }
+    
+    // Find the message to get WhatsApp number
+    const messageData = messages.get(messageId);
+    if (!messageData) {
+      console.warn('Message data not found for ID:', messageId);
+      return;
+    }
+    
+    const whatsapp = messageData.whatsapp || sender;
+    
+    // Send delete request to server
+    if (socket && socket.connected) {
+      socket.emit('delete_message', {
+        whatsapp: whatsapp,
+        messageId: messageId,
+        deleteForAll: true
+      });
+      
+      logActivity(`🗑️ Requested deletion of message: ${messageId}`);
+    } else {
+      alert('Not connected to server. Please check connection.');
+    }
   }
 
   // Log activity
@@ -744,7 +1134,7 @@
     
     logEntry.innerHTML = `
       <span class="activity-time">[${time}]</span>
-      ${text}
+      <span>${text}</span>
     `;
     
     activityLogContainer.insertBefore(logEntry, activityLogContainer.firstChild);
@@ -767,8 +1157,9 @@
     
     if (recentActivities.length === 0) {
       activityLogContainer.innerHTML = `
-        <div style="padding: 20px; text-align: center; color: #999;">
-          No recent activity
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div>No recent activity</div>
         </div>
       `;
       return;
@@ -796,7 +1187,7 @@
       
       logEntry.innerHTML = `
         <span class="activity-time">[${time}]</span>
-        ${activityText}
+        <span>${activityText}</span>
       `;
       
       activityLogContainer.appendChild(logEntry);
@@ -838,9 +1229,23 @@
 
   // Enter key for message input
   document.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && e.target.id === 'messageInput') {
+    if (e.target.id === 'messageInput' && e.key === 'Enter') {
       sendBroadcastMessage();
     }
+  });
+
+  // Handle mobile keyboard visibility
+  window.addEventListener('resize', function() {
+    // Scroll to bottom when keyboard appears/disappears
+    const messagesContainer = document.getElementById('messagesContainer');
+    if (messagesContainer) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+  });
+
+  // Initialize on load
+  window.addEventListener('DOMContentLoaded', function() {
+    superPassword.focus();
   });
 </script>
 </body>
