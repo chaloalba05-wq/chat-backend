@@ -663,7 +663,8 @@ io.on("connection", (socket) => {
       message: data.message,
       whatsapp: data.whatsapp || 'unknown',
       timestamp: new Date().toISOString(),
-      id: `agent_${Date.now()}`
+      id: `agent_${Date.now()}`,
+      messageType: 'agent_message'
     });
     
     // Also send to the specific user if we have their whatsapp
@@ -686,7 +687,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  // ===== USER MESSAGES - SIMPLIFIED & FIXED VERSION =====
+  // ===== USER MESSAGES - FIXED VERSION (NO DUPLICATES) =====
   socket.on("user_message", async (data) => {
     console.log("📨 Received user_message event:", data);
     
@@ -731,8 +732,9 @@ io.on("connection", (socket) => {
       console.log("✓ Message saved to MongoDB");
     }
     
-    // BROADCAST TO ALL RECIPIENTS IN ONE PLACE
-    // 1. Send to the user (confirmation) with full attachment data
+    // ===== FIXED BROADCASTING - NO DUPLICATES =====
+    
+    // 1. Send confirmation to the user who sent it
     socket.emit("new_message", {
       ...message,
       sender: "user",
@@ -740,30 +742,25 @@ io.on("connection", (socket) => {
       attachment: data.attachment || null
     });
     
-    // 2. Create broadcast message with FULL ORIGINAL ATTACHMENT DATA
+    // 2. Create ONE broadcast message
     const broadcastMessage = {
       ...message,
       sender: "user",
       text: data.message || '',
-      attachment: data.attachment || null, // KEEP ORIGINAL ATTACHMENT AS IS
-      originalAttachment: data.attachment ? {
-        ...data.attachment,
-        // Ensure full URL is included
-        url: data.attachment.url || `${data.attachment.path?.startsWith('http') ? data.attachment.path : `http://localhost:3000${data.attachment.path}`}`
-      } : null
+      attachment: data.attachment || null,
+      // Add messageType to distinguish from agent messages
+      messageType: 'user_message'
     };
     
-    // 3. Send to ALL recipients at once with ORIGINAL attachment
-    // Send to super_admin
-    io.to("super_admin").emit("user_message", broadcastMessage);
-    // Send to admin
-    io.to("admin").emit("new_message", broadcastMessage);
+    // 3. Send to super_admin and admin as ONE event (not multiple)
+    // Use chained .to() to send to multiple rooms with ONE emit
+    io.to("super_admin").to("admin").emit("new_message", broadcastMessage);
     
-    // 4. Send to non-muted agents WITH ORIGINAL IMAGE ATTACHMENT
+    // 4. Send to non-muted agents as ONE event type
     const onlineAgents = [];
     agents.forEach((agent, agentId) => {
       if (!agent.muted && agent.socketId) {
-        io.to(agent.socketId).emit("user_message", broadcastMessage);
+        io.to(agent.socketId).emit("new_message", broadcastMessage);
         onlineAgents.push(agentId);
       }
     });
@@ -875,28 +872,20 @@ io.on("connection", (socket) => {
         message: text,
         whatsapp: whatsapp,
         timestamp: new Date().toISOString(),
-        attachment: attachment || null
+        attachment: attachment || null,
+        messageType: 'agent_message'
       });
       
-      // Send to super_admin and admin
-      io.to("super_admin").emit("new_message", {
+      // Send to super_admin and admin as ONE event
+      io.to("super_admin").to("admin").emit("new_message", {
         sender: sender,
         agentId: agentId,
         agentName: agentName,
         message: text,
         whatsapp: whatsapp,
         timestamp: new Date().toISOString(),
-        attachment: attachment || null
-      });
-      
-      io.to("admin").emit("new_message", {
-        sender: sender,
-        agentId: agentId,
-        agentName: agentName,
-        message: text,
-        whatsapp: whatsapp,
-        timestamp: new Date().toISOString(),
-        attachment: attachment || null
+        attachment: attachment || null,
+        messageType: 'agent_message'
       });
     }
   });

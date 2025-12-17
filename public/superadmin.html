@@ -359,6 +359,7 @@
   let socket = null;
   let agents = [];
   let activityLog = [];
+  let displayedMessageIds = new Set(); // Track displayed messages to prevent duplicates
 
   // DOM Elements
   const loginOverlay = document.getElementById('loginOverlay');
@@ -477,7 +478,7 @@
     setupSocketListeners();
   }
 
-  // Setup socket listeners
+  // Setup socket listeners - FIXED TO PREVENT DUPLICATES
   function setupSocketListeners() {
     // Listen for agents list updates
     socket.on('agents_list', (agentList) => {
@@ -486,15 +487,36 @@
       updateStats();
     });
 
-    // Listen for user messages
-    socket.on('user_message', (data) => {
-      addMessage(data.userId || data.whatsapp || 'User', data.message || data.text, 'user', data.attachment);
-      logActivity(`📨 New user message from ${data.userId || data.whatsapp}`);
-    });
-
-    // Listen for agent messages
+    // === FIXED: LISTEN FOR ALL MESSAGES IN ONE PLACE ===
     socket.on('new_message', (data) => {
-      if (data.sender === 'agent') {
+      // Generate unique ID for this message to prevent duplicates
+      const messageId = generateMessageId(data);
+      
+      // Check if we've already displayed this message
+      if (displayedMessageIds.has(messageId)) {
+        console.log('⚠️ Duplicate message detected, skipping:', messageId);
+        return;
+      }
+      
+      // Add to displayed messages tracking
+      displayedMessageIds.add(messageId);
+      
+      // Clean up old message IDs (keep only last 100)
+      if (displayedMessageIds.size > 100) {
+        const iterator = displayedMessageIds.values();
+        for (let i = 0; i < 50; i++) {
+          displayedMessageIds.delete(iterator.next().value);
+        }
+      }
+      
+      // Handle user messages
+      if (data.sender === 'user') {
+        addMessage(data.userId || data.whatsapp || 'User', data.message || data.text, 'user', data.attachment);
+        logActivity(`📨 New user message from ${data.userId || data.whatsapp}`);
+      }
+      
+      // Handle agent messages
+      else if (data.sender === 'agent') {
         addMessage(data.agentName || 'Agent', data.message || data.text, 'agent', data.attachment);
         logActivity(`💬 ${data.agentName || 'Agent'} sent a message`);
       }
@@ -502,8 +524,15 @@
 
     // Listen for forwarded messages
     socket.on('forwarded_message', (data) => {
+      // Generate unique ID for forwarded messages too
+      const messageId = `forwarded_${Date.now()}_${JSON.stringify(data).substring(0, 50)}`;
+      
+      if (displayedMessageIds.has(messageId)) return;
+      displayedMessageIds.add(messageId);
+      
       if (data.type === 'user_message') {
         addMessage('User', data.data.message, 'user');
+        logActivity(`📨 Forwarded user message`);
       }
     });
 
@@ -522,6 +551,19 @@
         renderActivityLog();
       }
     });
+  }
+
+  // Generate unique message ID
+  function generateMessageId(data) {
+    if (data.id) return data.id;
+    
+    // Create ID from message properties
+    const sender = data.sender || 'unknown';
+    const whatsapp = data.whatsapp || data.userId || 'unknown';
+    const timestamp = data.timestamp || Date.now();
+    const messageContent = data.message || data.text || '';
+    
+    return `${sender}_${whatsapp}_${timestamp}_${messageContent.substring(0, 20)}`;
   }
 
   // Load agents
