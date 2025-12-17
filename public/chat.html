@@ -165,45 +165,29 @@
       display: none;
       flex: 1;
       flex-direction: column;
-      height: 100%;
+      height: 100vh;
       background: #f8f9fa;
       position: relative;
     }
 
-    .chat-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding: 0;
-      max-width: 800px;
-      margin: 0 auto;
-      width: 100%;
-      height: 100%;
-      background: white;
-    }
-
-    /* ===== FIXED CHAT LAYOUT - UPDATED FOR 3/4 & 1/4 SPLIT ===== */
     .chat-wrapper {
-      flex: 1;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
-      position: relative;
       height: 100vh;
       height: -webkit-fill-available;
+      width: 100%;
+      overflow: hidden;
     }
 
-    /* ===== MESSAGES AREA - TAKES 3/4 OF SCREEN ===== */
+    /* ===== MESSAGES SECTION - 3/4 OF SCREEN ===== */
     .messages-section {
-      flex: 3; /* Takes 3/4 of available space */
+      flex: 3; /* Takes 3/4 of screen */
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      position: relative;
-      min-height: 0; /* Important for flex children to respect overflow */
+      min-height: 0; /* Crucial for scrollable flex children */
     }
 
-    /* Chat header inside messages section */
     .chat-header {
       padding: 16px;
       background: white;
@@ -224,15 +208,16 @@
       font-weight: 500;
     }
 
-    /* Messages wrapper for scrollable content */
+    /* Messages wrapper - The key to independent scrolling */
     .messages-wrapper {
       flex: 1;
-      position: relative;
       overflow: hidden;
+      position: relative;
       background: #f8f9fa;
+      min-height: 0;
     }
 
-    /* Main messages container - Now scrollable independently */
+    /* Main messages container - Independently scrollable */
     #messages {
       position: absolute;
       top: 0;
@@ -244,54 +229,55 @@
       padding: 16px;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
-      scroll-behavior: smooth;
+      scroll-behavior: auto; /* Changed from smooth for faster scrolling */
+      will-change: transform;
+      backface-visibility: hidden;
+      transform: translateZ(0);
       display: flex;
       flex-direction: column;
-      will-change: transform; /* Hardware acceleration for smooth scrolling */
-      backface-visibility: hidden;
     }
 
-    /* Ensure messages container grows with content */
+    /* Bottom padding for messages */
     #messages::after {
       content: '';
-      flex: 0 0 16px; /* Add bottom padding */
+      flex: 0 0 16px;
     }
 
-    /* Custom scrollbar for messages - optimized for performance */
+    /* Optimized scrollbar */
     #messages::-webkit-scrollbar {
-      width: 8px;
+      width: 6px;
     }
 
     #messages::-webkit-scrollbar-track {
-      background: rgba(241, 241, 241, 0.8);
-      border-radius: 4px;
+      background: rgba(241, 241, 241, 0.5);
+      border-radius: 3px;
     }
 
     #messages::-webkit-scrollbar-thumb {
-      background: rgba(193, 193, 193, 0.8);
-      border-radius: 4px;
+      background: rgba(102, 126, 234, 0.5);
+      border-radius: 3px;
     }
 
     #messages::-webkit-scrollbar-thumb:hover {
-      background: rgba(168, 168, 168, 0.8);
+      background: rgba(102, 126, 234, 0.7);
     }
 
-    /* Hide scrollbar for Firefox */
+    /* Firefox scrollbar */
     #messages {
       scrollbar-width: thin;
-      scrollbar-color: rgba(193, 193, 193, 0.8) rgba(241, 241, 241, 0.8);
+      scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     }
 
-    /* ===== INPUT SECTION - TAKES 1/4 OF SCREEN ===== */
+    /* ===== INPUT SECTION - 1/4 OF SCREEN ===== */
     .input-section {
-      flex: 1; /* Takes 1/4 of available space */
+      flex: 1; /* Takes 1/4 of screen */
       display: flex;
       flex-direction: column;
       background: white;
       border-top: 1px solid #e8e8e8;
       flex-shrink: 0;
       z-index: 10;
-      min-height: 0; /* Important for flex children */
+      min-height: 0;
     }
 
     .input-area-container {
@@ -443,8 +429,9 @@
       animation: fadeIn 0.3s ease;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       line-height: 1.4;
-      flex-shrink: 0; /* Prevent messages from shrinking */
-      transform: translateZ(0); /* Hardware acceleration */
+      flex-shrink: 0;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
 
     @keyframes fadeIn {
@@ -568,7 +555,7 @@
     /* ===== SCROLL TO BOTTOM BUTTON ===== */
     .scroll-to-bottom-btn {
       position: absolute;
-      bottom: 100px; /* Position above input area */
+      bottom: 20px;
       right: 20px;
       width: 40px;
       height: 40px;
@@ -693,7 +680,8 @@
       }
       
       .scroll-to-bottom-btn {
-        bottom: 90px;
+        bottom: 16px;
+        right: 16px;
         width: 36px;
         height: 36px;
         font-size: 16px;
@@ -745,21 +733,20 @@
         font-size: 20px;
       }
       
-      /* Mobile-specific: reduce message padding */
       #messages {
         padding: 12px;
       }
       
       .scroll-to-bottom-btn {
-        bottom: 80px;
+        bottom: 14px;
+        right: 12px;
         width: 32px;
         height: 32px;
         font-size: 14px;
-        right: 12px;
       }
     }
 
-    /* ===== SAFE AREA SUPPORT FOR NOTCHED PHONES ===== */
+    /* ===== SAFE AREA SUPPORT ===== */
     @supports (padding: max(0px)) {
       body, #register, .input-area {
         padding-left: max(16px, env(safe-area-inset-left));
@@ -878,10 +865,172 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
   // ===== GLOBAL VARIABLES =====
-  const socket = io("https://chat-backend-p2b9.onrender.com");
+  const socket = io("https://chat-backend-p2b9.onrender.com", {
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    transports: ['websocket', 'polling']
+  });
+  
   let whatsapp = "";
   let selectedFile = null;
   let isScrolledToBottom = true;
+  
+  // ===== PERSISTENT CONNECTION MANAGER =====
+  const PersistentConnection = {
+    isConnected: false,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 20,
+    reconnectDelay: 1000,
+    maxReconnectDelay: 30000,
+    heartbeatInterval: null,
+    connectionCheckInterval: null,
+    lastActivityTime: Date.now(),
+    
+    init() {
+      this.setupConnectionPersistence();
+      this.setupActivityTracking();
+      this.setupVisibilityTracking();
+      console.log('🔗 Persistent connection manager initialized');
+    },
+    
+    setupConnectionPersistence() {
+      // Heartbeat to keep connection alive
+      this.heartbeatInterval = setInterval(() => {
+        if (socket.connected) {
+          socket.emit('heartbeat', { 
+            timestamp: Date.now(),
+            whatsapp: whatsapp || 'not-registered'
+          });
+          console.log('❤️ Heartbeat sent');
+        }
+      }, 25000);
+      
+      // Check connection status periodically
+      this.connectionCheckInterval = setInterval(() => {
+        this.checkConnection();
+      }, 10000);
+    },
+    
+    setupActivityTracking() {
+      // Track user activity to prevent timeout
+      const activityEvents = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+      activityEvents.forEach(event => {
+        document.addEventListener(event, () => {
+          this.lastActivityTime = Date.now();
+        }, { passive: true });
+      });
+      
+      // Send activity ping every minute if user is active
+      setInterval(() => {
+        const inactiveTime = Date.now() - this.lastActivityTime;
+        if (inactiveTime < 60000 && socket.connected) {
+          socket.emit('activity_ping', { whatsapp: whatsapp || 'not-registered' });
+        }
+      }, 60000);
+    },
+    
+    setupVisibilityTracking() {
+      // Handle page visibility changes
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.reconnectIfNeeded();
+        }
+      });
+      
+      // Handle page focus/blur
+      window.addEventListener('focus', () => {
+        this.reconnectIfNeeded();
+      });
+      
+      // Handle online/offline events
+      window.addEventListener('online', () => {
+        console.log('🌐 Internet connection restored');
+        this.reconnectWithBackoff();
+      });
+      
+      window.addEventListener('offline', () => {
+        console.log('🌐 Internet connection lost');
+        this.showConnectionStatus('disconnected', 'Offline - Reconnecting when back online');
+      });
+    },
+    
+    checkConnection() {
+      if (!socket.connected) {
+        this.reconnectWithBackoff();
+      }
+    },
+    
+    reconnectWithBackoff() {
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.log('🛑 Max reconnection attempts reached');
+        this.showConnectionStatus('disconnected', 'Connection failed. Please refresh the page.');
+        return;
+      }
+      
+      const delay = Math.min(
+        this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts),
+        this.maxReconnectDelay
+      );
+      
+      console.log(`🔄 Attempting reconnect in ${Math.round(delay/1000)}s (attempt ${this.reconnectAttempts + 1})`);
+      
+      setTimeout(() => {
+        if (!socket.connected) {
+          this.reconnectAttempts++;
+          socket.connect();
+          console.log(`🔌 Reconnection attempt ${this.reconnectAttempts}`);
+        }
+      }, delay);
+    },
+    
+    reconnectIfNeeded() {
+      if (!socket.connected) {
+        console.log('🔌 Page became visible, reconnecting...');
+        this.reconnectAttempts = 0;
+        socket.connect();
+      }
+    },
+    
+    showConnectionStatus(status, message) {
+      let statusDiv = document.getElementById('connectionStatus');
+      if (!statusDiv) {
+        statusDiv = document.createElement('div');
+        statusDiv.id = 'connectionStatus';
+        statusDiv.className = 'connection-status';
+        document.body.appendChild(statusDiv);
+      }
+      
+      statusDiv.className = `connection-status ${status}`;
+      statusDiv.textContent = message;
+      statusDiv.style.display = 'block';
+      
+      if (status === 'connected') {
+        setTimeout(() => {
+          statusDiv.style.display = 'none';
+        }, 5000);
+      }
+    },
+    
+    resetReconnection() {
+      this.reconnectAttempts = 0;
+      console.log('🔄 Reconnection counter reset');
+    },
+    
+    cleanup() {
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+      }
+      if (this.connectionCheckInterval) {
+        clearInterval(this.connectionCheckInterval);
+      }
+    }
+  };
+  
+  // Initialize persistent connection
+  PersistentConnection.init();
   
   // ===== DEDUPLICATION SYSTEM =====
   const duplicateManager = {
@@ -1053,14 +1202,14 @@
     const messagesDiv = document.getElementById("messages");
     const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
     
-    // Use passive event listener for better performance
+    // Optimized scroll listener with passive flag for better performance
     messagesDiv.addEventListener('scroll', function() {
       const scrollTop = messagesDiv.scrollTop;
       const scrollHeight = messagesDiv.scrollHeight;
       const clientHeight = messagesDiv.clientHeight;
       
-      // Check if we're near the bottom (within 100px)
-      isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 100;
+      // Check if we're near the bottom (within 50px)
+      isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
       
       // Show/hide scroll to bottom button
       if (!isScrolledToBottom) {
@@ -1073,36 +1222,94 @@
     // Scroll to bottom button click handler
     scrollToBottomBtn.addEventListener('click', scrollToBottom);
     
-    // Optimize scroll performance
-    messagesDiv.style.webkitOverflowScrolling = 'touch';
-    messagesDiv.style.overscrollBehavior = 'contain';
+    // Force hardware acceleration for smooth scrolling
+    messagesDiv.style.transform = 'translateZ(0)';
+    messagesDiv.style.backfaceVisibility = 'hidden';
+    messagesDiv.style.perspective = '1000px';
   }
   
   function scrollToBottom() {
     const messagesDiv = document.getElementById("messages");
     if (messagesDiv) {
-      // Use smooth scroll for better UX
-      messagesDiv.scrollTo({
-        top: messagesDiv.scrollHeight,
-        behavior: 'smooth'
-      });
+      // Use instant scroll for better performance
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
       isScrolledToBottom = true;
       document.getElementById("scrollToBottomBtn").classList.remove('visible');
     }
   }
   
-  // ===== SOCKET EVENT LISTENERS =====
+  // Optimized scrollToBottom for new messages
+  function scrollToBottomSmooth() {
+    const messagesDiv = document.getElementById("messages");
+    if (messagesDiv && isScrolledToBottom) {
+      messagesDiv.scrollTo({
+        top: messagesDiv.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }
+  
+  // ===== ENHANCED SOCKET EVENT LISTENERS =====
   socket.on("connect", () => {
-    console.log("Connected to server with ID:", socket.id);
+    console.log("✅ Connected to server with ID:", socket.id);
+    PersistentConnection.showConnectionStatus('connected', 'Connected');
+    PersistentConnection.resetReconnection();
     duplicateManager.clear();
+    
+    // Re-register if we have a whatsapp number
+    if (whatsapp) {
+      console.log("🔄 Re-registering after reconnect:", whatsapp);
+      socket.emit("register", { whatsapp: whatsapp });
+      socket.emit("get_messages", { whatsapp: whatsapp });
+    }
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("❌ Disconnected from server:", reason);
+    
+    if (reason === 'io server disconnect') {
+      // Server initiated disconnect, need to manually reconnect
+      socket.connect();
+    } else if (reason === 'io client disconnect') {
+      // Client initiated disconnect, do nothing
+    } else {
+      // Network error or other issues
+      PersistentConnection.showConnectionStatus('disconnected', 'Reconnecting...');
+      PersistentConnection.reconnectWithBackoff();
+    }
+  });
+
+  socket.on("connect_error", (error) => {
+    console.error("🔌 Connection error:", error.message);
+    PersistentConnection.showConnectionStatus('disconnected', 'Connection error. Reconnecting...');
+  });
+
+  socket.on("reconnect", (attemptNumber) => {
+    console.log(`🔄 Reconnected after ${attemptNumber} attempts`);
+    PersistentConnection.showConnectionStatus('connected', 'Reconnected');
+    PersistentConnection.resetReconnection();
+  });
+
+  socket.on("reconnect_attempt", (attemptNumber) => {
+    console.log(`🔄 Reconnection attempt ${attemptNumber}`);
+  });
+
+  socket.on("reconnecting", (attemptNumber) => {
+    console.log(`🔄 Reconnecting... attempt ${attemptNumber}`);
+    PersistentConnection.showConnectionStatus('disconnected', `Reconnecting... (${attemptNumber})`);
+  });
+
+  socket.on("reconnect_failed", () => {
+    console.log('🛑 Reconnection failed');
+    PersistentConnection.showConnectionStatus('disconnected', 'Connection failed. Please refresh.');
   });
 
   socket.on("registered", (data) => {
-    console.log("Registration successful:", data);
+    console.log("✅ Registration successful:", data);
   });
 
   socket.on("new_message", (msg) => {
-    console.log("New message received:", {
+    console.log("📨 New message received:", {
       sender: msg.sender,
       timestamp: msg.timestamp,
       preview: (msg.text || msg.message || '').substring(0, 50)
@@ -1117,13 +1324,11 @@
   });
 
   socket.on("message_history", (messages) => {
-    console.log("Message history:", messages.length, "messages");
+    console.log("📜 Message history:", messages.length, "messages");
     const messagesDiv = document.getElementById("messages");
     
-    // Remove existing content
-    while (messagesDiv.firstChild) {
-      messagesDiv.removeChild(messagesDiv.firstChild);
-    }
+    // Clear messages div efficiently
+    messagesDiv.innerHTML = '';
     
     if (messages.length === 0) {
       const emptyState = document.createElement("div");
@@ -1133,14 +1338,19 @@
       return;
     }
     
-    // Display all messages
+    // Use DocumentFragment for batch DOM operations
+    const fragment = document.createDocumentFragment();
+    
     messages.forEach(msg => {
       duplicateManager.isDuplicate(msg);
-      displayMessage(msg, false);
+      const messageElement = createMessageElement(msg);
+      fragment.appendChild(messageElement);
     });
     
+    messagesDiv.appendChild(fragment);
+    
     // Scroll to bottom after loading history
-    setTimeout(scrollToBottom, 100);
+    setTimeout(scrollToBottom, 50);
   });
 
   socket.on("connect_error", (error) => {
@@ -1149,15 +1359,7 @@
   });
 
   // ===== MESSAGE DISPLAY FUNCTIONS =====
-  function displayMessage(msg, scroll = true) {
-    const messagesDiv = document.getElementById("messages");
-    
-    // Remove empty state if present
-    const emptyState = messagesDiv.querySelector('.empty-state');
-    if (emptyState) {
-      emptyState.remove();
-    }
-    
+  function createMessageElement(msg) {
     const messageDiv = document.createElement("div");
     messageDiv.className = "message-container " + 
       (msg.sender === "user" ? "user-message" : "other-message");
@@ -1181,13 +1383,26 @@
       ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
     `;
     
-    messagesDiv.appendChild(messageDiv);
+    return messageDiv;
+  }
+
+  function displayMessage(msg, scroll = true) {
+    const messagesDiv = document.getElementById("messages");
+    
+    // Remove empty state if present
+    const emptyState = messagesDiv.querySelector('.empty-state');
+    if (emptyState) {
+      emptyState.remove();
+    }
+    
+    const messageElement = createMessageElement(msg);
+    messagesDiv.appendChild(messageElement);
     
     // Only auto-scroll if we're at the bottom or this is our own message
     if (scroll && (isScrolledToBottom || msg.sender === "user")) {
-      // Use requestAnimationFrame for smoother scrolling
-      requestAnimationFrame(() => {
-        scrollToBottom();
+      // Use microtask for smooth scrolling
+      Promise.resolve().then(() => {
+        scrollToBottomSmooth();
       });
     }
   }
@@ -1260,7 +1475,7 @@
     // Focus on message input after registration
     setTimeout(() => {
       document.getElementById("messageInput").focus();
-    }, 500);
+    }, 300);
   }
 
   // ===== FILE HANDLING =====
@@ -1482,7 +1697,7 @@
     }
   });
 
-  // Auto-resize message input for multiline text
+  // Auto-resize message input
   document.getElementById("messageInput").addEventListener("input", function() {
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, 120) + 'px';
@@ -1490,7 +1705,7 @@
     // Auto-scroll messages if input is growing
     if (this.scrollHeight > 70) {
       requestAnimationFrame(() => {
-        scrollToBottom();
+        scrollToBottomSmooth();
       });
     }
   });
@@ -1504,10 +1719,8 @@
     // If keyboard is shown/hidden (viewport height changed significantly)
     if (Math.abs(viewportHeight - newViewportHeight) > 100) {
       setTimeout(() => {
-        requestAnimationFrame(() => {
-          scrollToBottom();
-        });
-      }, 300); // Wait for keyboard animation
+        scrollToBottomSmooth();
+      }, 300);
     }
     
     viewportHeight = newViewportHeight;
@@ -1521,14 +1734,36 @@
     }
   });
 
-  // Cleanup
+  // ===== ENHANCED CLEANUP =====
   window.addEventListener('beforeunload', function() {
+    // Send disconnect event before leaving
+    if (socket && socket.connected) {
+      socket.emit('client_disconnecting', { 
+        whatsapp: whatsapp,
+        reason: 'page_closed'
+      });
+    }
+    
+    // Cleanup persistent connection
+    PersistentConnection.cleanup();
+    
+    // Disconnect socket
     if (socket) {
       socket.disconnect();
     }
+    
     duplicateManager.clear();
+    console.log('🧹 Cleanup completed');
   });
-  
+
+  // Keep connection alive during page hide/show
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && socket && !socket.connected) {
+      console.log('🔄 Page visible again, reconnecting...');
+      socket.connect();
+    }
+  });
+
   // Auto-cleanup duplicate manager every 5 minutes
   setInterval(() => {
     duplicateManager.clear();
@@ -1537,6 +1772,7 @@
   // Focus on WhatsApp input on page load
   window.addEventListener('DOMContentLoaded', function() {
     document.getElementById("whatsapp").focus();
+    console.log('🚀 Chat application loaded with persistent connection');
   });
 </script>
 </body>

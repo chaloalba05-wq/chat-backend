@@ -34,9 +34,11 @@
       width: 100%;
     }
     
-    /* ===== SIDEBAR ===== */
+    /* ===== SIDEBAR - EXACTLY 1/4 OF SCREEN ===== */
     .sidebar { 
-      width: clamp(280px, 25vw, 320px);
+      width: 25%;
+      min-width: 250px;
+      max-width: 400px;
       background: white; 
       border-right: 1px solid #e0e0e0;
       display: flex;
@@ -233,9 +235,10 @@
       word-break: break-word;
     }
     
-    /* ===== CHAT AREA ===== */
+    /* ===== CHAT AREA - EXACTLY 3/4 OF SCREEN ===== */
     .chat-area { 
-      flex: 1; 
+      width: 75%;
+      flex: 1;
       display: flex; 
       flex-direction: column;
       background: #f8f9fa;
@@ -290,9 +293,9 @@
       text-overflow: ellipsis;
     }
     
-    /* ===== NEW: MESSAGES CONTAINER - 3/4 OF SCREEN ===== */
+    /* ===== MESSAGES CONTAINER - 3/4 OF CHAT AREA (SCROLLABLE) ===== */
     .messages-container {
-      flex: 3; /* 3/4 of the space */
+      flex: 3; /* Takes 3/4 of chat area */
       overflow-y: auto;
       padding: clamp(16px, 2.5vw, 20px);
       display: flex;
@@ -429,9 +432,9 @@
       border: 1px solid rgba(0,0,0,0.1);
     }
     
-    /* ===== NEW: INPUT AREA - FIXED 1/4 OF SCREEN ===== */
+    /* ===== INPUT AREA - FIXED 1/4 OF CHAT AREA ===== */
     .input-area {
-      flex: 1; /* 1/4 of the space */
+      flex: 1; /* Takes 1/4 of chat area */
       padding: clamp(16px, 2.5vw, 20px);
       background: white;
       border-top: 1px solid #e0e0e0;
@@ -674,7 +677,7 @@
       display: block;
       font-size: clamp(13px, 1.8vw, 14px);
       color: #333;
-      margin-bottom: clamp(6px, 1vw, 8px);
+      margin-bottom = clamp(6px, 1vw, 8px);
       font-weight: 500;
     }
     
@@ -806,6 +809,20 @@
         border-bottom: 1px solid #e0e0e0;
       }
       
+      .chat-area {
+        width: 100%;
+        height: 60vh;
+      }
+      
+      /* Maintain the 3:1 ratio within chat area on mobile */
+      .messages-container {
+        flex: 3;
+      }
+      
+      .input-area {
+        flex: 1;
+      }
+      
       /* Mobile sidebar toggle */
       .mobile-sidebar-toggle {
         position: fixed;
@@ -821,19 +838,6 @@
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         z-index: 99;
         cursor: pointer;
-      }
-      
-      /* Chat area adjustments for mobile */
-      .chat-area {
-        height: 60vh;
-      }
-      
-      .messages-container {
-        flex: 2.5; /* Slightly adjusted for mobile */
-      }
-      
-      .input-area {
-        flex: 1;
       }
     }
     
@@ -1017,7 +1021,7 @@
   <!-- Mobile sidebar toggle -->
   <div class="mobile-sidebar-toggle" id="sidebarToggle" style="display: none;">☰</div>
   
-  <!-- Sidebar -->
+  <!-- Sidebar - 25% of screen -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <!-- Agent Info -->
@@ -1048,7 +1052,7 @@
     </div>
   </div>
   
-  <!-- Chat Area -->
+  <!-- Chat Area - 75% of screen -->
   <div class="chat-area">
     
     <!-- Chat Header -->
@@ -1060,7 +1064,7 @@
       </div>
     </div>
     
-    <!-- Messages Container - 3/4 of screen -->
+    <!-- Messages Container - 3/4 of chat area (scrollable) -->
     <div id="messages" class="messages-container">
       <div class="empty-state">
         <div class="empty-state-icon">👈</div>
@@ -1069,7 +1073,7 @@
       </div>
     </div>
     
-    <!-- Input Area - 1/4 of screen -->
+    <!-- Input Area - 1/4 of chat area (fixed at bottom) -->
     <div class="input-area">
       <div class="input-wrapper">
         <textarea 
@@ -1120,17 +1124,324 @@
   let users = new Map(); // Store users and their messages
   let isMuted = false;
   let autoReconnectAttempts = 0;
-  const MAX_RECONNECT_ATTEMPTS = 10;
+  const MAX_RECONNECT_ATTEMPTS = 20; // Increased from 10
   const RECONNECT_DELAY = 2000; // 2 seconds
   let reconnectTimeout = null;
   let selectedFile = null;
   let isMobile = window.innerWidth < 768;
   
   // ================================================
-  // NEW: Track if agent has received chat history
+  // PERSISTENT CONNECTION SYSTEM
   // ================================================
-  let hasReceivedHistory = false;
-  let allMessages = new Map(); // Store ALL messages across ALL chats
+  
+  // Persistent connection configuration
+  const CONNECTION_CONFIG = {
+    heartbeatInterval: 25000, // 25 seconds (less than typical timeout)
+    heartbeatTimeout: 10000, // 10 seconds to wait for heartbeat response
+    maxReconnectAttempts: 20,
+    baseReconnectDelay: 2000,
+    maxReconnectDelay: 30000,
+    connectionCheckInterval: 5000, // Check connection health every 5 seconds
+    offlineBuffer: [], // Store messages when offline
+    lastHeartbeat: null,
+    heartbeatTimer: null,
+    connectionCheckTimer: null,
+    isManualDisconnect: false, // Track if user manually disconnected
+    connectionState: 'disconnected', // 'connected', 'connecting', 'disconnected', 'error'
+    pingPongEnabled: true,
+    lastActivity: null
+  };
+  
+  // Initialize persistent connection
+  function initPersistentConnection() {
+    console.log("🔄 Initializing persistent connection system");
+    
+    // Clear any existing timers
+    clearTimers();
+    
+    // Reset connection state
+    CONNECTION_CONFIG.connectionState = 'disconnected';
+    CONNECTION_CONFIG.isManualDisconnect = false;
+    CONNECTION_CONFIG.lastActivity = Date.now();
+    
+    // Start connection monitoring
+    startConnectionMonitoring();
+    
+    // Set up beforeunload handler to prevent accidental disconnection
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Set up page visibility change handler
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    console.log("✅ Persistent connection system initialized");
+  }
+  
+  // Clear all timers
+  function clearTimers() {
+    if (CONNECTION_CONFIG.heartbeatTimer) {
+      clearInterval(CONNECTION_CONFIG.heartbeatTimer);
+      CONNECTION_CONFIG.heartbeatTimer = null;
+    }
+    
+    if (CONNECTION_CONFIG.connectionCheckTimer) {
+      clearInterval(CONNECTION_CONFIG.connectionCheckTimer);
+      CONNECTION_CONFIG.connectionCheckTimer = null;
+    }
+    
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+  }
+  
+  // Start connection monitoring
+  function startConnectionMonitoring() {
+    // Start connection health check
+    CONNECTION_CONFIG.connectionCheckTimer = setInterval(() => {
+      checkConnectionHealth();
+    }, CONNECTION_CONFIG.connectionCheckInterval);
+    
+    console.log("🔍 Started connection monitoring");
+  }
+  
+  // Check connection health
+  function checkConnectionHealth() {
+    if (!socket || !currentAgent) return;
+    
+    const now = Date.now();
+    const lastActivity = CONNECTION_CONFIG.lastActivity || now;
+    const timeSinceLastActivity = now - lastActivity;
+    
+    // If socket is connected but no activity for 60 seconds, send a ping
+    if (socket.connected && timeSinceLastActivity > 60000) {
+      console.log("🔄 No activity detected, sending keep-alive ping");
+      sendHeartbeat();
+    }
+    
+    // Check if heartbeat response is overdue
+    if (CONNECTION_CONFIG.lastHeartbeat && 
+        now - CONNECTION_CONFIG.lastHeartbeat > CONNECTION_CONFIG.heartbeatTimeout + 5000) {
+      console.warn("⚠️ Heartbeat response overdue, connection may be stale");
+      // Don't force reconnect here, let socket.io handle it
+    }
+  }
+  
+  // Send heartbeat to keep connection alive
+  function sendHeartbeat() {
+    if (!socket || !socket.connected || !currentAgent) return;
+    
+    try {
+      socket.emit('heartbeat', {
+        agentId: currentAgent.id,
+        timestamp: Date.now(),
+        type: 'ping'
+      });
+      
+      CONNECTION_CONFIG.lastHeartbeat = Date.now();
+      console.log("💓 Sent heartbeat");
+    } catch (error) {
+      console.error("Failed to send heartbeat:", error);
+    }
+  }
+  
+  // Start heartbeat system
+  function startHeartbeat() {
+    if (CONNECTION_CONFIG.heartbeatTimer) {
+      clearInterval(CONNECTION_CONFIG.heartbeatTimer);
+    }
+    
+    CONNECTION_CONFIG.heartbeatTimer = setInterval(() => {
+      if (socket && socket.connected && currentAgent) {
+        sendHeartbeat();
+      }
+    }, CONNECTION_CONFIG.heartbeatInterval);
+    
+    console.log("❤️ Heartbeat system started");
+  }
+  
+  // Update activity timestamp
+  function updateActivity() {
+    CONNECTION_CONFIG.lastActivity = Date.now();
+  }
+  
+  // Handle beforeunload event
+  function handleBeforeUnload(event) {
+    if (currentAgent && socket && socket.connected) {
+      // Don't prevent unload, but cleanly disconnect
+      CONNECTION_CONFIG.isManualDisconnect = true;
+      
+      // Send disconnect notification
+      if (socket && socket.connected) {
+        socket.emit('agent_disconnect', {
+          agentId: currentAgent.id,
+          timestamp: Date.now()
+        });
+      }
+      
+      // Give socket time to send the message
+      setTimeout(() => {
+        if (socket) socket.disconnect();
+      }, 100);
+    }
+  }
+  
+  // Handle visibility change
+  function handleVisibilityChange() {
+    if (!document.hidden && currentAgent && (!socket || !socket.connected)) {
+      console.log("📱 Page became visible, checking connection...");
+      
+      // If we're in a reconnection state but not currently reconnecting
+      if (CONNECTION_CONFIG.connectionState === 'disconnected' && 
+          !CONNECTION_CONFIG.isManualDisconnect) {
+        console.log("🔄 Attempting reconnection after page visibility restored");
+        reconnect();
+      }
+    }
+  }
+  
+  // Enhanced reconnect function with exponential backoff
+  function reconnect() {
+    if (CONNECTION_CONFIG.isManualDisconnect) {
+      console.log("Reconnection cancelled - manual disconnect");
+      return;
+    }
+    
+    if (autoReconnectAttempts >= CONNECTION_CONFIG.maxReconnectAttempts) {
+      console.log("Max reconnection attempts reached");
+      updateConnectionStatus('error', 'Max reconnection attempts');
+      showNotification('Connection failed after multiple attempts. Please refresh the page.', '#ffebee', '#c62828');
+      return;
+    }
+    
+    autoReconnectAttempts++;
+    const delay = calculateReconnectDelay();
+    
+    console.log(`🔄 Scheduling reconnection attempt ${autoReconnectAttempts} in ${delay}ms`);
+    
+    updateConnectionStatus('connecting', `Reconnecting (${autoReconnectAttempts}/${CONNECTION_CONFIG.maxReconnectAttempts})`);
+    
+    // Clear any existing timeout
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+    }
+    
+    reconnectTimeout = setTimeout(() => {
+      console.log("🔄 Attempting to reconnect...");
+      performReconnection();
+    }, delay);
+  }
+  
+  // Calculate reconnect delay with exponential backoff
+  function calculateReconnectDelay() {
+    const baseDelay = CONNECTION_CONFIG.baseReconnectDelay;
+    const maxDelay = CONNECTION_CONFIG.maxReconnectDelay;
+    const exponentialDelay = baseDelay * Math.pow(1.5, autoReconnectAttempts - 1);
+    const jitter = Math.random() * 1000; // Add random jitter
+    
+    return Math.min(exponentialDelay + jitter, maxDelay);
+  }
+  
+  // Perform the actual reconnection
+  function performReconnection() {
+    CONNECTION_CONFIG.connectionState = 'connecting';
+    
+    // Clean up old socket
+    if (socket) {
+      socket.removeAllListeners();
+      socket.disconnect();
+    }
+    
+    // Create new socket with persistent settings
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: false, // We handle reconnection ourselves
+      timeout: 30000,
+      forceNew: true,
+      multiplex: false,
+      upgrade: true,
+      rememberUpgrade: true,
+      path: '/socket.io/',
+      query: {
+        agentId: AGENT_CONFIG.id,
+        persistent: 'true',
+        reconnectAttempt: autoReconnectAttempts
+      }
+    });
+    
+    setupSocketListeners();
+    
+    // Set connection timeout
+    const connectionTimeout = setTimeout(() => {
+      if (CONNECTION_CONFIG.connectionState === 'connecting') {
+        console.log("Connection timeout");
+        if (socket) {
+          socket.disconnect();
+        }
+        scheduleReconnect();
+      }
+    }, 15000);
+    
+    // Once connected, clear timeout and proceed
+    socket.once('connect', () => {
+      clearTimeout(connectionTimeout);
+      CONNECTION_CONFIG.connectionState = 'connected';
+      autoReconnectAttempts = 0;
+      
+      console.log("✅ Reconnected to server, Socket ID:", socket.id);
+      updateConnectionStatus('connected', 'Reconnected');
+      showNotification('Connection restored successfully!', '#e8f5e9', '#2e7d32');
+      
+      // Re-authenticate
+      socket.emit('agent_login', { 
+        agentId: AGENT_CONFIG.id, 
+        password: AGENT_CONFIG.password,
+        reconnect: true
+      });
+    });
+    
+    socket.once('connect_error', (error) => {
+      clearTimeout(connectionTimeout);
+      console.error("Reconnection failed:", error);
+      scheduleReconnect();
+    });
+  }
+  
+  // Enhanced connection status update
+  function updateConnectionStatus(status, message = '') {
+    const connectionDot = document.getElementById('connectionDot');
+    const connectionStatus = document.getElementById('connectionStatus');
+    
+    // Remove all classes
+    connectionDot.className = 'connection-dot';
+    
+    CONNECTION_CONFIG.connectionState = status;
+    
+    switch(status) {
+      case 'connected':
+        connectionDot.classList.add('dot-connected');
+        connectionStatus.textContent = message || 'Connected';
+        connectionStatus.style.color = "#4CAF50";
+        break;
+      case 'connecting':
+        connectionDot.classList.add('dot-connecting');
+        connectionStatus.textContent = message || 'Connecting...';
+        connectionStatus.style.color = "#FFC107";
+        break;
+      case 'disconnected':
+        connectionDot.classList.add('dot-disconnected');
+        connectionStatus.textContent = message || 'Disconnected';
+        connectionStatus.style.color = "#ff9800";
+        break;
+      case 'error':
+        connectionDot.classList.add('dot-error');
+        connectionStatus.textContent = message || 'Connection Error';
+        connectionStatus.style.color = "#f44336";
+        break;
+    }
+    
+    // Update last activity
+    updateActivity();
+  }
   
   // Initialize on page load
   window.onload = function() {
@@ -1158,6 +1469,9 @@
     
     // Connect to server to register agent
     registerAgentOnServer();
+    
+    // Initialize persistent connection system
+    initPersistentConnection();
     
     // Handle window resize
     window.addEventListener('resize', handleResize);
@@ -1250,102 +1564,32 @@
     });
   }
 
-  // Update connection status display
-  function updateConnectionStatus(status, message = '') {
-    const connectionDot = document.getElementById('connectionDot');
-    const connectionStatus = document.getElementById('connectionStatus');
-    
-    // Remove all classes
-    connectionDot.className = 'connection-dot';
-    
-    switch(status) {
-      case 'connected':
-        connectionDot.classList.add('dot-connected');
-        connectionStatus.textContent = message || 'Connected';
-        connectionStatus.style.color = "#4CAF50";
-        break;
-      case 'connecting':
-        connectionDot.classList.add('dot-connecting');
-        connectionStatus.textContent = message || 'Connecting...';
-        connectionStatus.style.color = "#FFC107";
-        break;
-      case 'disconnected':
-        connectionDot.classList.add('dot-disconnected');
-        connectionStatus.textContent = message || 'Disconnected';
-        connectionStatus.style.color = "#ff9800";
-        break;
-      case 'error':
-        connectionDot.classList.add('dot-error');
-        connectionStatus.textContent = message || 'Connection Error';
-        connectionStatus.style.color = "#f44336";
-        break;
-    }
-  }
-
-  // Handle auto-reconnection
+  // Schedule reconnect (backward compatibility)
   function scheduleReconnect() {
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-    }
-    
-    if (autoReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.log("Max reconnection attempts reached");
-      updateConnectionStatus('error', 'Max reconnection attempts');
-      return;
-    }
-    
-    autoReconnectAttempts++;
-    const delay = Math.min(RECONNECT_DELAY * Math.pow(1.5, autoReconnectAttempts - 1), 30000);
-    
-    console.log(`Scheduling reconnection attempt ${autoReconnectAttempts} in ${delay}ms`);
-    
-    reconnectTimeout = setTimeout(() => {
-      if (currentAgent) {
-        console.log("Attempting to reconnect...");
-        reconnect();
-      }
-    }, delay);
-  }
-
-  // Reconnect function
-  function reconnect() {
-    updateConnectionStatus('connecting');
-    
-    if (socket) {
-      socket.disconnect();
-    }
-    
-    socket = io("https://chat-backend-p2b9.onrender.com", {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000
-    });
-    
-    setupSocketListeners();
-    
-    // Try to re-login
-    socket.emit('agent_login', { 
-      agentId: AGENT_CONFIG.id, 
-      password: AGENT_CONFIG.password 
-    });
+    reconnect();
   }
 
   // Setup socket listeners
   function setupSocketListeners() {
     socket.on('connect', () => {
-      console.log("Connected to server, Socket ID:", socket.id);
+      console.log("✅ Connected to server, Socket ID:", socket.id);
       updateConnectionStatus('connected');
       autoReconnectAttempts = 0;
+      CONNECTION_CONFIG.connectionState = 'connected';
+      
+      // Start heartbeat system
+      startHeartbeat();
+      
+      // Update activity
+      updateActivity();
       
       // If we have currentAgent, re-login
       if (currentAgent) {
-        console.log("Re-authenticating after reconnection...");
+        console.log("🔄 Re-authenticating after reconnection...");
         socket.emit('agent_login', { 
           agentId: AGENT_CONFIG.id, 
-          password: AGENT_CONFIG.password 
+          password: AGENT_CONFIG.password,
+          reconnect: true
         });
       }
     });
@@ -1354,7 +1598,7 @@
       const loginButton = document.getElementById('loginButton');
       
       if (res.success) {
-        console.log("Login successful:", res);
+        console.log("✅ Login successful:", res);
         currentAgent = { 
           id: AGENT_CONFIG.id, 
           name: res.name || AGENT_CONFIG.name,
@@ -1376,9 +1620,7 @@
           document.getElementById('sidebarToggle').style.display = 'flex';
         }
         
-        // ================================================
-        // NEW: Load all conversations and messages
-        // ================================================
+        // Load all conversations and messages
         loadAllConversations();
         
         // Focus on first user if available
@@ -1389,8 +1631,11 @@
           }
         }, 500);
         
+        // Send connection established notification
+        showNotification('Connected to server successfully!', '#e8f5e9', '#2e7d32');
+        
       } else {
-        console.error("Login failed:", res.message);
+        console.error("❌ Login failed:", res.message);
         document.getElementById('loginError').textContent = res.message || 'Login failed';
         
         // Re-enable login button on failure
@@ -1398,11 +1643,19 @@
           loginButton.disabled = false;
           loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
         }
+        
+        // If we're already logged in but re-login failed, try reconnect
+        if (currentAgent) {
+          setTimeout(() => reconnect(), 3000);
+        }
       }
+      
+      // Update activity
+      updateActivity();
     });
     
     socket.on('connect_error', (error) => {
-      console.error("Connection error:", error);
+      console.error("❌ Connection error:", error);
       updateConnectionStatus('error', 'Connection error');
       document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
       
@@ -1414,42 +1667,65 @@
       }
       
       // Schedule reconnect if we have a current agent
-      if (currentAgent) {
+      if (currentAgent && !CONNECTION_CONFIG.isManualDisconnect) {
         scheduleReconnect();
       }
+      
+      // Update activity
+      updateActivity();
     });
     
     socket.on('disconnect', (reason) => {
-      console.log("Disconnected:", reason);
+      console.log("🔌 Disconnected:", reason);
       updateConnectionStatus('disconnected');
+      CONNECTION_CONFIG.connectionState = 'disconnected';
+      
+      // Stop heartbeat
+      if (CONNECTION_CONFIG.heartbeatTimer) {
+        clearInterval(CONNECTION_CONFIG.heartbeatTimer);
+        CONNECTION_CONFIG.heartbeatTimer = null;
+      }
       
       // Schedule reconnect if this wasn't a manual disconnect
-      if (reason !== 'io client disconnect' && currentAgent) {
+      if (reason !== 'io client disconnect' && 
+          reason !== 'transport close' && // These are usually network issues
+          currentAgent && 
+          !CONNECTION_CONFIG.isManualDisconnect) {
+        
+        showNotification('Connection lost. Reconnecting...', '#fff3e0', '#f57c00');
         scheduleReconnect();
       }
+      
+      // If it was a manual disconnect, update status
+      if (CONNECTION_CONFIG.isManualDisconnect) {
+        console.log("Manual disconnect, not reconnecting");
+        updateConnectionStatus('disconnected', 'Disconnected by user');
+      }
+      
+      // Update activity
+      updateActivity();
     });
     
-    // ================================================
-    // ENHANCED: Listen for ALL messages (incoming/outgoing)
-    // ================================================
+    // Handle heartbeat response
+    socket.on('heartbeat_response', (data) => {
+      console.log("💓 Heartbeat response received");
+      CONNECTION_CONFIG.lastHeartbeat = Date.now();
+      updateActivity();
+    });
+    
+    // Handle pong from server
+    socket.on('pong', () => {
+      updateActivity();
+    });
+    
+    // Listen for ALL messages (incoming/outgoing)
     socket.on('new_message', (msg) => {
       console.log("📨 Received message:", msg);
+      updateActivity();
       
       const whatsapp = msg.whatsapp || 'unknown';
       
-      // Store in allMessages map
-      if (!allMessages.has(whatsapp)) {
-        allMessages.set(whatsapp, []);
-      }
-      
-      // Add message to global store
-      allMessages.get(whatsapp).push({
-        ...msg,
-        time: msg.timestamp || new Date().toISOString(),
-        sender: msg.sender || 'unknown'
-      });
-      
-      // Update users map for sidebar display
+      // Store in users map
       if (!users.has(whatsapp)) {
         users.set(whatsapp, {
           name: whatsapp,
@@ -1463,19 +1739,15 @@
       user.lastMsg = msg.text || msg.message || '[Attachment]';
       user.time = msg.timestamp || new Date().toISOString();
       
-      // If we have message data in msg.messages, use it
-      if (msg.messages) {
-        user.messages = msg.messages;
-      } else {
-        user.messages.push({
-          text: msg.text || msg.message,
-          time: msg.timestamp || new Date().toISOString(),
-          sender: msg.sender || 'unknown',
-          attachment: msg.attachment,
-          agentId: msg.agentId,
-          agentName: msg.agentName
-        });
-      }
+      // Add message to user's messages
+      user.messages.push({
+        text: msg.text || msg.message,
+        time: msg.timestamp || new Date().toISOString(),
+        sender: msg.sender || 'unknown',
+        attachment: msg.attachment,
+        agentId: msg.agentId,
+        agentName: msg.agentName
+      });
       
       // Update user list
       updateUserList();
@@ -1486,8 +1758,9 @@
       }
     });
     
-    // Legacy: Listen for forwarded messages from super admin
+    // Listen for forwarded messages from super admin
     socket.on('forwarded_message', (data) => {
+      updateActivity();
       if (data.type === 'user_message' && data.data) {
         const whatsapp = data.data.whatsapp || data.data.userId || 'User';
         addUserMessage(whatsapp, data.data.message, data.data);
@@ -1496,16 +1769,15 @@
       }
     });
     
-    // ================================================
-    // NEW: Listen for message deletions
-    // ================================================
+    // Listen for message deletions
     socket.on('message_deleted', (data) => {
       console.log("🗑️ Message deleted:", data);
-      if (data.whatsapp && allMessages.has(data.whatsapp)) {
-        const messages = allMessages.get(data.whatsapp);
-        const index = messages.findIndex(m => m.id === data.messageId);
+      updateActivity();
+      if (data.whatsapp && users.has(data.whatsapp)) {
+        const user = users.get(data.whatsapp);
+        const index = user.messages.findIndex(m => m.id === data.messageId);
         if (index > -1) {
-          messages.splice(index, 1);
+          user.messages.splice(index, 1);
         }
       }
       
@@ -1514,16 +1786,12 @@
       }
     });
     
-    // ================================================
-    // NEW: Listen for chat deletions
-    // ================================================
+    // Listen for chat deletions
     socket.on('chat_deleted', (data) => {
       console.log("🗑️ Chat deleted:", data.whatsapp);
+      updateActivity();
       if (users.has(data.whatsapp)) {
         users.delete(data.whatsapp);
-      }
-      if (allMessages.has(data.whatsapp)) {
-        allMessages.delete(data.whatsapp);
       }
       updateUserList();
       
@@ -1538,6 +1806,7 @@
     
     // Listen for mute status updates
     socket.on('mute_status', (data) => {
+      updateActivity();
       if (data.agentId === AGENT_CONFIG.id) {
         isMuted = data.muted;
         updateMuteStatus();
@@ -1552,6 +1821,7 @@
     
     // Listen for message history
     socket.on('message_history', (messages) => {
+      updateActivity();
       if (selectedUser && messages) {
         const user = users.get(selectedUser);
         if (user) {
@@ -1560,25 +1830,31 @@
         }
       }
     });
+    
+    // Listen for connection stability notifications
+    socket.on('connection_stable', () => {
+      console.log("✅ Connection is stable");
+      updateConnectionStatus('connected', 'Stable connection');
+      updateActivity();
+    });
   }
 
-  // ================================================
-  // NEW: Load all conversations from server
-  // ================================================
+  // Load all conversations from server
   function loadAllConversations() {
     if (!socket) return;
     
     console.log("📋 Loading all conversations...");
+    updateActivity();
     
     // Request existing users
     socket.emit('get_existing_users');
     
     socket.on('existing_users', (usersList) => {
       console.log("📋 Loaded existing users:", usersList.length);
+      updateActivity();
       
       // Clear existing data
       users.clear();
-      allMessages.clear();
       
       // Process each user
       usersList.forEach(user => {
@@ -1609,11 +1885,13 @@
   function showTypingIndicator() {
     const indicator = document.getElementById('typingIndicator');
     indicator.style.display = 'block';
+    updateActivity();
   }
 
   function hideTypingIndicator() {
     const indicator = document.getElementById('typingIndicator');
     indicator.style.display = 'none';
+    updateActivity();
   }
 
   // Show notification
@@ -1628,9 +1906,10 @@
     notification.innerHTML = message;
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 3000);
+    updateActivity();
   }
 
-  // Login - FIXED VERSION
+  // Login - FIXED VERSION with persistent connection
   function login() {
     const id = document.getElementById('agentId').value.trim();
     const pass = document.getElementById('agentPass').value.trim();
@@ -1667,33 +1946,43 @@
     // Clear any previous error
     document.getElementById('loginError').textContent = '';
     
-    // Create socket connection
-    socket = io("https://chat-backend-p2b9.onrender.com", {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000
-    });
+    // Reset manual disconnect flag
+    CONNECTION_CONFIG.isManualDisconnect = false;
     
     // Show connecting status
     updateConnectionStatus('connecting');
     
+    // Create socket connection with persistent settings
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: false, // We handle reconnection ourselves
+      timeout: 30000,
+      forceNew: true,
+      multiplex: false,
+      upgrade: true,
+      rememberUpgrade: true,
+      path: '/socket.io/',
+      query: {
+        agentId: AGENT_CONFIG.id,
+        persistent: 'true'
+      }
+    });
+    
     // Set up socket listeners
     setupSocketListeners();
     
-    // FIX: Send login credentials when connected - THIS WAS MISSING!
+    // Send login credentials when connected
     socket.once('connect', () => {
       console.log("Socket connected, sending login credentials...");
       socket.emit('agent_login', { 
         agentId: AGENT_CONFIG.id, 
-        password: AGENT_CONFIG.password 
+        password: AGENT_CONFIG.password,
+        persistent: true
       });
     });
     
     // Handle connection timeout
-    setTimeout(() => {
+    const connectionTimeout = setTimeout(() => {
       if (!currentAgent && loginButton.disabled) {
         console.log("Connection timeout");
         document.getElementById('loginError').textContent = 'Connection timeout. Please try again.';
@@ -1705,8 +1994,22 @@
         if (socket) {
           socket.disconnect();
         }
+        
+        // Try to reconnect
+        scheduleReconnect();
       }
-    }, 10000);
+    }, 15000);
+    
+    // Clear timeout on successful connection
+    socket.once('connect', () => {
+      clearTimeout(connectionTimeout);
+    });
+    
+    socket.once('connect_error', () => {
+      clearTimeout(connectionTimeout);
+    });
+    
+    updateActivity();
   }
 
   // Update mute status display
@@ -1732,10 +2035,13 @@
         messageInput.placeholder = "Type message...";
       }
     }
+    
+    updateActivity();
   }
 
   // Add user message (compatibility function)
   function addUserMessage(userId, message, data) {
+    updateActivity();
     // Add to users map
     if (!users.has(userId)) {
       users.set(userId, {
@@ -1768,6 +2074,7 @@
   // Update user list UI
   function updateUserList() {
     const userList = document.getElementById('userList');
+    updateActivity();
     
     // Sort users by last message time (newest first)
     const sortedUsers = Array.from(users.entries())
@@ -1821,6 +2128,7 @@
   function selectUser(userId) {
     selectedUser = userId;
     const user = users.get(userId);
+    updateActivity();
     
     // Update chat header
     document.getElementById('chatHeader').style.display = 'flex';
@@ -1852,9 +2160,10 @@
     showMessages();
   }
 
-  // Show messages for selected user - VERTICAL LAYOUT
+  // Show messages for selected user
   function showMessages() {
     if (!selectedUser) return;
+    updateActivity();
     
     const messagesDiv = document.getElementById('messages');
     const user = users.get(selectedUser);
@@ -1980,23 +2289,29 @@
       // You could add a preview here
       showNotification(`File selected: ${selectedFile.name}`, '#e3f2fd', '#1565c0');
     }
+    updateActivity();
   }
 
   // Send message
   function sendMessage() {
     if (isMuted) {
       alert("Your account is muted by Super Admin. You cannot send messages.");
+      updateActivity();
       return;
     }
     
     if (!socket || !socket.connected) {
       alert("Not connected to server. Please wait for reconnection.");
+      updateActivity();
       return;
     }
     
     const input = document.getElementById('messageInput');
     const text = input.value.trim();
     if (!text || !selectedUser) return;
+    
+    // Update activity before sending
+    updateActivity();
     
     // Add to local messages
     const user = users.get(selectedUser);
@@ -2008,9 +2323,7 @@
       agentName: currentAgent.name
     });
     
-    // ================================================
-    // UPDATED: Use the new agent_message event format
-    // ================================================
+    // Send message to server
     socket.emit('agent_message', {
       whatsapp: selectedUser,
       message: text,
@@ -2062,29 +2375,16 @@
   });
   
   document.getElementById('messageInput').addEventListener('keypress', (e) => {
+    updateActivity();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   });
   
-  // Handle page visibility change
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && currentAgent && (!socket || !socket.connected)) {
-      console.log("Page became visible, checking connection...");
-      scheduleReconnect();
-    }
-  });
-  
-  // Periodic health check
-  setInterval(() => {
-    if (currentAgent && socket && socket.connected) {
-      socket.emit('ping');
-    }
-  }, 30000);
-  
   // Handle back button on mobile
   window.addEventListener('popstate', function() {
+    updateActivity();
     if (isMobile && document.getElementById('app').style.display === 'flex') {
       document.getElementById('sidebar').classList.remove('open');
       document.getElementById('sidebarToggle').textContent = '☰';
