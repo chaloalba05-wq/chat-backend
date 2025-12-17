@@ -4,174 +4,705 @@
   <meta charset="UTF-8">
   <title>Agent Admin</title>
   <style>
-    body { font-family: Arial; margin: 0; background: #f5f5f5; }
-    
-    /* Layout */
-    .container { display: flex; height: 100vh; }
-    .sidebar { width: 250px; background: white; border-right: 1px solid #ddd; overflow-y: auto; }
-    .chat-area { flex: 1; display: flex; flex-direction: column; }
-    
-    /* User list */
-    .user { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
-    .user:hover { background: #f9f9f9; }
-    .user.active { background: #e3f2fd; }
-    .user-name { font-weight: bold; }
-    .user-preview { font-size: 12px; color: #666; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    
-    /* Messages */
-    .messages { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; }
-    .msg { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; max-width: 70%; }
-    .msg.user { background: #e3f2fd; float: left; }
-    .msg.agent { background: #dcf8c6; float: right; }
-    .msg-img { max-width: 200px; margin-top: 5px; border-radius: 5px; }
-    
-    /* Input */
-    .input-area { padding: 15px; background: white; border-top: 1px solid #ddd; display: flex; gap: 10px; }
-    .input-area input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-    .input-area button { padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    
-    /* Login */
-    .login { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: flex; justify-content: center; align-items: center; }
-    .login-box { width: 350px; padding: 30px; border: 1px solid #ddd; border-radius: 8px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    
-    /* Agent Info Section */
-    .agent-info-section {
-      background: #f8f9fa;
-      padding: 15px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      border-left: 4px solid #1976d2;
+    /* ===== RESET & BASE ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+      margin: 0; 
+      background: #f5f5f5; 
+      height: 100vh;
+      overflow: hidden;
     }
     
-    .agent-info-title {
+    /* ===== LAYOUT ===== */
+    .container { 
+      display: flex; 
+      height: 100vh; 
+    }
+    
+    /* ===== SIDEBAR ===== */
+    .sidebar { 
+      width: 320px; 
+      background: white; 
+      border-right: 1px solid #e0e0e0;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .sidebar-header { 
+      padding: 20px; 
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .agent-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+    
+    .agent-avatar {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
       font-weight: bold;
-      color: #1976d2;
-      margin-bottom: 8px;
-      font-size: 16px;
     }
     
     .agent-details {
-      background: white;
-      padding: 10px;
-      border-radius: 4px;
-      border: 1px solid #e0e0e0;
-      margin-bottom: 10px;
+      flex: 1;
     }
     
-    .agent-field {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 5px;
-      font-size: 14px;
-    }
-    
-    .agent-label {
-      font-weight: bold;
+    .agent-name {
+      font-weight: 600;
       color: #333;
+      font-size: 15px;
     }
     
-    .agent-value {
-      color: #1976d2;
-      font-weight: bold;
-    }
-    
-    .note {
+    .agent-id {
       font-size: 12px;
       color: #666;
-      font-style: italic;
-      margin-top: 10px;
     }
     
-    /* File info */
-    .file-info {
-      background: #e8f5e9;
-      padding: 10px;
-      border-radius: 4px;
-      border: 1px solid #c8e6c9;
-      margin-bottom: 15px;
-      font-size: 13px;
+    .status-container {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    
+    .dot-connected { background-color: #4CAF50; }
+    .dot-connecting { background-color: #FFC107; animation: pulse 1.5s infinite; }
+    .dot-disconnected { background-color: #f44336; }
+    .dot-error { background-color: #9C27B0; }
+    
+    .connection-status {
+      font-size: 12px;
+      color: #666;
     }
     
     .mute-status {
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: bold;
-      margin-left: 10px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
     
-    .muted { background: #ffcdd2; color: #c62828; }
-    .unmuted { background: #c8e6c9; color: #2e7d32; }
+    .muted { background: #ffebee; color: #c62828; }
+    .unmuted { background: #e8f5e9; color: #2e7d32; }
     
-    /* Login header */
+    /* ===== USER LIST ===== */
+    .user-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    
+    .user-list-title {
+      padding: 15px 20px 10px;
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    
+    .user-item {
+      padding: 16px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    
+    .user-item:hover { background: #f9f9f9; }
+    .user-item.active { background: #e8f0fe; }
+    
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      background: #e0e0e0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-weight: 600;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    
+    .user-item.active .user-avatar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .user-content {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .user-name-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    
+    .user-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .user-time {
+      font-size: 11px;
+      color: #999;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+    
+    .user-preview {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    
+    /* ===== CHAT AREA ===== */
+    .chat-area { 
+      flex: 1; 
+      display: flex; 
+      flex-direction: column;
+      background: #f8f9fa;
+    }
+    
+    /* Chat Header */
+    .chat-header {
+      padding: 20px 24px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .chat-user-avatar {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    
+    .chat-user-info {
+      flex: 1;
+    }
+    
+    .chat-user-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 16px;
+      margin-bottom: 2px;
+    }
+    
+    .chat-user-number {
+      font-size: 13px;
+      color: #666;
+    }
+    
+    /* Messages Container - VERTICAL LAYOUT */
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    /* Message Bubbles - VERTICAL STACK */
+    .message-bubble {
+      max-width: 70%;
+      margin: 4px 0;
+      clear: both;
+    }
+    
+    .message-bubble.user {
+      align-self: flex-start;
+    }
+    
+    .message-bubble.agent {
+      align-self: flex-end;
+    }
+    
+    .message-content {
+      padding: 12px 16px;
+      border-radius: 18px;
+      position: relative;
+      word-wrap: break-word;
+      line-height: 1.4;
+    }
+    
+    .message-bubble.user .message-content {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-top-left-radius: 4px;
+    }
+    
+    .message-bubble.agent .message-content {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-top-right-radius: 4px;
+    }
+    
+    .message-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      padding: 0 4px;
+      font-size: 11px;
+      color: #999;
+    }
+    
+    .message-bubble.agent .message-meta {
+      flex-direction: row-reverse;
+    }
+    
+    .message-sender {
+      font-weight: 500;
+    }
+    
+    .message-time {
+      opacity: 0.8;
+    }
+    
+    /* File attachments */
+    .attachment {
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      border-left: 3px solid #4CAF50;
+    }
+    
+    .message-bubble.user .attachment {
+      background: #f8f9fa;
+      border-left-color: #2196F3;
+    }
+    
+    .attachment-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: inherit;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .attachment-link:hover {
+      text-decoration: underline;
+    }
+    
+    .file-icon {
+      font-size: 18px;
+    }
+    
+    .attachment-preview {
+      margin-top: 8px;
+    }
+    
+    .attachment-preview img {
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+    
+    /* Input Area */
+    .input-area {
+      padding: 20px;
+      background: white;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    
+    .input-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .message-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #e0e0e0;
+      border-radius: 24px;
+      font-size: 14px;
+      outline: none;
+      transition: border 0.2s;
+      resize: none;
+      min-height: 44px;
+      max-height: 120px;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+    
+    .message-input:focus {
+      border-color: #667eea;
+    }
+    
+    .message-input:disabled {
+      background: #f5f5f5;
+      cursor: not-allowed;
+    }
+    
+    .input-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .file-attachment {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    
+    .send-button {
+      padding: 10px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .send-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .send-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    /* ===== LOGIN SCREEN ===== */
+    .login-screen { 
+      position: fixed; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      height: 100%; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex; 
+      justify-content: center; 
+      align-items: center;
+      z-index: 1000;
+    }
+    
+    .login-container {
+      width: 420px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    
     .login-header {
+      padding: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       text-align: center;
-      margin-bottom: 25px;
+      color: white;
     }
     
     .login-title {
       font-size: 24px;
-      color: #1976d2;
-      margin-bottom: 5px;
+      font-weight: 700;
+      margin-bottom: 8px;
     }
     
     .login-subtitle {
-      color: #666;
       font-size: 14px;
+      opacity: 0.9;
     }
+    
+    .login-body {
+      padding: 30px;
+    }
+    
+    .agent-info-section {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .agent-info-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .agent-details-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+    
+    .agent-field {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .field-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    
+    .field-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .file-info {
+      background: #e8f5e9;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border 0.2s;
+    }
+    
+    .form-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .login-error {
+      color: #d32f2f;
+      font-size: 14px;
+      margin: 10px 0;
+      min-height: 20px;
+      text-align: center;
+    }
+    
+    .login-button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .login-button:hover {
+      transform: translateY(-2px);
+    }
+    
+    .login-button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .login-note {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+    
+    /* ===== UTILITIES ===== */
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #999;
+      text-align: center;
+      padding: 40px;
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+    
+    .empty-state-title {
+      font-size: 18px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    
+    .empty-state-subtitle {
+      font-size: 14px;
+      max-width: 300px;
+      line-height: 1.5;
+    }
+    
+    .hidden { display: none; }
   </style>
 </head>
 <body>
 
 <!-- Login Screen -->
-<div id="loginScreen" class="login">
-  <div class="login-box">
+<div id="loginScreen" class="login-screen">
+  <div class="login-container">
     <div class="login-header">
-      <div class="login-title">Agent Login</div>
-      <div class="login-subtitle">This agent is permanently registered</div>
+      <div class="login-title">🔐 Agent Login</div>
+      <div class="login-subtitle">Permanent Agent Account</div>
     </div>
     
-    <!-- Agent Information Section -->
-    <div class="agent-info-section">
-      <div class="agent-info-title">📋 Agent Configuration</div>
-      <div class="file-info">
-        📁 <strong>Agent File:</strong> <span id="agentFileName">Loading...</span>
-      </div>
-      <div class="agent-details">
-        <div class="agent-field">
-          <span class="agent-label">Agent ID:</span>
-          <span class="agent-value" id="displayAgentId">Loading...</span>
+    <div class="login-body">
+      <!-- Agent Information Section -->
+      <div class="agent-info-section">
+        <div class="agent-info-title">
+          <span>📋 Agent Configuration</span>
         </div>
-        <div class="agent-field">
-          <span class="agent-label">Agent Name:</span>
-          <span class="agent-value" id="displayAgentName">Loading...</span>
+        
+        <div class="file-info">
+          <span>📁</span>
+          <span><strong>Agent File:</strong> <span id="agentFileName">Loading...</span></span>
         </div>
-        <div class="agent-field">
-          <span class="agent-label">Status:</span>
-          <span id="agentStatus" class="mute-status unmuted">⚡ Ready</span>
+        
+        <div class="agent-details-grid">
+          <div class="agent-field">
+            <div class="field-label">Agent ID</div>
+            <div class="field-value" id="displayAgentId">Loading...</div>
+          </div>
+          <div class="agent-field">
+            <div class="field-label">Agent Name</div>
+            <div class="field-value" id="displayAgentName">Loading...</div>
+          </div>
+          <div class="agent-field">
+            <div class="field-label">Status</div>
+            <div id="agentStatus" class="mute-status unmuted">⚡ Ready</div>
+          </div>
+          <div class="agent-field">
+            <div class="field-label">Server</div>
+            <div class="field-value">chat-backend-p2b9.onrender.com</div>
+          </div>
+        </div>
+        
+        <div class="note" style="font-size: 11px; color: #666; font-style: italic; margin-top: 10px;">
+          This agent account is permanently created on the server.
         </div>
       </div>
-      <div class="note">
-        This agent account is permanently created on the server. Login with credentials below.
+      
+      <!-- Login Form -->
+      <div class="form-group">
+        <label class="form-label">Agent ID</label>
+        <input type="text" id="agentId" class="form-input" placeholder="Enter Agent ID">
       </div>
-    </div>
-    
-    <!-- Login Form -->
-    <input type="text" id="agentId" placeholder="Enter Agent ID" 
-           style="width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 4px; font-size: 14px;">
-    <input type="password" id="agentPass" placeholder="Enter Password" 
-           style="width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 4px; font-size: 14px;">
-    
-    <div id="loginError" style="color: #d32f2f; margin: 10px 0; font-size: 14px; min-height: 20px;"></div>
-    
-    <button onclick="login()" 
-            style="width: 100%; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer;">
-      🔓 Login as Agent
-    </button>
-    
-    <div style="margin-top: 20px; font-size: 12px; color: #666; text-align: left;">
-      <div><strong>Note:</strong> This agent is automatically registered on the server.</div>
-      <div style="margin-top: 5px;">Credentials are hardcoded in this HTML file for permanent access.</div>
+      
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="agentPass" class="form-input" placeholder="Enter Password">
+      </div>
+      
+      <div id="loginError" class="login-error"></div>
+      
+      <button onclick="login()" id="loginButton" class="login-button">
+        <span>🔓</span>
+        <span>Login as Agent</span>
+      </button>
+      
+      <div class="login-note">
+        <div><strong>Note:</strong> This agent is automatically registered on the server.</div>
+        <div style="margin-top: 5px;">Credentials are hardcoded for permanent access.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -179,18 +710,34 @@
 <!-- Main App -->
 <div id="app" class="container" style="display: none;">
   
-  <!-- Sidebar: User List -->
+  <!-- Sidebar -->
   <div class="sidebar">
-    <div style="padding: 15px; border-bottom: 1px solid #ddd; background: #f9f9f9;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <strong>Chats</strong>
-        <span id="muteIndicator" class="mute-status unmuted">⚡ Active</span>
+    <div class="sidebar-header">
+      <!-- Agent Info -->
+      <div class="agent-info">
+        <div class="agent-avatar" id="agentAvatar">A1</div>
+        <div class="agent-details">
+          <div class="agent-name" id="agentNameDisplay">Agent 1</div>
+          <div class="agent-id">ID: <span id="agentIdDisplay">agent1</span></div>
+        </div>
       </div>
-      <div id="agentNameDisplay" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
-      <div id="connectionStatus" style="font-size: 11px; color: #4CAF50; margin-top: 2px;">● Connected</div>
+      
+      <!-- Connection Status -->
+      <div class="status-container">
+        <span class="connection-dot" id="connectionDot"></span>
+        <span class="connection-status" id="connectionStatus">Connected</span>
+        <span id="muteIndicator" class="mute-status unmuted" style="margin-left: auto;">⚡ Active</span>
+      </div>
     </div>
-    <div id="userList">
-      <!-- Users will appear here -->
+    
+    <!-- User List -->
+    <div class="user-list-title">Active Conversations</div>
+    <div id="userList" class="user-list">
+      <div class="empty-state">
+        <div class="empty-state-icon">💬</div>
+        <div class="empty-state-title">No conversations yet</div>
+        <div class="empty-state-subtitle">Users will appear here when they send messages</div>
+      </div>
     </div>
   </div>
   
@@ -198,21 +745,51 @@
   <div class="chat-area">
     
     <!-- Chat Header -->
-    <div style="padding: 15px; border-bottom: 1px solid #ddd; background: white;">
-      <strong id="currentUser">Select a user to chat</strong>
-      <div id="userInfo" style="font-size: 12px; color: #666; margin-top: 2px;">Click on a user from the left</div>
-      <div id="whatsappNumber" style="font-size: 11px; color: #1976d2; margin-top: 2px;"></div>
+    <div class="chat-header" id="chatHeader" style="display: none;">
+      <div class="chat-user-avatar" id="chatUserAvatar">U</div>
+      <div class="chat-user-info">
+        <div class="chat-user-name" id="currentUser">Select a user</div>
+        <div class="chat-user-number" id="whatsappNumber">Click on a user from the left</div>
+      </div>
     </div>
     
-    <!-- Messages -->
-    <div id="messages" class="messages">
-      <!-- Messages will appear here -->
+    <!-- Messages Container -->
+    <div id="messages" class="messages-container">
+      <div class="empty-state">
+        <div class="empty-state-icon">👈</div>
+        <div class="empty-state-title">Select a conversation</div>
+        <div class="empty-state-subtitle">Choose a user from the sidebar to start chatting</div>
+      </div>
     </div>
     
     <!-- Input Area -->
     <div class="input-area">
-      <input type="text" id="messageInput" placeholder="Type message..." disabled>
-      <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+      <div class="input-wrapper">
+        <textarea 
+          id="messageInput" 
+          class="message-input" 
+          placeholder="Type message..." 
+          disabled
+          rows="1"
+        ></textarea>
+        
+        <div class="input-actions">
+          <div class="file-attachment" onclick="document.getElementById('fileInput').click()">
+            <span>📎</span>
+            <span>Attach file</span>
+          </div>
+          <div id="typingIndicator" style="font-size: 12px; color: #666; display: none;">
+            Typing...
+          </div>
+        </div>
+      </div>
+      
+      <button id="sendBtn" onclick="sendMessage()" class="send-button" disabled>
+        <span>Send</span>
+        <span>➤</span>
+      </button>
+      
+      <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect()">
     </div>
   </div>
 </div>
@@ -220,13 +797,13 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
   // ================================================
-  // AGENT CONFIGURATION - EDIT THESE VALUES
+  // AGENT CONFIGURATION - FIXED VALUES
   // ================================================
   const AGENT_CONFIG = {
-    id: "agent3" + Math.floor(Math.random() * 1000), // Unique ID for this agent
+    id: "agent3", // FIXED: Always use "agent1" for consistent login
     name: "agent3", // Display name
     password: "agent3", // Login password
-    filename: window.location.pathname.split('/').pop() || "agentX.html" // Auto-detect filename
+    filename: window.location.pathname.split('/').pop() || "agent1.html" // Auto-detect filename
   };
   // ================================================
 
@@ -235,13 +812,12 @@
   let selectedUser = null;
   let users = new Map(); // Store users and their messages
   let isMuted = false;
+  let autoReconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 10;
+  const RECONNECT_DELAY = 2000; // 2 seconds
+  let reconnectTimeout = null;
+  let selectedFile = null;
   
-  // Detect current filename
-  function getCurrentFileName() {
-    const path = window.location.pathname;
-    return path.split('/').pop() || "agentX.html";
-  }
-
   // Initialize on page load
   window.onload = function() {
     const fileName = getCurrentFileName();
@@ -254,22 +830,37 @@
     
     // Pre-fill login fields
     document.getElementById('agentId').value = AGENT_CONFIG.id;
+    document.getElementById('agentPass').value = AGENT_CONFIG.password;
+    
+    // Set up textarea auto-resize
+    const textarea = document.getElementById('messageInput');
+    textarea.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
     
     // Connect to server to register agent
     registerAgentOnServer();
   };
 
+  // Detect current filename
+  function getCurrentFileName() {
+    const path = window.location.pathname;
+    return path.split('/').pop() || "agent1.html";
+  }
+
   // Register this agent on the server
   function registerAgentOnServer() {
     console.log("Registering agent on server:", AGENT_CONFIG);
     
-    // Create a temporary connection to register the agent
-    const tempSocket = io("https://chat-backend-p2b9.onrender.com");
+    const tempSocket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: false
+    });
     
     tempSocket.on('connect', () => {
       console.log("Connected for registration");
       
-      // Send agent registration to super admin
       tempSocket.emit('register_permanent_agent', {
         id: AGENT_CONFIG.id,
         name: AGENT_CONFIG.name,
@@ -277,7 +868,6 @@
         filename: AGENT_CONFIG.filename
       });
       
-      // Close the connection after registration
       setTimeout(() => {
         tempSocket.disconnect();
         console.log("Agent registration completed");
@@ -297,6 +887,232 @@
     });
   }
 
+  // Update connection status display
+  function updateConnectionStatus(status, message = '') {
+    const connectionDot = document.getElementById('connectionDot');
+    const connectionStatus = document.getElementById('connectionStatus');
+    
+    // Remove all classes
+    connectionDot.className = 'connection-dot';
+    
+    switch(status) {
+      case 'connected':
+        connectionDot.classList.add('dot-connected');
+        connectionStatus.textContent = message || 'Connected';
+        connectionStatus.style.color = "#4CAF50";
+        break;
+      case 'connecting':
+        connectionDot.classList.add('dot-connecting');
+        connectionStatus.textContent = message || 'Connecting...';
+        connectionStatus.style.color = "#FFC107";
+        break;
+      case 'disconnected':
+        connectionDot.classList.add('dot-disconnected');
+        connectionStatus.textContent = message || 'Disconnected';
+        connectionStatus.style.color = "#ff9800";
+        break;
+      case 'error':
+        connectionDot.classList.add('dot-error');
+        connectionStatus.textContent = message || 'Connection Error';
+        connectionStatus.style.color = "#f44336";
+        break;
+    }
+  }
+
+  // Handle auto-reconnection
+  function scheduleReconnect() {
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+    }
+    
+    if (autoReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.log("Max reconnection attempts reached");
+      updateConnectionStatus('error', 'Max reconnection attempts');
+      return;
+    }
+    
+    autoReconnectAttempts++;
+    const delay = Math.min(RECONNECT_DELAY * Math.pow(1.5, autoReconnectAttempts - 1), 30000);
+    
+    console.log(`Scheduling reconnection attempt ${autoReconnectAttempts} in ${delay}ms`);
+    
+    reconnectTimeout = setTimeout(() => {
+      if (currentAgent) {
+        console.log("Attempting to reconnect...");
+        reconnect();
+      }
+    }, delay);
+  }
+
+  // Reconnect function
+  function reconnect() {
+    updateConnectionStatus('connecting');
+    
+    if (socket) {
+      socket.disconnect();
+    }
+    
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
+    });
+    
+    setupSocketListeners();
+    
+    // Try to re-login
+    socket.emit('agent_login', { 
+      agentId: AGENT_CONFIG.id, 
+      password: AGENT_CONFIG.password 
+    });
+  }
+
+  // Setup socket listeners
+  function setupSocketListeners() {
+    socket.on('connect', () => {
+      console.log("Connected to server, Socket ID:", socket.id);
+      updateConnectionStatus('connected');
+      autoReconnectAttempts = 0;
+      
+      // If we have currentAgent, re-login
+      if (currentAgent) {
+        console.log("Re-authenticating after reconnection...");
+        socket.emit('agent_login', { 
+          agentId: AGENT_CONFIG.id, 
+          password: AGENT_CONFIG.password 
+        });
+      }
+    });
+    
+    socket.on('agent_login_response', (res) => {
+      if (res.success) {
+        console.log("Login successful:", res);
+        currentAgent = { 
+          id: AGENT_CONFIG.id, 
+          name: res.name || AGENT_CONFIG.name,
+          muted: res.muted || false
+        };
+        
+        isMuted = res.muted || false;
+        updateMuteStatus();
+        
+        // If this is a reconnection, we're already logged in
+        if (document.getElementById('loginScreen').style.display !== 'none') {
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('app').style.display = 'flex';
+          document.getElementById('agentNameDisplay').textContent = currentAgent.name;
+          document.getElementById('agentIdDisplay').textContent = currentAgent.id;
+          document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
+          
+          loadExistingUsers();
+        }
+        
+      } else {
+        console.error("Login failed:", res.message);
+        document.getElementById('loginError').textContent = res.message || 'Login failed';
+      }
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.error("Connection error:", error);
+      updateConnectionStatus('error', 'Connection error');
+      document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
+      
+      // Schedule reconnect if we have a current agent
+      if (currentAgent) {
+        scheduleReconnect();
+      }
+    });
+    
+    socket.on('disconnect', (reason) => {
+      console.log("Disconnected:", reason);
+      updateConnectionStatus('disconnected');
+      
+      // Schedule reconnect if this wasn't a manual disconnect
+      if (reason !== 'io client disconnect' && currentAgent) {
+        scheduleReconnect();
+      }
+    });
+    
+    // Listen for user messages
+    socket.on('user_message', (data) => {
+      const whatsapp = data.whatsapp || data.userId || 'User';
+      addUserMessage(whatsapp, data.message || data.text, data);
+    });
+    
+    // Listen for all messages
+    socket.on('new_message', (msg) => {
+      if (msg.sender === 'user') {
+        const whatsapp = msg.whatsapp || 'User';
+        addUserMessage(whatsapp, msg.text || msg.message, msg);
+      }
+    });
+    
+    // Listen for forwarded messages from super admin
+    socket.on('forwarded_message', (data) => {
+      if (data.type === 'user_message' && data.data) {
+        const whatsapp = data.data.whatsapp || data.data.userId || 'User';
+        addUserMessage(whatsapp, data.data.message, data.data);
+      } else if (data.type === 'broadcast' && data.data) {
+        addUserMessage('Super Admin', data.data.message, data);
+      }
+    });
+    
+    // Listen for mute status updates
+    socket.on('mute_status', (data) => {
+      if (data.agentId === AGENT_CONFIG.id) {
+        isMuted = data.muted;
+        updateMuteStatus();
+        
+        showNotification(
+          isMuted ? '🔇 Account muted by Super Admin' : '🔊 Account unmuted by Super Admin',
+          isMuted ? '#ffcdd2' : '#c8e6c9',
+          isMuted ? '#c62828' : '#2e7d32'
+        );
+      }
+    });
+    
+    // Listen for typing indicators
+    socket.on('typing', (data) => {
+      if (data.whatsapp === selectedUser && data.isTyping) {
+        showTypingIndicator();
+      } else if (data.whatsapp === selectedUser && !data.isTyping) {
+        hideTypingIndicator();
+      }
+    });
+  }
+
+  // Show typing indicator
+  function showTypingIndicator() {
+    const indicator = document.getElementById('typingIndicator');
+    indicator.style.display = 'block';
+  }
+
+  function hideTypingIndicator() {
+    const indicator = document.getElementById('typingIndicator');
+    indicator.style.display = 'none';
+  }
+
+  // Show notification
+  function showNotification(message, bgColor, textColor) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed; top: 20px; right: 20px; 
+      padding: 12px 20px; background: ${bgColor}; 
+      color: ${textColor}; border-radius: 8px; 
+      z-index: 1000; border: 1px solid ${textColor}33;
+      font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      max-width: 300px; font-size: 14px;
+      display: flex; align-items: center; gap: 8px;
+    `;
+    notification.innerHTML = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+  }
+
   // Login
   function login() {
     const id = document.getElementById('agentId').value.trim();
@@ -307,7 +1123,6 @@
       return;
     }
     
-    // Verify credentials match hardcoded values
     if (id !== AGENT_CONFIG.id) {
       document.getElementById('loginError').textContent = 'Invalid Agent ID';
       return;
@@ -318,56 +1133,34 @@
       return;
     }
     
-    socket = io("https://chat-backend-p2b9.onrender.com");
+    // Disable login button
+    const loginButton = document.getElementById('loginButton');
+    loginButton.disabled = true;
+    loginButton.innerHTML = '<span>🔄</span><span>Connecting...</span>';
     
-    socket.on('connect', () => {
-      console.log("Connected to server, logging in...");
-      document.getElementById('connectionStatus').textContent = "● Connecting...";
-      socket.emit('agent_login', { 
-        agentId: AGENT_CONFIG.id, 
-        password: AGENT_CONFIG.password 
-      });
+    // Clear any existing reconnect timeout
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+    
+    // Reset reconnection attempts
+    autoReconnectAttempts = 0;
+    
+    // Create socket connection
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
     });
     
-    socket.on('agent_login_response', (res) => {
-      if (res.success) {
-        currentAgent = { 
-          id: AGENT_CONFIG.id, 
-          name: res.name || AGENT_CONFIG.name,
-          muted: res.muted || false
-        };
-        
-        isMuted = res.muted || false;
-        updateMuteStatus();
-        
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
-        document.getElementById('agentNameDisplay').textContent = currentAgent.name;
-        document.getElementById('connectionStatus').textContent = "● Connected";
-        document.getElementById('connectionStatus').style.color = "#4CAF50";
-        
-        setupListeners();
-        loadExistingUsers();
-        
-        console.log("Logged in as:", currentAgent.name);
-        
-      } else {
-        document.getElementById('loginError').textContent = res.message || 'Login failed';
-        document.getElementById('connectionStatus').textContent = "● Connection Failed";
-        document.getElementById('connectionStatus').style.color = "#f44336";
-      }
-    });
+    setupSocketListeners();
     
-    socket.on('connect_error', (error) => {
-      document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
-      document.getElementById('connectionStatus').textContent = "● Connection Error";
-      document.getElementById('connectionStatus').style.color = "#f44336";
-    });
-    
-    socket.on('disconnect', () => {
-      document.getElementById('connectionStatus').textContent = "● Disconnected";
-      document.getElementById('connectionStatus').style.color = "#ff9800";
-    });
+    // Show connecting status
+    updateConnectionStatus('connecting');
   }
 
   // Update mute status display
@@ -395,61 +1188,14 @@
     }
   }
 
-  // Setup socket listeners
-  function setupListeners() {
-    // Listen for user messages
-    socket.on('user_message', (data) => {
-      const whatsapp = data.whatsapp || data.userId || 'User';
-      addUserMessage(whatsapp, data.message || data.text, data);
-    });
-    
-    // Listen for all messages
-    socket.on('new_message', (msg) => {
-      if (msg.sender === 'user') {
-        const whatsapp = msg.whatsapp || 'User';
-        addUserMessage(whatsapp, msg.text || msg.message, msg);
-      }
-    });
-    
-    // Listen for forwarded messages from super admin
-    socket.on('forwarded_message', (data) => {
-      if (data.type === 'user_message' && data.data) {
-        const whatsapp = data.data.whatsapp || data.data.userId || 'User';
-        addUserMessage(whatsapp, data.data.message, data.data);
-      } else if (data.type === 'broadcast' && data.data) {
-        // Handle broadcast messages from super admin
-        addUserMessage('Super Admin', data.data.message, data);
-      }
-    });
-    
-    // Listen for mute status updates from super admin
-    socket.on('mute_status', (data) => {
-      if (data.agentId === AGENT_CONFIG.id) {
-        isMuted = data.muted;
-        updateMuteStatus();
-        
-        // Show notification
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-          position: fixed; top: 20px; right: 20px; 
-          padding: 15px; background: ${isMuted ? '#ffcdd2' : '#c8e6c9'}; 
-          color: ${isMuted ? '#c62828' : '#2e7d32'}; border-radius: 5px; 
-          z-index: 1000; border: 1px solid ${isMuted ? '#ef9a9a' : '#a5d6a7'};
-          font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        `;
-        notification.textContent = isMuted ? '🔇 Account muted by Super Admin' : '🔊 Account unmuted by Super Admin';
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
-      }
-    });
-  }
-
   // Load existing users from server
   function loadExistingUsers() {
+    if (!socket) return;
+    
     socket.emit('get_existing_users');
     
     socket.on('existing_users', (usersList) => {
-      console.log("Loaded existing users:", usersList);
+      console.log("Loaded existing users:", usersList.length);
       usersList.forEach(user => {
         if (!users.has(user.whatsapp)) {
           users.set(user.whatsapp, {
@@ -507,10 +1253,10 @@
     
     if (sortedUsers.length === 0) {
       userList.innerHTML = `
-        <div style="padding: 40px; text-align: center; color: #666;">
-          <div style="font-size: 48px; margin-bottom: 20px;">👤</div>
-          <h4>No conversations yet</h4>
-          <p style="font-size: 12px;">Users will appear here when they send messages</p>
+        <div class="empty-state">
+          <div class="empty-state-icon">💬</div>
+          <div class="empty-state-title">No conversations yet</div>
+          <div class="empty-state-subtitle">Users will appear here when they send messages</div>
         </div>
       `;
       return;
@@ -518,18 +1264,22 @@
     
     sortedUsers.forEach(([userId, user]) => {
       const div = document.createElement('div');
-      div.className = `user ${selectedUser === userId ? 'active' : ''}`;
+      div.className = `user-item ${selectedUser === userId ? 'active' : ''}`;
       div.onclick = () => selectUser(userId);
       
-      const time = new Date(user.time).toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
+      const time = formatTime(user.time);
+      const userInitial = userId.charAt(0).toUpperCase();
+      const preview = user.lastMsg.length > 50 ? user.lastMsg.substring(0, 50) + '...' : user.lastMsg;
       
       div.innerHTML = `
-        <div class="user-name">${user.name}</div>
-        <div class="user-preview">${user.lastMsg}</div>
-        <div style="font-size: 10px; color: #999; text-align: right; margin-top: 2px;">${time}</div>
+        <div class="user-avatar">${userInitial}</div>
+        <div class="user-content">
+          <div class="user-name-row">
+            <div class="user-name">${user.name}</div>
+            <div class="user-time">${time}</div>
+          </div>
+          <div class="user-preview">${preview}</div>
+        </div>
       `;
       
       userList.appendChild(div);
@@ -541,9 +1291,11 @@
     selectedUser = userId;
     const user = users.get(userId);
     
+    // Update chat header
+    document.getElementById('chatHeader').style.display = 'flex';
     document.getElementById('currentUser').textContent = user.name;
-    document.getElementById('userInfo').textContent = `Last message: ${new Date(user.time).toLocaleTimeString()}`;
     document.getElementById('whatsappNumber').textContent = `WhatsApp: ${userId}`;
+    document.getElementById('chatUserAvatar').textContent = userId.charAt(0).toUpperCase();
     
     // Enable input if not muted
     const messageInput = document.getElementById('messageInput');
@@ -560,7 +1312,7 @@
     showMessages();
   }
 
-  // Show messages for selected user
+  // Show messages for selected user - VERTICAL LAYOUT
   function showMessages() {
     if (!selectedUser) return;
     
@@ -569,41 +1321,133 @@
     
     messagesDiv.innerHTML = '';
     
-    user.messages.forEach(msg => {
-      const div = document.createElement('div');
-      div.className = `msg ${msg.sender === 'agent' ? 'agent' : 'user'}`;
-      
-      let content = msg.text || '';
-      if (msg.attachment) {
-        const fileType = msg.attachment.mimetype?.split('/')[0];
-        let icon = '📄';
-        let preview = '';
+    // Group messages by date
+    const groupedMessages = groupMessagesByDate(user.messages);
+    
+    Object.keys(groupedMessages).forEach(date => {
+      // Add date separator
+      if (Object.keys(groupedMessages).length > 1) {
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'date-separator';
+        dateDiv.style.cssText = `
+          text-align: center;
+          margin: 20px 0;
+          color: #666;
+          font-size: 12px;
+          font-weight: 500;
+          position: relative;
+        `;
         
-        if (fileType === 'image') {
-          icon = '🖼️';
-          const imgUrl = msg.attachment.url || msg.attachment.path;
-          preview = `<br><img src="${imgUrl}" class="msg-img">`;
-        } else if (fileType === 'video') icon = '🎬';
-        else if (fileType === 'audio') icon = '🎵';
-        else if (msg.attachment.mimetype?.includes('pdf')) icon = '📕';
-        
-        const fileName = msg.attachment.originalname || msg.attachment.filename;
-        const fileUrl = msg.attachment.url || msg.attachment.path;
-        content += `<br><div style="margin-top: 5px;">${icon} <a href="${fileUrl}" target="_blank">${fileName}</a>${preview}</div>`;
+        dateDiv.innerHTML = `
+          <div style="background: #f8f9fa; padding: 0 15px; display: inline-block;">
+            ${formatDate(date)}
+          </div>
+          <div style="position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e0e0e0; z-index: -1;"></div>
+        `;
+        messagesDiv.appendChild(dateDiv);
       }
       
-      div.innerHTML = content + `<div style="font-size: 11px; color: #666; margin-top: 3px;">${formatTime(msg.time)}</div>`;
-      messagesDiv.appendChild(div);
+      // Add messages for this date
+      groupedMessages[date].forEach(msg => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-bubble ${msg.sender === 'agent' ? 'agent' : 'user'}`;
+        
+        let content = msg.text || '';
+        let attachmentHtml = '';
+        
+        if (msg.attachment) {
+          attachmentHtml = formatAttachment(msg.attachment);
+        }
+        
+        const senderName = msg.sender === 'agent' ? (currentAgent?.name || 'Agent') : 'User';
+        const time = formatTime(msg.time);
+        
+        messageDiv.innerHTML = `
+          <div class="message-content">
+            ${content}
+            ${attachmentHtml}
+          </div>
+          <div class="message-meta">
+            <span class="message-sender">${senderName}</span>
+            <span class="message-time">${time}</span>
+          </div>
+        `;
+        
+        messagesDiv.appendChild(messageDiv);
+      });
     });
     
     // Scroll to bottom
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   }
 
+  // Group messages by date
+  function groupMessagesByDate(messages) {
+    const grouped = {};
+    
+    messages.forEach(msg => {
+      const date = new Date(msg.time).toDateString();
+      if (!grouped[date]) {
+        grouped[date] = [];
+      }
+      grouped[date].push(msg);
+    });
+    
+    return grouped;
+  }
+
+  // Format attachment
+  function formatAttachment(attachment) {
+    if (!attachment) return '';
+    
+    const fileType = attachment.mimetype?.split('/')[0] || 'file';
+    let icon = '📄';
+    let preview = '';
+    
+    const fileUrl = attachment.url || attachment.path;
+    const fileName = attachment.originalname || attachment.filename || 'file';
+    
+    if (fileType === 'image') {
+      icon = '🖼️';
+      preview = `<div class="attachment-preview"><img src="${fileUrl}" alt="${fileName}"></div>`;
+    } else if (fileType === 'video') {
+      icon = '🎬';
+    } else if (fileType === 'audio') {
+      icon = '🎵';
+    } else if (attachment.mimetype?.includes('pdf')) {
+      icon = '📕';
+    }
+    
+    return `
+      <div class="attachment">
+        <a href="${fileUrl}" target="_blank" class="attachment-link">
+          <span class="file-icon">${icon}</span>
+          <span>${fileName}</span>
+        </a>
+        ${preview}
+      </div>
+    `;
+  }
+
+  // Handle file selection
+  function handleFileSelect() {
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput.files.length > 0) {
+      selectedFile = fileInput.files[0];
+      console.log("File selected:", selectedFile.name);
+      // You could add a preview here
+    }
+  }
+
   // Send message
   function sendMessage() {
     if (isMuted) {
       alert("Your account is muted by Super Admin. You cannot send messages.");
+      return;
+    }
+    
+    if (!socket || !socket.connected) {
+      alert("Not connected to server. Please wait for reconnection.");
       return;
     }
     
@@ -639,12 +1483,30 @@
     // Update UI
     showMessages();
     input.value = '';
+    input.style.height = 'auto';
     input.focus();
   }
 
   // Helper: Format time
   function formatTime(timestamp) {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Helper: Format date
+  function formatDate(dateString) {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+    }
   }
 
   // Enter key support
@@ -653,8 +1515,26 @@
   });
   
   document.getElementById('messageInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   });
+  
+  // Handle page visibility change
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && currentAgent && (!socket || !socket.connected)) {
+      console.log("Page became visible, checking connection...");
+      scheduleReconnect();
+    }
+  });
+  
+  // Periodic health check
+  setInterval(() => {
+    if (currentAgent && socket && socket.connected) {
+      socket.emit('ping');
+    }
+  }, 30000);
 </script>
 </body>
 </html>

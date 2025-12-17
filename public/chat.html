@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Live Chat</title>
   <style>
+    /* [All your existing CSS styles remain exactly the same] */
     body { 
       font-family: Arial; 
       margin: 0;
@@ -372,16 +373,279 @@
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-  // ===== GLOBAL VARIABLES WITH ANTI-DUPLICATE PROTECTION =====
+  // ===== GLOBAL VARIABLES WITH ENHANCED DEDUPLICATION =====
   const socket = io("https://chat-backend-p2b9.onrender.com");
   let whatsapp = "";
   let selectedFile = null;
-  let lastMessageTime = null;
-  let isSending = false;
-  let sendCooldown = false;
-  let sentMessageIds = new Set(); // Track sent message IDs to prevent duplicates
-  let pendingMessageId = null; // Track the ID of the message we just sent
-  let debounceTimer = null;
+  
+  // ===== DEDUPLICATION SYSTEM =====
+  const duplicateManager = {
+    // Store seen message fingerprints (last 1000 messages)
+    seenMessages: new Set(),
+    
+    // Store message content hashes (last 100 messages for rapid duplicate detection)
+    recentMessageHashes: new Map(),
+    
+    // Track pending message IDs
+    pendingMessages: new Map(),
+    
+    // Rate limiting by content
+    contentRateLimits: new Map(),
+    
+    // Message buffer for ordering
+    messageBuffer: new Map(),
+    
+    // Generate a comprehensive fingerprint for a message
+    generateFingerprint(msg) {
+      const parts = [];
+      
+      // Use server-provided ID if available
+      if (msg.id) return `id:${msg.id}`;
+      
+      // Use timestamp if available
+      if (msg.timestamp) parts.push(`ts:${msg.timestamp}`);
+      
+      // Use sender info
+      if (msg.sender) parts.push(`s:${msg.sender}`);
+      
+      // Use WhatsApp number
+      if (msg.whatsapp) parts.push(`w:${msg.whatsapp}`);
+      
+      // Use message content (truncated and cleaned)
+      const content = (msg.text || msg.message || '').trim();
+      if (content) {
+        // Remove extra whitespace and normalize
+        const normalizedContent = content.replace(/\s+/g, ' ').toLowerCase();
+        // Take first 50 chars and hash
+        const contentHash = this.simpleHash(normalizedContent.substring(0, 50));
+        parts.push(`c:${contentHash}`);
+      }
+      
+      // Use attachment info if present
+      if (msg.attachment) {
+        const attachment = msg.attachment;
+        if (attachment.filename) parts.push(`fn:${attachment.filename}`);
+        if (attachment.size) parts.push(`sz:${attachment.size}`);
+        if (attachment.url) {
+          const urlHash = this.simpleHash(attachment.url);
+          parts.push(`uh:${urlHash}`);
+        }
+      }
+      
+      // Add random component for edge cases
+      parts.push(`r:${Math.random().toString(36).substring(2, 9)}`);
+      
+      return parts.join('|');
+    },
+    
+    // Simple string hash function
+    simpleHash(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      return Math.abs(hash).toString(36);
+    },
+    
+    // Check if message is a duplicate
+    isDuplicate(msg) {
+      const fingerprint = this.generateFingerprint(msg);
+      
+      // Check in seen messages
+      if (this.seenMessages.has(fingerprint)) {
+        console.log('🔴 DUPLICATE DETECTED by fingerprint:', fingerprint.substring(0, 100));
+        return true;
+      }
+      
+      // Check content rate limiting
+      const content = (msg.text || msg.message || '').trim();
+      if (content) {
+        const normalizedContent = content.toLowerCase().replace(/\s+/g, ' ');
+        const contentHash = this.simpleHash(normalizedContent);
+        const lastSeen = this.contentRateLimits.get(contentHash);
+        
+        // If same content was seen in last 3 seconds, it's likely a duplicate
+        if (lastSeen && (Date.now() - lastSeen) < 3000) {
+          console.log('🔴 DUPLICATE DETECTED by content rate limit');
+          return true;
+        }
+      }
+      
+      // Add to seen messages
+      this.seenMessages.add(fingerprint);
+      
+      // Clean up old fingerprints (keep only last 1000)
+      if (this.seenMessages.size > 1000) {
+        const iterator = this.seenMessages.values();
+        for (let i = 0; i < 500; i++) {
+          this.seenMessages.delete(iterator.next().value);
+        }
+      }
+      
+      // Update content rate limit
+      if (content) {
+        const normalizedContent = content.toLowerCase().replace(/\s+/g, ' ');
+        const contentHash = this.simpleHash(normalizedContent);
+        this.contentRateLimits.set(contentHash, Date.now());
+        
+        // Clean old rate limits
+        if (this.contentRateLimits.size > 100) {
+          const now = Date.now();
+          for (const [key, timestamp] of this.contentRateLimits.entries()) {
+            if (now - timestamp > 10000) { // 10 seconds
+              this.contentRateLimits.delete(key);
+            }
+          }
+        }
+      }
+      
+      return false;
+    },
+    
+    // Track pending message (one we just sent)
+    addPendingMessage(msg, clientMsgId) {
+      const fingerprint = this.generateFingerprint(msg);
+      this.pendingMessages.set(clientMsgId, {
+        fingerprint,
+        timestamp: Date.now(),
+        msg
+      });
+      
+      // Auto-cleanup after 10 seconds
+      setTimeout(() => {
+        this.pendingMessages.delete(clientMsgId);
+      }, 10000);
+    },
+    
+    // Check if message matches a pending message
+    isPendingDuplicate(msg) {
+      const content = (msg.text || msg.message || '').trim();
+      const normalizedContent = content.toLowerCase().replace(/\s+/g, ' ');
+      
+      for (const [clientMsgId, pending] of this.pendingMessages.entries()) {
+        const pendingContent = (pending.msg.text || pending.msg.message || '').trim();
+        const pendingNormalized = pendingContent.toLowerCase().replace(/\s+/g, ' ');
+        
+        // Check multiple similarity factors
+        let similarityScore = 0;
+        
+        // Content similarity
+        if (normalizedContent === pendingNormalized) similarityScore += 40;
+        
+        // Sender similarity
+        if (msg.sender === pending.msg.sender) similarityScore += 20;
+        
+        // WhatsApp number similarity
+        if (msg.whatsapp === pending.msg.whatsapp) similarityScore += 20;
+        
+        // Time proximity (within 5 seconds)
+        const timeDiff = Math.abs(Date.now() - pending.timestamp);
+        if (timeDiff < 5000) similarityScore += 20;
+        
+        // If highly likely to be the same message
+        if (similarityScore >= 60) {
+          console.log('🟡 Pending duplicate detected, score:', similarityScore);
+          this.pendingMessages.delete(clientMsgId);
+          return true;
+        }
+      }
+      
+      return false;
+    },
+    
+    // Clear all data for new session
+    clear() {
+      this.seenMessages.clear();
+      this.recentMessageHashes.clear();
+      this.pendingMessages.clear();
+      this.contentRateLimits.clear();
+      this.messageBuffer.clear();
+    }
+  };
+  
+  // ===== SENDING CONTROL SYSTEM =====
+  const sendController = {
+    isSending: false,
+    cooldown: false,
+    debounceTimer: null,
+    enterKeyCooldown: false,
+    lastSendTime: 0,
+    consecutiveSends: 0,
+    
+    // Check if we can send a message
+    canSend() {
+      const now = Date.now();
+      
+      // Already sending
+      if (this.isSending) {
+        console.log('⚠️ Already sending, please wait...');
+        return { canSend: false, reason: 'Already sending' };
+      }
+      
+      // Cooldown active
+      if (this.cooldown) {
+        console.log('⚠️ Send cooldown active');
+        return { canSend: false, reason: 'Cooldown active' };
+      }
+      
+      // Debounce active
+      if (this.debounceTimer) {
+        console.log('⚠️ Debounce active');
+        return { canSend: false, reason: 'Debounce active' };
+      }
+      
+      // Check for rapid consecutive sends
+      if (this.consecutiveSends >= 3) {
+        const timeSinceLast = now - this.lastSendTime;
+        if (timeSinceLast < 1000) { // If 3+ sends in 1 second
+          console.log('⚠️ Too many rapid sends');
+          return { canSend: false, reason: 'Too many rapid sends' };
+        }
+      }
+      
+      return { canSend: true };
+    },
+    
+    // Start sending
+    beginSend() {
+      this.isSending = true;
+      this.lastSendTime = Date.now();
+      this.consecutiveSends++;
+      
+      // Reset consecutive sends after 2 seconds of inactivity
+      setTimeout(() => {
+        this.consecutiveSends = 0;
+      }, 2000);
+      
+      // Set debounce
+      this.debounceTimer = setTimeout(() => {
+        this.debounceTimer = null;
+      }, 500);
+    },
+    
+    // Finish sending
+    finishSend() {
+      this.isSending = false;
+      this.cooldown = true;
+      
+      // Remove cooldown after 1 second
+      setTimeout(() => {
+        this.cooldown = false;
+      }, 1000);
+    },
+    
+    // Reset sending state
+    reset() {
+      this.isSending = false;
+      this.cooldown = false;
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = null;
+      }
+    }
+  };
   
   // ===== FORMAT FUNCTIONS =====
   function formatTime(timestamp) {
@@ -402,80 +666,58 @@
   // ===== SOCKET EVENT LISTENERS =====
   socket.on("connect", () => {
     console.log("Connected to server with ID:", socket.id);
+    // Clear duplicate manager on new connection
+    duplicateManager.clear();
   });
 
   socket.on("registered", (data) => {
     console.log("Registration successful:", data);
   });
 
-  // Handle incoming messages - FIXED DUPLICATE PREVENTION
+  // Handle incoming messages - ROBUST DEDUPLICATION
   socket.on("new_message", (msg) => {
-    console.log("New message received:", msg);
+    console.log("New message received:", {
+      sender: msg.sender,
+      timestamp: msg.timestamp,
+      preview: (msg.text || msg.message || '').substring(0, 50)
+    });
     
-    // Generate unique message ID for duplicate checking
-    const messageId = generateMessageId(msg);
-    
-    // Check if we've already seen this message
-    if (sentMessageIds.has(messageId)) {
-      console.log("⚠️ Duplicate message detected, skipping:", messageId);
+    // Check if this is a duplicate
+    if (duplicateManager.isDuplicate(msg)) {
+      console.log("🛑 Skipping duplicate message");
       return;
     }
     
-    // Add to sent message tracking
-    sentMessageIds.add(messageId);
-    
-    // Clean up old message IDs (keep only last 100)
-    if (sentMessageIds.size > 100) {
-      const iterator = sentMessageIds.values();
-      for (let i = 0; i < 50; i++) {
-        sentMessageIds.delete(iterator.next().value);
-      }
+    // Check if this matches a pending message we just sent
+    if (duplicateManager.isPendingDuplicate(msg)) {
+      console.log("🛑 Skipping pending duplicate (likely our own echo)");
+      return;
     }
     
-    // FIX: Check if this is our own pending message
-    if (pendingMessageId && messageId === pendingMessageId) {
-      console.log("This is our own pending message, we already showed it");
-      pendingMessageId = null; // Clear pending flag
-      return; // Don't show it again
-    }
-    
-    // Skip if this is our own message that was just sent (fallback)
-    if (msg.sender === "user" && msg.whatsapp === whatsapp && lastMessageTime) {
-      const messageTime = new Date(msg.timestamp).getTime();
-      const timeDiff = Math.abs(messageTime - lastMessageTime);
-      
-      // If message was sent within last 3 seconds, skip it (already shown)
-      if (timeDiff < 3000) {
-        console.log("Skipping own recent message");
-        return;
-      }
-    }
-    
+    // Display the message
     displayMessage(msg);
   });
 
   // Handle message history
   socket.on("message_history", (messages) => {
-    console.log("Message history:", messages);
+    console.log("Message history:", messages.length, "messages");
     const messagesDiv = document.getElementById("messages");
     messagesDiv.innerHTML = "";
+    
+    // Add all historical messages to duplicate tracker
     messages.forEach(msg => {
-      // Add historical messages to tracking
-      const messageId = generateMessageId(msg);
-      sentMessageIds.add(messageId);
+      duplicateManager.isDuplicate(msg); // This adds to seen messages
       displayMessage(msg, false);
     });
+    
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 
-  // Generate unique message ID for duplicate tracking
-  function generateMessageId(msg) {
-    if (msg.id) return msg.id;
-    if (msg.timestamp && msg.sender && msg.whatsapp) {
-      return `${msg.sender}_${msg.whatsapp}_${msg.timestamp}_${(msg.text || msg.message || '').substring(0, 20)}`;
-    }
-    return `${Date.now()}_${Math.random()}`;
-  }
+  // Handle connection errors
+  socket.on("connect_error", (error) => {
+    console.error("Connection error:", error);
+    showError("Connection error. Please refresh the page.");
+  });
 
   // ===== MESSAGE DISPLAY FUNCTIONS =====
   function displayMessage(msg, scroll = true) {
@@ -561,12 +803,22 @@
       return;
     }
 
+    // Validate format
+    if (!/^\+?[\d\s\-\(\)]+$/.test(whatsapp)) {
+      alert("Please enter a valid phone number");
+      return;
+    }
+
     console.log("Registering:", whatsapp);
     socket.emit("register", { whatsapp: whatsapp });
 
     document.getElementById("register").style.display = "none";
     document.getElementById("chat").style.display = "flex";
     document.getElementById("chatNumber").textContent = whatsapp;
+    
+    // Clear duplicate manager for new session
+    duplicateManager.clear();
+    sendController.reset();
     
     // Load message history
     socket.emit("get_messages", { whatsapp: whatsapp });
@@ -649,29 +901,12 @@
     xhr.send(formData);
   }
 
-  // ===== MESSAGE SENDING - FIXED DUPLICATE ISSUE =====
+  // ===== MESSAGE SENDING - WITH COMPLETE DEDUPLICATION =====
   function sendMessage() {
-    // DEBOUNCE: Prevent rapid multiple clicks
-    if (debounceTimer) {
-      console.log("Debounce active, ignoring click");
-      return;
-    }
-    
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null;
-    }, 300);
-    
-    // Layer 1: Check if already sending
-    if (isSending) {
-      showError("Please wait, message is being sent...");
-      console.log("⚠️ Already sending, please wait...");
-      return;
-    }
-    
-    // Layer 2: Check cooldown
-    if (sendCooldown) {
-      showError("Please wait before sending another message");
-      console.log("⚠️ Send cooldown active, please wait...");
+    // Check if we can send
+    const canSend = sendController.canSend();
+    if (!canSend.canSend) {
+      showError(canSend.reason);
       return;
     }
     
@@ -684,86 +919,70 @@
       return;
     }
     
-    // Layer 3: Check for duplicate content (if same content was sent recently)
-    if (text && lastMessageTime) {
-      const timeSinceLastMessage = Date.now() - lastMessageTime;
-      if (timeSinceLastMessage < 2000) { // 2 second cooldown
-        showError("Please wait a moment before sending another message");
-        return;
-      }
-    }
+    // Begin send process
+    sendController.beginSend();
     
-    // Set sending state
-    isSending = true;
-    sendCooldown = true;
-    lastMessageTime = Date.now();
-    
+    // Update UI
     const sendButton = document.getElementById('sendButton');
     const sendingIndicator = document.getElementById('sendingIndicator');
     const errorMessage = document.getElementById('errorMessage');
     
-    // Update UI
     sendButton.disabled = true;
     sendButton.textContent = "Sending...";
     sendingIndicator.style.display = 'block';
     errorMessage.style.display = 'none';
     
-    // Create unique message ID for this send
-    const messageId = `user_${whatsapp}_${Date.now()}_${text.substring(0, 20)}`;
-    sentMessageIds.add(messageId);
-    pendingMessageId = messageId; // Set as pending message
+    // Generate unique client message ID
+    const clientMsgId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Create message object
+    const messageToSend = {
+      id: clientMsgId,
+      sender: "user",
+      whatsapp: whatsapp,
+      text: text,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    
+    // Add to pending messages
+    duplicateManager.addPendingMessage(messageToSend, clientMsgId);
     
     // Send message logic
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
-        // Reset sending state
-        resetSendingState();
-        
         if (fileInfo) {
           console.log("📤 Sending message with attachment:", fileInfo);
           
-          // Show message immediately in chat
-          const tempMsg = {
-            id: messageId,
-            sender: "user",
-            whatsapp: whatsapp,
-            text: text,
-            attachment: fileInfo,
-            timestamp: new Date().toISOString(),
-            read: false
-          };
-          displayMessage(tempMsg);
+          // Update message with attachment
+          messageToSend.attachment = fileInfo;
           
-          // Send ONLY ONE event to backend
+          // Show message immediately in chat
+          displayMessage(messageToSend);
+          
+          // Send to server
           socket.emit("user_message", {
             whatsapp: whatsapp,
             userId: whatsapp,
             message: text,
-            attachment: fileInfo
+            attachment: fileInfo,
+            clientMsgId: clientMsgId
           });
-          
         } else {
           // File upload failed, send text only if exists
           if (text) {
-            const tempMsg = {
-              id: messageId,
-              sender: "user",
-              whatsapp: whatsapp,
-              text: text,
-              timestamp: new Date().toISOString(),
-              read: false
-            };
-            displayMessage(tempMsg);
-            
+            displayMessage(messageToSend);
             socket.emit("user_message", {
               whatsapp: whatsapp,
               userId: whatsapp,
-              message: text
+              message: text,
+              clientMsgId: clientMsgId
             });
           }
         }
         
-        // Clear inputs
+        // Cleanup
+        finishMessageSend();
         document.getElementById("messageInput").value = "";
         fileInput.value = "";
         document.getElementById("filePreview").innerHTML = "";
@@ -772,40 +991,27 @@
       // No file, just send text
       console.log("📤 Sending text message:", text);
       
-      // Show message immediately in chat
-      const tempMsg = {
-        id: messageId,
-        sender: "user",
-        whatsapp: whatsapp,
-        text: text,
-        timestamp: new Date().toISOString(),
-        read: false
-      };
-      displayMessage(tempMsg);
+      // Show message immediately
+      displayMessage(messageToSend);
       
-      // Send ONLY ONE event to backend
+      // Send to server
       socket.emit("user_message", {
         whatsapp: whatsapp,
         userId: whatsapp,
-        message: text
+        message: text,
+        clientMsgId: clientMsgId
       });
       
-      // Reset sending state after a short delay
+      // Cleanup
       setTimeout(() => {
-        resetSendingState();
+        finishMessageSend();
         document.getElementById("messageInput").value = "";
       }, 500);
     }
   }
   
-  // Helper function to reset sending state
-  function resetSendingState() {
-    isSending = false;
-    
-    // Remove cooldown after 1 second
-    setTimeout(() => {
-      sendCooldown = false;
-    }, 1000);
+  function finishMessageSend() {
+    sendController.finishSend();
     
     const sendButton = document.getElementById('sendButton');
     const sendingIndicator = document.getElementById('sendingIndicator');
@@ -815,47 +1021,47 @@
     sendingIndicator.style.display = 'none';
   }
   
-  // Helper function to show error
   function showError(message) {
     const errorMessage = document.getElementById('errorMessage');
     errorMessage.textContent = message;
     errorMessage.style.display = 'block';
     
-    // Hide error after 3 seconds
     setTimeout(() => {
       errorMessage.style.display = 'none';
     }, 3000);
   }
 
   // ===== KEYBOARD EVENT HANDLING =====
-  let enterKeyCooldown = false;
   document.getElementById("messageInput").addEventListener("keypress", function(e) {
     if (e.key === "Enter") {
-      // Prevent default to avoid form submission
       e.preventDefault();
       
-      // Prevent multiple Enter key triggers
-      if (enterKeyCooldown) {
+      if (sendController.enterKeyCooldown) {
         console.log("Enter key cooldown active");
         return;
       }
       
-      enterKeyCooldown = true;
+      sendController.enterKeyCooldown = true;
       sendMessage();
       
-      // Reset cooldown after 1 second
       setTimeout(() => {
-        enterKeyCooldown = false;
+        sendController.enterKeyCooldown = false;
       }, 1000);
     }
   });
 
-  // ===== CLEANUP ON PAGE UNLOAD =====
+  // ===== CLEANUP =====
   window.addEventListener('beforeunload', function() {
     if (socket) {
       socket.disconnect();
     }
+    duplicateManager.clear();
   });
+  
+  // Auto-cleanup duplicate manager every 5 minutes
+  setInterval(() => {
+    duplicateManager.clear();
+  }, 5 * 60 * 1000);
 </script>
 </body>
 </html>
