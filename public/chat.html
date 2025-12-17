@@ -167,9 +167,13 @@
       height: 100vh;
       height: -webkit-fill-available;
       background: #f8f9fa;
-      position: relative;
-      flex: 1;
-      min-height: 0;
+      position: fixed; /* FIXED: Changed to fixed */
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      z-index: 1000;
       overflow: hidden;
     }
 
@@ -191,7 +195,6 @@
       min-height: 0;
       position: relative;
       background: #f8f9fa;
-      padding-bottom: 0;
     }
 
     .chat-header {
@@ -200,6 +203,8 @@
       border-bottom: 1px solid #e8e8e8;
       flex-shrink: 0;
       z-index: 10;
+      position: sticky;
+      top: 0;
     }
 
     .chat-header h3 {
@@ -230,10 +235,6 @@
       flex-direction: column;
       min-height: 0;
       background: #f8f9fa;
-      border-radius: 0;
-      margin: 0;
-      height: calc(100vh - 220px); /* Fixed height to prevent expansion */
-      max-height: calc(100vh - 220px);
     }
 
     /* Bottom padding for messages */
@@ -273,7 +274,8 @@
       background: white;
       border-top: 1px solid #e8e8e8;
       z-index: 10;
-      position: relative;
+      position: sticky;
+      bottom: 0;
       padding-bottom: max(16px, env(safe-area-inset-bottom));
     }
 
@@ -681,11 +683,6 @@
         height: 36px;
         font-size: 16px;
       }
-      
-      #messages {
-        height: calc(100vh - 210px);
-        max-height: calc(100vh - 210px);
-      }
     }
 
     @media (max-width: 480px) {
@@ -731,12 +728,6 @@
 
       .file-upload-btn {
         font-size: 20px;
-      }
-      
-      #messages {
-        padding: 12px;
-        height: calc(100vh - 200px);
-        max-height: calc(100vh - 200px);
       }
       
       .scroll-to-bottom-btn {
@@ -1725,9 +1716,6 @@
     this.style.height = 'auto';
     const newHeight = Math.min(this.scrollHeight, 120);
     this.style.height = newHeight + 'px';
-    
-    // REMOVED: The problematic section that was dynamically changing messages container height
-    // This was causing the chat box to resize and lose its fixed position
   });
 
   // Handle keyboard show/hide on mobile
