@@ -160,32 +160,35 @@
       transform: translateY(-1px);
     }
 
-    /* ===== CHAT SECTION ===== */
+    /* ===== CHAT SECTION - FIXED ===== */
     #chat {
       display: none;
-      flex: 1;
       flex-direction: column;
       height: 100vh;
+      height: -webkit-fill-available;
       background: #f8f9fa;
       position: relative;
+      flex: 1;
+      min-height: 0;
     }
 
     .chat-wrapper {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      height: -webkit-fill-available;
+      height: 100%;
       width: 100%;
       overflow: hidden;
+      min-height: 0;
     }
 
-    /* ===== MESSAGES SECTION - 3/4 OF SCREEN ===== */
+    /* ===== MESSAGES SECTION - FIXED ===== */
     .messages-section {
-      flex: 3; /* Takes 3/4 of screen */
+      flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      min-height: 0; /* Crucial for scrollable flex children */
+      min-height: 0;
+      position: relative;
     }
 
     .chat-header {
@@ -208,33 +211,32 @@
       font-weight: 500;
     }
 
-    /* Messages wrapper - The key to independent scrolling */
+    /* Messages wrapper - FIXED */
     .messages-wrapper {
       flex: 1;
       overflow: hidden;
       position: relative;
       background: #f8f9fa;
       min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Main messages container - Independently scrollable */
+    /* Main messages container - FIXED */
     #messages {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
       padding: 16px;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
-      scroll-behavior: auto; /* Changed from smooth for faster scrolling */
+      scroll-behavior: auto;
       will-change: transform;
       backface-visibility: hidden;
       transform: translateZ(0);
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
 
     /* Bottom padding for messages */
@@ -268,23 +270,20 @@
       scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     }
 
-    /* ===== INPUT SECTION - 1/4 OF SCREEN ===== */
+    /* ===== INPUT SECTION - FIXED ===== */
     .input-section {
-      flex: 1; /* Takes 1/4 of screen */
+      flex-shrink: 0;
       display: flex;
       flex-direction: column;
       background: white;
       border-top: 1px solid #e8e8e8;
-      flex-shrink: 0;
       z-index: 10;
-      min-height: 0;
     }
 
     .input-area-container {
-      flex: 1;
       display: flex;
       flex-direction: column;
-      min-height: 0;
+      width: 100%;
     }
 
     .upload-progress {
@@ -555,7 +554,7 @@
     /* ===== SCROLL TO BOTTOM BUTTON ===== */
     .scroll-to-bottom-btn {
       position: absolute;
-      bottom: 20px;
+      bottom: 80px;
       right: 20px;
       width: 40px;
       height: 40px;
@@ -680,7 +679,7 @@
       }
       
       .scroll-to-bottom-btn {
-        bottom: 16px;
+        bottom: 70px;
         right: 16px;
         width: 36px;
         height: 36px;
@@ -738,7 +737,7 @@
       }
       
       .scroll-to-bottom-btn {
-        bottom: 14px;
+        bottom: 65px;
         right: 12px;
         width: 32px;
         height: 32px;
@@ -808,7 +807,7 @@
 <!-- Chat section -->
 <div id="chat">
   <div class="chat-wrapper">
-    <!-- Messages Section (3/4 of screen) -->
+    <!-- Messages Section -->
     <div class="messages-section">
       <div class="chat-header">
         <h3>Chat: <span id="chatNumber"></span></h3>
@@ -829,7 +828,7 @@
       </div>
     </div>
     
-    <!-- Input Section (1/4 of screen) -->
+    <!-- Input Section -->
     <div class="input-section">
       <div class="input-area-container">
         <div class="upload-progress" id="uploadProgress">

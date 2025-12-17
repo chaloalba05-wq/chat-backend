@@ -34,11 +34,37 @@
       width: 100%;
     }
     
+    /* ===== CHAT LIST VIEW (INITIAL VIEW) ===== */
+    .chat-list-view {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      background: white;
+    }
+    
+    /* ===== CHAT DETAIL VIEW (FULL SCREEN) ===== */
+    .chat-detail-view {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #f8f9fa;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+    
+    .chat-detail-view.active {
+      transform: translateX(0);
+    }
+    
     /* ===== SIDEBAR - EXACTLY 1/4 OF SCREEN ===== */
     .sidebar { 
-      width: 25%;
-      min-width: 250px;
-      max-width: 400px;
+      width: 100%;
+      height: 100%;
       background: white; 
       border-right: 1px solid #e0e0e0;
       display: flex;
@@ -235,18 +261,8 @@
       word-break: break-word;
     }
     
-    /* ===== CHAT AREA - EXACTLY 3/4 OF SCREEN ===== */
-    .chat-area { 
-      width: 75%;
-      flex: 1;
-      display: flex; 
-      flex-direction: column;
-      background: #f8f9fa;
-      min-width: 0;
-    }
-    
-    /* Chat Header */
-    .chat-header {
+    /* ===== CHAT DETAIL HEADER ===== */
+    .chat-detail-header {
       padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
       background: white;
       border-bottom: 1px solid #e0e0e0;
@@ -256,7 +272,27 @@
       flex-shrink: 0;
     }
     
-    .chat-user-avatar {
+    .back-button {
+      padding: 8px;
+      background: #f5f5f5;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    
+    .back-button:active {
+      background: #e0e0e0;
+    }
+    
+    .chat-detail-user-avatar {
       width: clamp(36px, 8vw, 44px);
       height: clamp(36px, 8vw, 44px);
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -270,12 +306,12 @@
       flex-shrink: 0;
     }
     
-    .chat-user-info {
+    .chat-detail-user-info {
       flex: 1;
       min-width: 0;
     }
     
-    .chat-user-name {
+    .chat-detail-user-name {
       font-weight: 600;
       color: #333;
       font-size: clamp(14px, 2vw, 16px);
@@ -285,7 +321,7 @@
       text-overflow: ellipsis;
     }
     
-    .chat-user-number {
+    .chat-detail-user-number {
       font-size: clamp(12px, 1.8vw, 13px);
       color: #666;
       white-space: nowrap;
@@ -293,9 +329,9 @@
       text-overflow: ellipsis;
     }
     
-    /* ===== MESSAGES CONTAINER - 3/4 OF CHAT AREA (SCROLLABLE) ===== */
-    .messages-container {
-      flex: 3; /* Takes 3/4 of chat area */
+    /* ===== MESSAGES CONTAINER - 3/4 OF SCREEN (SCROLLABLE) ===== */
+    .chat-messages-container {
+      flex: 3; /* Takes 3/4 of screen */
       overflow-y: auto;
       padding: clamp(16px, 2.5vw, 20px);
       display: flex;
@@ -314,7 +350,7 @@
     }
     
     /* Force hardware acceleration for smooth scrolling */
-    .messages-container {
+    .chat-messages-container {
       transform: translate3d(0, 0, 0);
       -webkit-transform: translate3d(0, 0, 0);
     }
@@ -432,9 +468,9 @@
       border: 1px solid rgba(0,0,0,0.1);
     }
     
-    /* ===== INPUT AREA - FIXED 1/4 OF CHAT AREA ===== */
-    .input-area {
-      flex: 1; /* Takes 1/4 of chat area */
+    /* ===== INPUT AREA - FIXED 1/4 OF SCREEN ===== */
+    .chat-input-area {
+      flex: 1; /* Takes 1/4 of screen */
       padding: clamp(16px, 2.5vw, 20px);
       background: white;
       border-top: 1px solid #e0e0e0;
@@ -446,7 +482,7 @@
       max-height: 120px;
     }
     
-    .input-wrapper {
+    .chat-input-wrapper {
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -455,7 +491,7 @@
       height: 100%;
     }
     
-    .message-input {
+    .chat-message-input {
       flex: 1;
       padding: clamp(10px, 2vw, 12px) clamp(12px, 2.5vw, 16px);
       border: 1px solid #e0e0e0;
@@ -473,16 +509,16 @@
       width: 100%;
     }
     
-    .message-input:focus {
+    .chat-message-input:focus {
       border-color: #667eea;
     }
     
-    .message-input:disabled {
+    .chat-message-input:disabled {
       background: #f5f5f5;
       cursor: not-allowed;
     }
     
-    .input-actions {
+    .chat-input-actions {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -492,7 +528,7 @@
       gap: 8px;
     }
     
-    .file-attachment {
+    .chat-file-attachment {
       display: flex;
       align-items: center;
       gap: clamp(6px, 1vw, 8px);
@@ -502,11 +538,11 @@
       transition: background 0.2s;
     }
     
-    .file-attachment:active {
+    .chat-file-attachment:active {
       background: #f0f0f0;
     }
     
-    .send-button {
+    .chat-send-button {
       padding: clamp(8px, 2vw, 10px) clamp(16px, 3vw, 24px);
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -523,15 +559,15 @@
       flex-shrink: 0;
     }
     
-    .send-button:active {
+    .chat-send-button:active {
       transform: scale(0.95);
     }
     
-    .send-button:hover {
+    .chat-send-button:hover {
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
     
-    .send-button:disabled {
+    .chat-send-button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
       transform: none;
@@ -798,46 +834,14 @@
     
     /* ===== MOBILE OPTIMIZATIONS ===== */
     @media (max-width: 767px) {
-      .container {
-        flex-direction: column;
-      }
-      
-      .sidebar {
-        width: 100%;
-        height: 40vh;
-        border-right: none;
-        border-bottom: 1px solid #e0e0e0;
-      }
-      
-      .chat-area {
-        width: 100%;
-        height: 60vh;
-      }
-      
-      /* Maintain the 3:1 ratio within chat area on mobile */
-      .messages-container {
-        flex: 3;
-      }
-      
-      .input-area {
-        flex: 1;
-      }
-      
-      /* Mobile sidebar toggle */
-      .mobile-sidebar-toggle {
+      .chat-detail-view {
         position: fixed;
-        top: 16px;
-        left: 16px;
-        width: 40px;
-        height: 40px;
-        background: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        z-index: 99;
-        cursor: pointer;
+      }
+      
+      .back-button {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
       }
     }
     
@@ -867,7 +871,7 @@
         padding-right: max(16px, env(safe-area-inset-right));
       }
       
-      .input-area, .sidebar-header {
+      .sidebar-header, .chat-detail-header, .chat-input-area {
         padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
         padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
       }
@@ -1018,54 +1022,53 @@
 <!-- Main App -->
 <div id="app" class="container" style="display: none;">
   
-  <!-- Mobile sidebar toggle -->
-  <div class="mobile-sidebar-toggle" id="sidebarToggle" style="display: none;">☰</div>
-  
-  <!-- Sidebar - 25% of screen -->
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <!-- Agent Info -->
-      <div class="agent-info">
-        <div class="agent-avatar" id="agentAvatar">A1</div>
-        <div class="agent-details">
-          <div class="agent-name" id="agentNameDisplay">Agent 1</div>
-          <div class="agent-id">ID: <span id="agentIdDisplay">agent1</span></div>
+  <!-- Chat List View (Initial View) -->
+  <div id="chatListView" class="chat-list-view">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <!-- Agent Info -->
+        <div class="agent-info">
+          <div class="agent-avatar" id="agentAvatar">A1</div>
+          <div class="agent-details">
+            <div class="agent-name" id="agentNameDisplay">Agent 1</div>
+            <div class="agent-id">ID: <span id="agentIdDisplay">agent1</span></div>
+          </div>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="status-container">
+          <span class="connection-dot" id="connectionDot"></span>
+          <span class="connection-status" id="connectionStatus">Connected</span>
+          <span id="muteIndicator" class="mute-status unmuted" style="margin-left: auto;">⚡ Active</span>
         </div>
       </div>
       
-      <!-- Connection Status -->
-      <div class="status-container">
-        <span class="connection-dot" id="connectionDot"></span>
-        <span class="connection-status" id="connectionStatus">Connected</span>
-        <span id="muteIndicator" class="mute-status unmuted" style="margin-left: auto;">⚡ Active</span>
-      </div>
-    </div>
-    
-    <!-- User List -->
-    <div class="user-list-title">Active Conversations</div>
-    <div id="userList" class="user-list">
-      <div class="empty-state">
-        <div class="empty-state-icon">💬</div>
-        <div class="empty-state-title">No conversations yet</div>
-        <div class="empty-state-subtitle">Users will appear here when they send messages</div>
+      <!-- User List -->
+      <div class="user-list-title">Active Conversations</div>
+      <div id="userList" class="user-list">
+        <div class="empty-state">
+          <div class="empty-state-icon">💬</div>
+          <div class="empty-state-title">No conversations yet</div>
+          <div class="empty-state-subtitle">Users will appear here when they send messages</div>
+        </div>
       </div>
     </div>
   </div>
   
-  <!-- Chat Area - 75% of screen -->
-  <div class="chat-area">
-    
-    <!-- Chat Header -->
-    <div class="chat-header" id="chatHeader" style="display: none;">
-      <div class="chat-user-avatar" id="chatUserAvatar">U</div>
-      <div class="chat-user-info">
-        <div class="chat-user-name" id="currentUser">Select a user</div>
-        <div class="chat-user-number" id="whatsappNumber">Click on a user from the left</div>
+  <!-- Chat Detail View (Full Screen) -->
+  <div id="chatDetailView" class="chat-detail-view">
+    <!-- Chat Header with Back Button -->
+    <div class="chat-detail-header">
+      <button class="back-button" onclick="exitChat()">←</button>
+      <div class="chat-detail-user-avatar" id="chatDetailUserAvatar">U</div>
+      <div class="chat-detail-user-info">
+        <div class="chat-detail-user-name" id="currentUser">Select a user</div>
+        <div class="chat-detail-user-number" id="whatsappNumber">Click on a user from the left</div>
       </div>
     </div>
     
-    <!-- Messages Container - 3/4 of chat area (scrollable) -->
-    <div id="messages" class="messages-container">
+    <!-- Messages Container - 3/4 of screen (scrollable) -->
+    <div id="chatMessages" class="chat-messages-container">
       <div class="empty-state">
         <div class="empty-state-icon">👈</div>
         <div class="empty-state-title">Select a conversation</div>
@@ -1073,34 +1076,34 @@
       </div>
     </div>
     
-    <!-- Input Area - 1/4 of chat area (fixed at bottom) -->
-    <div class="input-area">
-      <div class="input-wrapper">
+    <!-- Input Area - 1/4 of screen (fixed at bottom) -->
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
         <textarea 
-          id="messageInput" 
-          class="message-input" 
+          id="chatMessageInput" 
+          class="chat-message-input" 
           placeholder="Type message..." 
           disabled
           rows="1"
         ></textarea>
         
-        <div class="input-actions">
-          <div class="file-attachment" onclick="document.getElementById('fileInput').click()">
+        <div class="chat-input-actions">
+          <div class="chat-file-attachment" onclick="document.getElementById('chatFileInput').click()">
             <span>📎</span>
             <span>Attach file</span>
           </div>
-          <div id="typingIndicator" style="font-size: 12px; color: #666; display: none;">
+          <div id="chatTypingIndicator" style="font-size: 12px; color: #666; display: none;">
             Typing...
           </div>
         </div>
       </div>
       
-      <button id="sendBtn" onclick="sendMessage()" class="send-button" disabled>
+      <button id="chatSendBtn" onclick="sendMessage()" class="chat-send-button" disabled>
         <span>Send</span>
         <span>➤</span>
       </button>
       
-      <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect()">
+      <input type="file" id="chatFileInput" style="display: none;" onchange="handleFileSelect()">
     </div>
   </div>
 </div>
@@ -1458,14 +1461,11 @@
     document.getElementById('agentPass').value = AGENT_CONFIG.password;
     
     // Set up textarea auto-resize
-    const textarea = document.getElementById('messageInput');
+    const textarea = document.getElementById('chatMessageInput');
     textarea.addEventListener('input', function() {
       this.style.height = 'auto';
       this.style.height = Math.min(this.scrollHeight, 80) + 'px';
     });
-    
-    // Initialize mobile sidebar toggle
-    initMobileSidebar();
     
     // Connect to server to register agent
     registerAgentOnServer();
@@ -1485,41 +1485,8 @@
   // Handle window resize
   function handleResize() {
     isMobile = window.innerWidth < 768;
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    
-    if (isMobile) {
-      sidebarToggle.style.display = 'flex';
-      document.getElementById('sidebar').classList.remove('open');
-    } else {
-      sidebarToggle.style.display = 'none';
-      document.getElementById('sidebar').classList.add('open');
-    }
   }
   
-  // Initialize mobile sidebar
-  function initMobileSidebar() {
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    
-    if (isMobile) {
-      sidebarToggle.style.display = 'flex';
-    }
-    
-    sidebarToggle.addEventListener('click', function() {
-      sidebar.classList.toggle('open');
-      this.textContent = sidebar.classList.contains('open') ? '✕' : '☰';
-    });
-    
-    // Close sidebar when clicking on a user (mobile only)
-    document.addEventListener('click', function(event) {
-      if (isMobile && !sidebar.contains(event.target) && 
-          event.target !== sidebarToggle && !sidebarToggle.contains(event.target)) {
-        sidebar.classList.remove('open');
-        sidebarToggle.textContent = '☰';
-      }
-    });
-  }
-
   // Detect current filename
   function getCurrentFileName() {
     const path = window.location.pathname;
@@ -1615,21 +1582,8 @@
         document.getElementById('agentIdDisplay').textContent = currentAgent.id;
         document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
         
-        // Show mobile sidebar toggle
-        if (isMobile) {
-          document.getElementById('sidebarToggle').style.display = 'flex';
-        }
-        
         // Load all conversations and messages
         loadAllConversations();
-        
-        // Focus on first user if available
-        setTimeout(() => {
-          if (users.size > 0) {
-            const firstUser = Array.from(users.keys())[0];
-            selectUser(firstUser);
-          }
-        }, 500);
         
         // Send connection established notification
         showNotification('Connected to server successfully!', '#e8f5e9', '#2e7d32');
@@ -1796,11 +1750,7 @@
       updateUserList();
       
       if (selectedUser === data.whatsapp) {
-        selectedUser = null;
-        showMessages();
-        document.getElementById('chatHeader').style.display = 'none';
-        document.getElementById('messageInput').disabled = true;
-        document.getElementById('sendBtn').disabled = true;
+        exitChat();
       }
     });
     
@@ -1883,13 +1833,13 @@
 
   // Show typing indicator
   function showTypingIndicator() {
-    const indicator = document.getElementById('typingIndicator');
+    const indicator = document.getElementById('chatTypingIndicator');
     indicator.style.display = 'block';
     updateActivity();
   }
 
   function hideTypingIndicator() {
-    const indicator = document.getElementById('typingIndicator');
+    const indicator = document.getElementById('chatTypingIndicator');
     indicator.style.display = 'none';
     updateActivity();
   }
@@ -2015,8 +1965,8 @@
   // Update mute status display
   function updateMuteStatus() {
     const muteIndicator = document.getElementById('muteIndicator');
-    const sendBtn = document.getElementById('sendBtn');
-    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('chatSendBtn');
+    const messageInput = document.getElementById('chatMessageInput');
     
     if (isMuted) {
       muteIndicator.textContent = "🔇 Muted";
@@ -2098,11 +2048,6 @@
       div.className = `user-item ${selectedUser === userId ? 'active' : ''}`;
       div.onclick = () => {
         selectUser(userId);
-        // Close sidebar on mobile
-        if (isMobile) {
-          document.getElementById('sidebar').classList.remove('open');
-          document.getElementById('sidebarToggle').textContent = '☰';
-        }
       };
       
       const time = formatTime(user.time);
@@ -2130,15 +2075,14 @@
     const user = users.get(userId);
     updateActivity();
     
-    // Update chat header
-    document.getElementById('chatHeader').style.display = 'flex';
+    // Update chat detail header
     document.getElementById('currentUser').textContent = user.name;
     document.getElementById('whatsappNumber').textContent = `WhatsApp: ${userId}`;
-    document.getElementById('chatUserAvatar').textContent = userId.charAt(0).toUpperCase();
+    document.getElementById('chatDetailUserAvatar').textContent = userId.charAt(0).toUpperCase();
     
     // Enable input if not muted
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.getElementById('sendBtn');
+    const messageInput = document.getElementById('chatMessageInput');
+    const sendBtn = document.getElementById('chatSendBtn');
     
     if (!isMuted) {
       messageInput.disabled = false;
@@ -2158,6 +2102,30 @@
     
     // Show messages
     showMessages();
+    
+    // Show chat detail view
+    document.getElementById('chatDetailView').classList.add('active');
+  }
+
+  // Exit chat and return to chat list
+  function exitChat() {
+    selectedUser = null;
+    
+    // Hide chat detail view
+    document.getElementById('chatDetailView').classList.remove('active');
+    
+    // Disable input
+    const messageInput = document.getElementById('chatMessageInput');
+    const sendBtn = document.getElementById('chatSendBtn');
+    messageInput.disabled = true;
+    sendBtn.disabled = true;
+    messageInput.value = '';
+    messageInput.placeholder = "Select a conversation to start chatting";
+    
+    // Update user list to remove active state
+    updateUserList();
+    
+    updateActivity();
   }
 
   // Show messages for selected user
@@ -2165,7 +2133,7 @@
     if (!selectedUser) return;
     updateActivity();
     
-    const messagesDiv = document.getElementById('messages');
+    const messagesDiv = document.getElementById('chatMessages');
     const user = users.get(selectedUser);
     
     messagesDiv.innerHTML = '';
@@ -2282,7 +2250,7 @@
 
   // Handle file selection
   function handleFileSelect() {
-    const fileInput = document.getElementById('fileInput');
+    const fileInput = document.getElementById('chatFileInput');
     if (fileInput.files.length > 0) {
       selectedFile = fileInput.files[0];
       console.log("File selected:", selectedFile.name);
@@ -2306,7 +2274,7 @@
       return;
     }
     
-    const input = document.getElementById('messageInput');
+    const input = document.getElementById('chatMessageInput');
     const text = input.value.trim();
     if (!text || !selectedUser) return;
     
@@ -2374,7 +2342,7 @@
     if (e.key === 'Enter') login();
   });
   
-  document.getElementById('messageInput').addEventListener('keypress', (e) => {
+  document.getElementById('chatMessageInput').addEventListener('keypress', (e) => {
     updateActivity();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -2382,12 +2350,11 @@
     }
   });
   
-  // Handle back button on mobile
+  // Handle back button on mobile (browser back button)
   window.addEventListener('popstate', function() {
     updateActivity();
-    if (isMobile && document.getElementById('app').style.display === 'flex') {
-      document.getElementById('sidebar').classList.remove('open');
-      document.getElementById('sidebarToggle').textContent = '☰';
+    if (selectedUser) {
+      exitChat();
     }
   });
   
