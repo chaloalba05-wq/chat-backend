@@ -284,6 +284,24 @@
       gap: 10px;
       align-items: flex-end;
     }
+    
+    /* Sending indicator */
+    .sending-indicator {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+      text-align: center;
+      display: none;
+    }
+    
+    /* Error message */
+    .error-message {
+      color: #d32f2f;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 5px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -330,11 +348,13 @@
           </button>
           <span class="file-upload-label">file upload</span>
         </div>
-        <button class="send-btn" onclick="sendMessage()">
+        <button class="send-btn" onclick="sendMessage()" id="sendButton">
           Send
         </button>
       </div>
     </div>
+    <div class="sending-indicator" id="sendingIndicator">Sending...</div>
+    <div class="error-message" id="errorMessage">Please wait before sending another message</div>
     <span id="filePreview" class="file-preview"></span>
     <input type="file" id="fileInput" onchange="handleFileSelect()">
   </div>
@@ -342,12 +362,17 @@
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
+  // ===== GLOBAL VARIABLES WITH ANTI-DUPLICATE PROTECTION =====
   const socket = io("https://chat-backend-p2b9.onrender.com");
   let whatsapp = "";
   let selectedFile = null;
   let lastMessageTime = null;
-
-  // Format time functions
+  let isSending = false;
+  let sendCooldown = false;
+  let sentMessageIds = new Set(); // Track sent message IDs to prevent duplicates
+  let debounceTimer = null;
+  
+  // ===== FORMAT FUNCTIONS =====
   function formatTime(timestamp) {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -363,6 +388,7 @@
     });
   }
 
+  // ===== SOCKET EVENT LISTENERS =====
   socket.on("connect", () => {
     console.log("Connected to server with ID:", socket.id);
   });
@@ -371,9 +397,29 @@
     console.log("Registration successful:", data);
   });
 
-  // Handle new messages with duplicate prevention
+  // Handle incoming messages - FIXED DUPLICATE PREVENTION
   socket.on("new_message", (msg) => {
     console.log("New message received:", msg);
+    
+    // Generate unique message ID for duplicate checking
+    const messageId = generateMessageId(msg);
+    
+    // Check if we've already seen this message
+    if (sentMessageIds.has(messageId)) {
+      console.log("⚠️ Duplicate message detected, skipping:", messageId);
+      return;
+    }
+    
+    // Add to sent message tracking
+    sentMessageIds.add(messageId);
+    
+    // Clean up old message IDs (keep only last 100)
+    if (sentMessageIds.size > 100) {
+      const iterator = sentMessageIds.values();
+      for (let i = 0; i < 50; i++) {
+        sentMessageIds.delete(iterator.next().value);
+      }
+    }
     
     // Skip if this is our own message that was just sent
     if (msg.sender === "user" && msg.whatsapp === whatsapp && lastMessageTime) {
@@ -396,12 +442,24 @@
     const messagesDiv = document.getElementById("messages");
     messagesDiv.innerHTML = "";
     messages.forEach(msg => {
+      // Add historical messages to tracking
+      const messageId = generateMessageId(msg);
+      sentMessageIds.add(messageId);
       displayMessage(msg, false);
     });
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 
-  // Function to display a message
+  // Generate unique message ID for duplicate tracking
+  function generateMessageId(msg) {
+    if (msg.id) return msg.id;
+    if (msg.timestamp && msg.sender && msg.whatsapp) {
+      return `${msg.sender}_${msg.whatsapp}_${msg.timestamp}_${msg.text?.substring(0, 20)}`;
+    }
+    return `${Date.now()}_${Math.random()}`;
+  }
+
+  // ===== MESSAGE DISPLAY FUNCTIONS =====
   function displayMessage(msg, scroll = true) {
     const messagesDiv = document.getElementById("messages");
     const messageDiv = document.createElement("div");
@@ -434,7 +492,6 @@
     }
   }
 
-  // Format attachment display - UPDATED to use url field
   function formatAttachment(attachment) {
     if (!attachment) return '';
     
@@ -478,6 +535,7 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
+  // ===== REGISTRATION =====
   function register() {
     whatsapp = document.getElementById("whatsapp").value.trim();
     if (!whatsapp) {
@@ -496,6 +554,7 @@
     socket.emit("get_messages", { whatsapp: whatsapp });
   }
 
+  // ===== FILE HANDLING =====
   function handleFileSelect() {
     const fileInput = document.getElementById('fileInput');
     const filePreview = document.getElementById('filePreview');
@@ -572,7 +631,32 @@
     xhr.send(formData);
   }
 
+  // ===== MESSAGE SENDING WITH ROBUST ANTI-DUPLICATE PROTECTION =====
   function sendMessage() {
+    // DEBOUNCE: Prevent rapid multiple clicks
+    if (debounceTimer) {
+      console.log("Debounce active, ignoring click");
+      return;
+    }
+    
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+    }, 300);
+    
+    // Layer 1: Check if already sending
+    if (isSending) {
+      showError("Please wait, message is being sent...");
+      console.log("⚠️ Already sending, please wait...");
+      return;
+    }
+    
+    // Layer 2: Check cooldown
+    if (sendCooldown) {
+      showError("Please wait before sending another message");
+      console.log("⚠️ Send cooldown active, please wait...");
+      return;
+    }
+    
     const text = document.getElementById("messageInput").value.trim();
     const fileInput = document.getElementById('fileInput');
     
@@ -581,18 +665,47 @@
       alert("Please enter a message or select a file");
       return;
     }
-
-    // Store current time for duplicate message prevention
+    
+    // Layer 3: Check for duplicate content (if same content was sent recently)
+    if (text && lastMessageTime) {
+      const timeSinceLastMessage = Date.now() - lastMessageTime;
+      if (timeSinceLastMessage < 2000) { // 2 second cooldown
+        showError("Please wait a moment before sending another message");
+        return;
+      }
+    }
+    
+    // Set sending state
+    isSending = true;
+    sendCooldown = true;
     lastMessageTime = Date.now();
-
-    // If there's a file, upload it first
+    
+    const sendButton = document.getElementById('sendButton');
+    const sendingIndicator = document.getElementById('sendingIndicator');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    // Update UI
+    sendButton.disabled = true;
+    sendButton.textContent = "Sending...";
+    sendingIndicator.style.display = 'block';
+    errorMessage.style.display = 'none';
+    
+    // Create unique message ID for this send
+    const messageId = `user_${whatsapp}_${Date.now()}_${text.substring(0, 20)}`;
+    sentMessageIds.add(messageId);
+    
+    // Send message logic
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
+        // Reset sending state
+        resetSendingState();
+        
         if (fileInfo) {
           console.log("📤 Sending message with attachment:", fileInfo);
           
           // Show message immediately in chat
           const tempMsg = {
+            id: messageId,
             sender: "user",
             whatsapp: whatsapp,
             text: text,
@@ -614,6 +727,7 @@
           // File upload failed, send text only if exists
           if (text) {
             const tempMsg = {
+              id: messageId,
               sender: "user",
               whatsapp: whatsapp,
               text: text,
@@ -641,6 +755,7 @@
       
       // Show message immediately in chat
       const tempMsg = {
+        id: messageId,
         sender: "user",
         whatsapp: whatsapp,
         text: text,
@@ -655,27 +770,73 @@
         userId: whatsapp,
         message: text
       });
-
-      document.getElementById("messageInput").value = "";
+      
+      // Reset sending state after a short delay
+      setTimeout(() => {
+        resetSendingState();
+        document.getElementById("messageInput").value = "";
+      }, 500);
     }
   }
+  
+  // Helper function to reset sending state
+  function resetSendingState() {
+    isSending = false;
+    
+    // Remove cooldown after 1 second
+    setTimeout(() => {
+      sendCooldown = false;
+    }, 1000);
+    
+    const sendButton = document.getElementById('sendButton');
+    const sendingIndicator = document.getElementById('sendingIndicator');
+    
+    sendButton.disabled = false;
+    sendButton.textContent = "Send";
+    sendingIndicator.style.display = 'none';
+  }
+  
+  // Helper function to show error
+  function showError(message) {
+    const errorMessage = document.getElementById('errorMessage');
+    errorMessage.textContent = message;
+    errorMessage.style.display = 'block';
+    
+    // Hide error after 3 seconds
+    setTimeout(() => {
+      errorMessage.style.display = 'none';
+    }, 3000);
+  }
 
-  // Allow sending message with Enter key
+  // ===== KEYBOARD EVENT HANDLING =====
+  let enterKeyCooldown = false;
   document.getElementById("messageInput").addEventListener("keypress", function(e) {
     if (e.key === "Enter") {
+      // Prevent default to avoid form submission
+      e.preventDefault();
+      
+      // Prevent multiple Enter key triggers
+      if (enterKeyCooldown) {
+        console.log("Enter key cooldown active");
+        return;
+      }
+      
+      enterKeyCooldown = true;
       sendMessage();
+      
+      // Reset cooldown after 1 second
+      setTimeout(() => {
+        enterKeyCooldown = false;
+      }, 1000);
     }
   });
 
-  // Also listen for user_message events from backend (for consistency)
-  socket.on("user_message", (msg) => {
-    console.log("Received user_message from backend:", msg);
-    // This handles messages from other users or system notifications
-    if (msg.sender !== "user" || msg.whatsapp !== whatsapp) {
-      displayMessage(msg);
+  // ===== CLEANUP ON PAGE UNLOAD =====
+  window.addEventListener('beforeunload', function() {
+    if (socket) {
+      socket.disconnect();
     }
   });
 </script>
-
 </body>
 </html>
