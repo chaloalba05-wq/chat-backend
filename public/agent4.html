@@ -988,6 +988,8 @@
     });
     
     socket.on('agent_login_response', (res) => {
+      const loginButton = document.getElementById('loginButton');
+      
       if (res.success) {
         console.log("Login successful:", res);
         currentAgent = { 
@@ -999,20 +1001,24 @@
         isMuted = res.muted || false;
         updateMuteStatus();
         
-        // If this is a reconnection, we're already logged in
-        if (document.getElementById('loginScreen').style.display !== 'none') {
-          document.getElementById('loginScreen').style.display = 'none';
-          document.getElementById('app').style.display = 'flex';
-          document.getElementById('agentNameDisplay').textContent = currentAgent.name;
-          document.getElementById('agentIdDisplay').textContent = currentAgent.id;
-          document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
-          
-          loadExistingUsers();
-        }
+        // Hide login screen, show main app
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+        document.getElementById('agentNameDisplay').textContent = currentAgent.name;
+        document.getElementById('agentIdDisplay').textContent = currentAgent.id;
+        document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
+        
+        loadExistingUsers();
         
       } else {
         console.error("Login failed:", res.message);
         document.getElementById('loginError').textContent = res.message || 'Login failed';
+        
+        // Re-enable login button on failure
+        if (loginButton) {
+          loginButton.disabled = false;
+          loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
+        }
       }
     });
     
@@ -1020,6 +1026,13 @@
       console.error("Connection error:", error);
       updateConnectionStatus('error', 'Connection error');
       document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
+      
+      // Re-enable login button on error
+      const loginButton = document.getElementById('loginButton');
+      if (loginButton) {
+        loginButton.disabled = false;
+        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
+      }
       
       // Schedule reconnect if we have a current agent
       if (currentAgent) {
@@ -1113,7 +1126,7 @@
     setTimeout(() => notification.remove(), 3000);
   }
 
-  // Login
+  // Login - FIXED VERSION
   function login() {
     const id = document.getElementById('agentId').value.trim();
     const pass = document.getElementById('agentPass').value.trim();
@@ -1147,6 +1160,9 @@
     // Reset reconnection attempts
     autoReconnectAttempts = 0;
     
+    // Clear any previous error
+    document.getElementById('loginError').textContent = '';
+    
     // Create socket connection
     socket = io("https://chat-backend-p2b9.onrender.com", {
       transports: ['websocket', 'polling'],
@@ -1157,10 +1173,36 @@
       timeout: 20000
     });
     
-    setupSocketListeners();
-    
     // Show connecting status
     updateConnectionStatus('connecting');
+    
+    // Set up socket listeners
+    setupSocketListeners();
+    
+    // FIX: Send login credentials when connected - THIS WAS MISSING!
+    socket.once('connect', () => {
+      console.log("Socket connected, sending login credentials...");
+      socket.emit('agent_login', { 
+        agentId: AGENT_CONFIG.id, 
+        password: AGENT_CONFIG.password 
+      });
+    });
+    
+    // Handle connection timeout
+    setTimeout(() => {
+      if (!currentAgent && loginButton.disabled) {
+        console.log("Connection timeout");
+        document.getElementById('loginError').textContent = 'Connection timeout. Please try again.';
+        loginButton.disabled = false;
+        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
+        updateConnectionStatus('error', 'Connection timeout');
+        
+        // Disconnect socket if still trying
+        if (socket) {
+          socket.disconnect();
+        }
+      }
+    }, 10000);
   }
 
   // Update mute status display
