@@ -181,9 +181,9 @@
       min-height: 0;
     }
 
-    /* ===== MESSAGES SECTION - FIXED ===== */
+    /* ===== MESSAGES SECTION - FIXED TO TAKE 3/4 OF SCREEN ===== */
     .messages-section {
-      flex: 1;
+      flex: 3; /* Takes 3/4 of available space */
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -222,7 +222,7 @@
       flex-direction: column;
     }
 
-    /* Main messages container - FIXED */
+    /* Main messages container - FIXED - Scrollable area */
     #messages {
       flex: 1;
       overflow-y: auto;
@@ -270,20 +270,23 @@
       scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     }
 
-    /* ===== INPUT SECTION - FIXED ===== */
+    /* ===== INPUT SECTION - FIXED AT BOTTOM ===== */
     .input-section {
       flex-shrink: 0;
+      flex: 1; /* Takes 1/4 of available space */
       display: flex;
       flex-direction: column;
       background: white;
       border-top: 1px solid #e8e8e8;
       z-index: 10;
+      position: relative; /* Static positioning - always at bottom */
     }
 
     .input-area-container {
       display: flex;
       flex-direction: column;
       width: 100%;
+      height: 100%;
     }
 
     .upload-progress {
@@ -344,6 +347,7 @@
       gap: 12px;
       flex-shrink: 0;
       padding-bottom: max(16px, env(safe-area-inset-bottom));
+      height: 100%;
     }
 
     #messageInput {
@@ -807,7 +811,7 @@
 <!-- Chat section -->
 <div id="chat">
   <div class="chat-wrapper">
-    <!-- Messages Section -->
+    <!-- Messages Section - Takes 3/4 of screen -->
     <div class="messages-section">
       <div class="chat-header">
         <h3>Chat: <span id="chatNumber"></span></h3>
@@ -819,6 +823,7 @@
       </button>
       
       <div class="messages-wrapper">
+        <!-- Scrollable messages area -->
         <div id="messages">
           <!-- Messages will appear here -->
           <div class="empty-state">
@@ -828,7 +833,7 @@
       </div>
     </div>
     
-    <!-- Input Section -->
+    <!-- Input Section - Always static at bottom, takes 1/4 of screen -->
     <div class="input-section">
       <div class="input-area-container">
         <div class="upload-progress" id="uploadProgress">
@@ -876,6 +881,67 @@
   let whatsapp = "";
   let selectedFile = null;
   let isScrolledToBottom = true;
+  
+  // ===== ENHANCED DEDUPLICATION SYSTEM =====
+  const duplicateManager = {
+    seenMessages: new Map(), // Use Map for better performance
+    timeThreshold: 5000, // 5 seconds - messages within this time are considered duplicates
+    
+    generateMessageKey(msg) {
+      // Create a unique key based on timestamp, sender, and content
+      const timestamp = Math.floor(new Date(msg.timestamp).getTime() / this.timeThreshold) * this.timeThreshold;
+      const sender = msg.sender || 'unknown';
+      const contentHash = this.hashString((msg.text || msg.message || '').trim());
+      
+      return `${timestamp}_${sender}_${contentHash}`;
+    },
+    
+    hashString(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash).toString(36);
+    },
+    
+    isDuplicate(msg) {
+      const key = this.generateMessageKey(msg);
+      const now = Date.now();
+      
+      // Clean old entries (older than 1 minute)
+      for (const [oldKey, timestamp] of this.seenMessages.entries()) {
+        if (now - timestamp > 60000) {
+          this.seenMessages.delete(oldKey);
+        }
+      }
+      
+      if (this.seenMessages.has(key)) {
+        console.log('🔴 DUPLICATE DETECTED:', {
+          key,
+          timestamp: msg.timestamp,
+          sender: msg.sender,
+          preview: (msg.text || msg.message || '').substring(0, 50)
+        });
+        return true;
+      }
+      
+      this.seenMessages.set(key, now);
+      
+      // Limit map size
+      if (this.seenMessages.size > 1000) {
+        const keys = Array.from(this.seenMessages.keys()).slice(0, 500);
+        keys.forEach(k => this.seenMessages.delete(k));
+      }
+      
+      return false;
+    },
+    
+    clear() {
+      this.seenMessages.clear();
+    }
+  };
   
   // ===== PERSISTENT CONNECTION MANAGER =====
   const PersistentConnection = {
@@ -1030,76 +1096,6 @@
   
   // Initialize persistent connection
   PersistentConnection.init();
-  
-  // ===== DEDUPLICATION SYSTEM =====
-  const duplicateManager = {
-    seenMessages: new Set(),
-    
-    generateFingerprint(msg) {
-      const parts = [];
-      
-      if (msg.id) return `id:${msg.id}`;
-      
-      if (msg.timestamp) parts.push(`ts:${msg.timestamp}`);
-      if (msg.sender) parts.push(`s:${msg.sender}`);
-      if (msg.whatsapp) parts.push(`w:${msg.whatsapp}`);
-      
-      const content = (msg.text || msg.message || '').trim();
-      if (content) {
-        const normalizedContent = content.replace(/\s+/g, ' ').toLowerCase();
-        const contentHash = this.simpleHash(normalizedContent.substring(0, 50));
-        parts.push(`c:${contentHash}`);
-      }
-      
-      if (msg.attachment) {
-        const attachment = msg.attachment;
-        if (attachment.filename) parts.push(`fn:${attachment.filename}`);
-        if (attachment.size) parts.push(`sz:${attachment.size}`);
-        if (attachment.url) {
-          const urlHash = this.simpleHash(attachment.url);
-          parts.push(`uh:${urlHash}`);
-        }
-      }
-      
-      parts.push(`r:${Math.random().toString(36).substring(2, 9)}`);
-      
-      return parts.join('|');
-    },
-    
-    simpleHash(str) {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      return Math.abs(hash).toString(36);
-    },
-    
-    isDuplicate(msg) {
-      const fingerprint = this.generateFingerprint(msg);
-      
-      if (this.seenMessages.has(fingerprint)) {
-        console.log('🔴 DUPLICATE DETECTED by fingerprint:', fingerprint.substring(0, 100));
-        return true;
-      }
-      
-      this.seenMessages.add(fingerprint);
-      
-      if (this.seenMessages.size > 1000) {
-        const iterator = this.seenMessages.values();
-        for (let i = 0; i < 500; i++) {
-          this.seenMessages.delete(iterator.next().value);
-        }
-      }
-      
-      return false;
-    },
-    
-    clear() {
-      this.seenMessages.clear();
-    }
-  };
   
   // ===== SENDING CONTROL SYSTEM =====
   const sendController = {
@@ -1314,6 +1310,7 @@
       preview: (msg.text || msg.message || '').substring(0, 50)
     });
     
+    // Check for duplicates using enhanced deduplication
     if (duplicateManager.isDuplicate(msg)) {
       console.log("🛑 Skipping duplicate message");
       return;
@@ -1340,8 +1337,23 @@
     // Use DocumentFragment for batch DOM operations
     const fragment = document.createDocumentFragment();
     
-    messages.forEach(msg => {
-      duplicateManager.isDuplicate(msg);
+    // Sort messages by timestamp (oldest to newest)
+    const sortedMessages = messages.sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    
+    // Filter out duplicates while processing history
+    const uniqueMessages = [];
+    sortedMessages.forEach(msg => {
+      if (!duplicateManager.isDuplicate(msg)) {
+        uniqueMessages.push(msg);
+      } else {
+        console.log("🛑 Skipping duplicate in history");
+      }
+    });
+    
+    // Display unique messages
+    uniqueMessages.forEach(msg => {
       const messageElement = createMessageElement(msg);
       fragment.appendChild(messageElement);
     });
