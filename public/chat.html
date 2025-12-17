@@ -182,15 +182,44 @@
       background: white;
     }
 
-    /* ===== MESSAGES AREA ===== */
-    #messages {
+    /* ===== FIXED CHAT LAYOUT ===== */
+    .chat-wrapper {
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; /* Prevents content from overflowing the wrapper */
+      position: relative;
+      height: 100%;
+    }
+
+    /* ===== MESSAGES AREA - NOW SCROLLABLE ===== */
+    .messages-wrapper {
+      flex: 1;
+      position: relative;
+      overflow: hidden; /* Hide scrollbar from wrapper */
+    }
+
+    #messages {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       overflow-y: auto;
+      overflow-x: hidden;
       padding: 16px;
       background: #f8f9fa;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       scroll-behavior: smooth;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Ensure messages container grows with content */
+    #messages::after {
+      content: '';
+      flex: 0 0 16px; /* Add bottom padding */
     }
 
     /* Custom scrollbar for messages */
@@ -212,6 +241,12 @@
       background: #a8a8a8;
     }
 
+    /* Hide scrollbar for Firefox */
+    #messages {
+      scrollbar-width: thin;
+      scrollbar-color: #c1c1c1 #f1f1f1;
+    }
+
     /* ===== MESSAGE BUBBLES ===== */
     .message-container {
       margin: 12px 0;
@@ -223,6 +258,7 @@
       animation: fadeIn 0.3s ease;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       line-height: 1.4;
+      flex-shrink: 0; /* Prevent messages from shrinking */
     }
 
     @keyframes fadeIn {
@@ -291,6 +327,8 @@
       word-wrap: break-word;
       font-size: clamp(14px, 4vw, 16px);
       line-height: 1.5;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
 
     .read-status {
@@ -301,11 +339,17 @@
       font-style: italic;
     }
 
-    /* ===== INPUT AREA ===== */
+    /* ===== INPUT AREA - ALWAYS VISIBLE AT BOTTOM ===== */
+    .input-section {
+      background: white;
+      border-top: 1px solid #e8e8e8;
+      flex-shrink: 0; /* Prevent input area from shrinking */
+      z-index: 10; /* Keep above messages */
+    }
+
     .input-area {
       padding: 16px;
       background: white;
-      border-top: 1px solid #e8e8e8;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -322,6 +366,9 @@
       min-height: 50px;
       border-radius: 25px;
       background: #f8f9fa;
+      resize: none;
+      overflow-y: auto;
+      max-height: 120px;
     }
 
     .action-buttons {
@@ -579,6 +626,11 @@
       .file-upload-btn {
         font-size: 20px;
       }
+      
+      /* Mobile-specific: reduce message padding */
+      #messages {
+        padding: 12px;
+      }
     }
 
     /* ===== SAFE AREA SUPPORT FOR NOTCHED PHONES ===== */
@@ -602,6 +654,12 @@
       color: #999;
       padding: 40px 20px;
       font-size: 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 200px;
     }
 
     /* ===== TYPING INDICATOR ===== */
@@ -664,6 +722,39 @@
       background: #f44336;
       color: white;
     }
+    
+    /* ===== SCROLL TO BOTTOM BUTTON ===== */
+    .scroll-to-bottom-btn {
+      position: absolute;
+      bottom: 90px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #667eea;
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+      z-index: 5;
+      transition: all 0.3s ease;
+      opacity: 0;
+      visibility: hidden;
+    }
+    
+    .scroll-to-bottom-btn.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .scroll-to-bottom-btn:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+    }
   </style>
 </head>
 <body>
@@ -692,89 +783,79 @@
     <h3>Chat: <span id="chatNumber"></span></h3>
   </div>
   
-  <div id="messages">
-    <!-- Messages will appear here -->
-  </div>
+  <!-- Scroll to bottom button -->
+  <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
+    ↓
+  </button>
   
-  <div class="upload-progress" id="uploadProgress">
-    <div class="progress-bar" id="progressBar"></div>
-  </div>
-  
-  <div class="file-preview" id="filePreview"></div>
-  
-  <div class="input-area">
-    <input id="messageInput" placeholder="Type your message here...">
-    <div class="action-buttons">
-      <div class="file-upload-container">
-        <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-          📎
-        </button>
-        <span class="file-upload-label">file upload</span>
+  <div class="chat-wrapper">
+    <div class="messages-wrapper">
+      <div id="messages">
+        <!-- Messages will appear here -->
+        <div class="empty-state">
+          <div>No messages yet. Start the conversation!</div>
+        </div>
       </div>
-      <button class="send-btn" onclick="sendMessage()" id="sendButton">
-        Send
-      </button>
+    </div>
+    
+    <div class="upload-progress" id="uploadProgress">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    
+    <div class="file-preview" id="filePreview"></div>
+    
+    <div class="sending-indicator" id="sendingIndicator">Sending...</div>
+    <div class="error-message" id="errorMessage">Please wait before sending another message</div>
+    
+    <div class="input-section">
+      <div class="input-area">
+        <input id="messageInput" placeholder="Type your message here...">
+        <div class="action-buttons">
+          <div class="file-upload-container">
+            <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+              📎
+            </button>
+            <span class="file-upload-label">file upload</span>
+          </div>
+          <button class="send-btn" onclick="sendMessage()" id="sendButton">
+            Send
+          </button>
+        </div>
+      </div>
     </div>
   </div>
-  
-  <div class="sending-indicator" id="sendingIndicator">Sending...</div>
-  <div class="error-message" id="errorMessage">Please wait before sending another message</div>
   
   <input type="file" id="fileInput" onchange="handleFileSelect()">
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-  // [All your existing JavaScript code remains exactly the same]
-  // ===== GLOBAL VARIABLES WITH ENHANCED DEDUPLICATION =====
+  // ===== GLOBAL VARIABLES =====
   const socket = io("https://chat-backend-p2b9.onrender.com");
   let whatsapp = "";
   let selectedFile = null;
+  let isScrolledToBottom = true;
   
   // ===== DEDUPLICATION SYSTEM =====
   const duplicateManager = {
-    // Store seen message fingerprints (last 1000 messages)
     seenMessages: new Set(),
     
-    // Store message content hashes (last 100 messages for rapid duplicate detection)
-    recentMessageHashes: new Map(),
-    
-    // Track pending message IDs
-    pendingMessages: new Map(),
-    
-    // Rate limiting by content
-    contentRateLimits: new Map(),
-    
-    // Message buffer for ordering
-    messageBuffer: new Map(),
-    
-    // Generate a comprehensive fingerprint for a message
     generateFingerprint(msg) {
       const parts = [];
       
-      // Use server-provided ID if available
       if (msg.id) return `id:${msg.id}`;
       
-      // Use timestamp if available
       if (msg.timestamp) parts.push(`ts:${msg.timestamp}`);
-      
-      // Use sender info
       if (msg.sender) parts.push(`s:${msg.sender}`);
-      
-      // Use WhatsApp number
       if (msg.whatsapp) parts.push(`w:${msg.whatsapp}`);
       
-      // Use message content (truncated and cleaned)
       const content = (msg.text || msg.message || '').trim();
       if (content) {
-        // Remove extra whitespace and normalize
         const normalizedContent = content.replace(/\s+/g, ' ').toLowerCase();
-        // Take first 50 chars and hash
         const contentHash = this.simpleHash(normalizedContent.substring(0, 50));
         parts.push(`c:${contentHash}`);
       }
       
-      // Use attachment info if present
       if (msg.attachment) {
         const attachment = msg.attachment;
         if (attachment.filename) parts.push(`fn:${attachment.filename}`);
@@ -785,51 +866,31 @@
         }
       }
       
-      // Add random component for edge cases
       parts.push(`r:${Math.random().toString(36).substring(2, 9)}`);
       
       return parts.join('|');
     },
     
-    // Simple string hash function
     simpleHash(str) {
       let hash = 0;
       for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
+        hash = hash & hash;
       }
       return Math.abs(hash).toString(36);
     },
     
-    // Check if message is a duplicate
     isDuplicate(msg) {
       const fingerprint = this.generateFingerprint(msg);
       
-      // Check in seen messages
       if (this.seenMessages.has(fingerprint)) {
         console.log('🔴 DUPLICATE DETECTED by fingerprint:', fingerprint.substring(0, 100));
         return true;
       }
       
-      // Check content rate limiting
-      const content = (msg.text || msg.message || '').trim();
-      if (content) {
-        const normalizedContent = content.toLowerCase().replace(/\s+/g, ' ');
-        const contentHash = this.simpleHash(normalizedContent);
-        const lastSeen = this.contentRateLimits.get(contentHash);
-        
-        // If same content was seen in last 3 seconds, it's likely a duplicate
-        if (lastSeen && (Date.now() - lastSeen) < 3000) {
-          console.log('🔴 DUPLICATE DETECTED by content rate limit');
-          return true;
-        }
-      }
-      
-      // Add to seen messages
       this.seenMessages.add(fingerprint);
       
-      // Clean up old fingerprints (keep only last 1000)
       if (this.seenMessages.size > 1000) {
         const iterator = this.seenMessages.values();
         for (let i = 0; i < 500; i++) {
@@ -837,84 +898,11 @@
         }
       }
       
-      // Update content rate limit
-      if (content) {
-        const normalizedContent = content.toLowerCase().replace(/\s+/g, ' ');
-        const contentHash = this.simpleHash(normalizedContent);
-        this.contentRateLimits.set(contentHash, Date.now());
-        
-        // Clean old rate limits
-        if (this.contentRateLimits.size > 100) {
-          const now = Date.now();
-          for (const [key, timestamp] of this.contentRateLimits.entries()) {
-            if (now - timestamp > 10000) { // 10 seconds
-              this.contentRateLimits.delete(key);
-            }
-          }
-        }
-      }
-      
       return false;
     },
     
-    // Track pending message (one we just sent)
-    addPendingMessage(msg, clientMsgId) {
-      const fingerprint = this.generateFingerprint(msg);
-      this.pendingMessages.set(clientMsgId, {
-        fingerprint,
-        timestamp: Date.now(),
-        msg
-      });
-      
-      // Auto-cleanup after 10 seconds
-      setTimeout(() => {
-        this.pendingMessages.delete(clientMsgId);
-      }, 10000);
-    },
-    
-    // Check if message matches a pending message
-    isPendingDuplicate(msg) {
-      const content = (msg.text || msg.message || '').trim();
-      const normalizedContent = content.toLowerCase().replace(/\s+/g, ' ');
-      
-      for (const [clientMsgId, pending] of this.pendingMessages.entries()) {
-        const pendingContent = (pending.msg.text || pending.msg.message || '').trim();
-        const pendingNormalized = pendingContent.toLowerCase().replace(/\s+/g, ' ');
-        
-        // Check multiple similarity factors
-        let similarityScore = 0;
-        
-        // Content similarity
-        if (normalizedContent === pendingNormalized) similarityScore += 40;
-        
-        // Sender similarity
-        if (msg.sender === pending.msg.sender) similarityScore += 20;
-        
-        // WhatsApp number similarity
-        if (msg.whatsapp === pending.msg.whatsapp) similarityScore += 20;
-        
-        // Time proximity (within 5 seconds)
-        const timeDiff = Math.abs(Date.now() - pending.timestamp);
-        if (timeDiff < 5000) similarityScore += 20;
-        
-        // If highly likely to be the same message
-        if (similarityScore >= 60) {
-          console.log('🟡 Pending duplicate detected, score:', similarityScore);
-          this.pendingMessages.delete(clientMsgId);
-          return true;
-        }
-      }
-      
-      return false;
-    },
-    
-    // Clear all data for new session
     clear() {
       this.seenMessages.clear();
-      this.recentMessageHashes.clear();
-      this.pendingMessages.clear();
-      this.contentRateLimits.clear();
-      this.messageBuffer.clear();
     }
   };
   
@@ -927,32 +915,27 @@
     lastSendTime: 0,
     consecutiveSends: 0,
     
-    // Check if we can send a message
     canSend() {
       const now = Date.now();
       
-      // Already sending
       if (this.isSending) {
         console.log('⚠️ Already sending, please wait...');
         return { canSend: false, reason: 'Already sending' };
       }
       
-      // Cooldown active
       if (this.cooldown) {
         console.log('⚠️ Send cooldown active');
         return { canSend: false, reason: 'Cooldown active' };
       }
       
-      // Debounce active
       if (this.debounceTimer) {
         console.log('⚠️ Debounce active');
         return { canSend: false, reason: 'Debounce active' };
       }
       
-      // Check for rapid consecutive sends
       if (this.consecutiveSends >= 3) {
         const timeSinceLast = now - this.lastSendTime;
-        if (timeSinceLast < 1000) { // If 3+ sends in 1 second
+        if (timeSinceLast < 1000) {
           console.log('⚠️ Too many rapid sends');
           return { canSend: false, reason: 'Too many rapid sends' };
         }
@@ -961,35 +944,29 @@
       return { canSend: true };
     },
     
-    // Start sending
     beginSend() {
       this.isSending = true;
       this.lastSendTime = Date.now();
       this.consecutiveSends++;
       
-      // Reset consecutive sends after 2 seconds of inactivity
       setTimeout(() => {
         this.consecutiveSends = 0;
       }, 2000);
       
-      // Set debounce
       this.debounceTimer = setTimeout(() => {
         this.debounceTimer = null;
       }, 500);
     },
     
-    // Finish sending
     finishSend() {
       this.isSending = false;
       this.cooldown = true;
       
-      // Remove cooldown after 1 second
       setTimeout(() => {
         this.cooldown = false;
       }, 1000);
     },
     
-    // Reset sending state
     reset() {
       this.isSending = false;
       this.cooldown = false;
@@ -1024,6 +1001,40 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
   
+  // ===== SCROLL MANAGEMENT =====
+  function setupScrollListener() {
+    const messagesDiv = document.getElementById("messages");
+    const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
+    
+    messagesDiv.addEventListener('scroll', function() {
+      const scrollTop = messagesDiv.scrollTop;
+      const scrollHeight = messagesDiv.scrollHeight;
+      const clientHeight = messagesDiv.clientHeight;
+      
+      // Check if we're near the bottom (within 100px)
+      isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 100;
+      
+      // Show/hide scroll to bottom button
+      if (!isScrolledToBottom) {
+        scrollToBottomBtn.classList.add('visible');
+      } else {
+        scrollToBottomBtn.classList.remove('visible');
+      }
+    });
+    
+    // Scroll to bottom button click handler
+    scrollToBottomBtn.addEventListener('click', scrollToBottom);
+  }
+  
+  function scrollToBottom() {
+    const messagesDiv = document.getElementById("messages");
+    if (messagesDiv) {
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      isScrolledToBottom = true;
+      document.getElementById("scrollToBottomBtn").classList.remove('visible');
+    }
+  }
+  
   // ===== SOCKET EVENT LISTENERS =====
   socket.on("connect", () => {
     console.log("Connected to server with ID:", socket.id);
@@ -1046,30 +1057,34 @@
       return;
     }
     
-    if (duplicateManager.isPendingDuplicate(msg)) {
-      console.log("🛑 Skipping pending duplicate (likely our own echo)");
-      return;
-    }
-    
     displayMessage(msg);
   });
 
   socket.on("message_history", (messages) => {
     console.log("Message history:", messages.length, "messages");
     const messagesDiv = document.getElementById("messages");
-    messagesDiv.innerHTML = "";
+    
+    // Remove existing content
+    while (messagesDiv.firstChild) {
+      messagesDiv.removeChild(messagesDiv.firstChild);
+    }
     
     if (messages.length === 0) {
-      messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+      const emptyState = document.createElement("div");
+      emptyState.className = "empty-state";
+      emptyState.innerHTML = '<div>No messages yet. Start the conversation!</div>';
+      messagesDiv.appendChild(emptyState);
       return;
     }
     
+    // Display all messages
     messages.forEach(msg => {
       duplicateManager.isDuplicate(msg);
       displayMessage(msg, false);
     });
     
-    scrollToBottom();
+    // Scroll to bottom after loading history
+    setTimeout(scrollToBottom, 100);
   });
 
   socket.on("connect_error", (error) => {
@@ -1083,7 +1098,9 @@
     
     // Remove empty state if present
     const emptyState = messagesDiv.querySelector('.empty-state');
-    if (emptyState) emptyState.remove();
+    if (emptyState) {
+      emptyState.remove();
+    }
     
     const messageDiv = document.createElement("div");
     messageDiv.className = "message-container " + 
@@ -1109,7 +1126,9 @@
     `;
     
     messagesDiv.appendChild(messageDiv);
-    if (scroll) {
+    
+    // Only auto-scroll if we're at the bottom or this is our own message
+    if (scroll && (isScrolledToBottom || msg.sender === "user")) {
       scrollToBottom();
     }
   }
@@ -1174,12 +1193,15 @@
     duplicateManager.clear();
     sendController.reset();
     
+    // Setup scroll listener after chat is visible
+    setTimeout(setupScrollListener, 100);
+    
     socket.emit("get_messages", { whatsapp: whatsapp });
     
     // Focus on message input after registration
     setTimeout(() => {
       document.getElementById("messageInput").focus();
-    }, 300);
+    }, 500);
   }
 
   // ===== FILE HANDLING =====
@@ -1296,8 +1318,6 @@
       read: false
     };
     
-    duplicateManager.addPendingMessage(messageToSend, clientMsgId);
-    
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
@@ -1330,6 +1350,11 @@
         fileInput.value = "";
         document.getElementById("filePreview").innerHTML = "";
         document.getElementById("filePreview").style.display = 'none';
+        
+        // Reset input height
+        const messageInput = document.getElementById("messageInput");
+        messageInput.style.height = 'auto';
+        messageInput.style.height = '50px';
       });
     } else {
       console.log("📤 Sending text message:", text);
@@ -1346,6 +1371,11 @@
       setTimeout(() => {
         finishMessageSend();
         document.getElementById("messageInput").value = "";
+        
+        // Reset input height
+        const messageInput = document.getElementById("messageInput");
+        messageInput.style.height = 'auto';
+        messageInput.style.height = '50px';
       }, 500);
     }
   }
@@ -1374,14 +1404,6 @@
     }, 3000);
   }
 
-  // ===== UTILITY FUNCTIONS =====
-  function scrollToBottom() {
-    const messagesDiv = document.getElementById("messages");
-    if (messagesDiv) {
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-  }
-
   // ===== EVENT LISTENERS =====
   document.getElementById("messageInput").addEventListener("keypress", function(e) {
     if (e.key === "Enter") {
@@ -1405,21 +1427,25 @@
   document.getElementById("messageInput").addEventListener("input", function() {
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-  });
-
-  // Close keyboard on scroll (mobile)
-  let touchStartY = 0;
-  document.addEventListener('touchstart', function(e) {
-    touchStartY = e.touches[0].clientY;
-  });
-
-  document.addEventListener('touchmove', function(e) {
-    const touchY = e.touches[0].clientY;
-    const diff = touchStartY - touchY;
     
-    if (Math.abs(diff) > 10) {
-      document.activeElement.blur();
+    // Auto-scroll messages if input is growing
+    if (this.scrollHeight > 70) {
+      scrollToBottom();
     }
+  });
+
+  // Handle keyboard show/hide on mobile
+  let viewportHeight = window.innerHeight;
+  
+  window.addEventListener('resize', function() {
+    const newViewportHeight = window.innerHeight;
+    
+    // If keyboard is shown/hidden (viewport height changed significantly)
+    if (Math.abs(viewportHeight - newViewportHeight) > 100) {
+      setTimeout(scrollToBottom, 300); // Wait for keyboard animation
+    }
+    
+    viewportHeight = newViewportHeight;
   });
 
   // Handle back button on mobile
