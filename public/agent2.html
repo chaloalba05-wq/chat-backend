@@ -261,319 +261,6 @@
       word-break: break-word;
     }
     
-    /* ===== CHAT DETAIL HEADER ===== */
-    .chat-detail-header {
-      padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
-      background: white;
-      border-bottom: 1px solid #e0e0e0;
-      display: flex;
-      align-items: center;
-      gap: clamp(12px, 2vw, 15px);
-      flex-shrink: 0;
-    }
-    
-    .back-button {
-      padding: 8px;
-      background: #f5f5f5;
-      border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 18px;
-      transition: background 0.2s;
-      flex-shrink: 0;
-    }
-    
-    .back-button:active {
-      background: #e0e0e0;
-    }
-    
-    .chat-detail-user-avatar {
-      width: clamp(36px, 8vw, 44px);
-      height: clamp(36px, 8vw, 44px);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 600;
-      font-size: clamp(14px, 3vw, 16px);
-      flex-shrink: 0;
-    }
-    
-    .chat-detail-user-info {
-      flex: 1;
-      min-width: 0;
-    }
-    
-    .chat-detail-user-name {
-      font-weight: 600;
-      color: #333;
-      font-size: clamp(14px, 2vw, 16px);
-      margin-bottom: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
-    .chat-detail-user-number {
-      font-size: clamp(12px, 1.8vw, 13px);
-      color: #666;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
-    /* ===== MESSAGES CONTAINER - 3/4 OF SCREEN (SCROLLABLE) ===== */
-    .chat-messages-container {
-      flex: 3; /* Takes 3/4 of screen */
-      overflow-y: auto;
-      padding: clamp(16px, 2.5vw, 20px);
-      display: flex;
-      flex-direction: column;
-      gap: clamp(8px, 1vw, 10px);
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      scroll-behavior: smooth;
-      scrollbar-width: thin;
-      scrollbar-color: #c1c1c1 #f1f1f1;
-      will-change: transform;
-      transform: translateZ(0);
-      -webkit-transform: translateZ(0);
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
-    
-    /* Force hardware acceleration for smooth scrolling */
-    .chat-messages-container {
-      transform: translate3d(0, 0, 0);
-      -webkit-transform: translate3d(0, 0, 0);
-    }
-    
-    /* Message Bubbles */
-    .message-bubble {
-      max-width: 85%;
-      margin: clamp(3px, 0.5vw, 4px) 0;
-      clear: both;
-      animation: fadeIn 0.3s ease;
-    }
-    
-    @media (min-width: 768px) {
-      .message-bubble {
-        max-width: 70%;
-      }
-    }
-    
-    .message-bubble.user {
-      align-self: flex-start;
-    }
-    
-    .message-bubble.agent {
-      align-self: flex-end;
-    }
-    
-    .message-content {
-      padding: clamp(10px, 2vw, 12px) clamp(12px, 2.5vw, 16px);
-      border-radius: clamp(16px, 3vw, 18px);
-      position: relative;
-      word-wrap: break-word;
-      line-height: 1.4;
-      font-size: clamp(14px, 2vw, 16px);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    
-    .message-bubble.user .message-content {
-      background: white;
-      border: 1px solid #e0e0e0;
-      border-top-left-radius: clamp(4px, 1vw, 6px);
-    }
-    
-    .message-bubble.agent .message-content {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border-top-right-radius: clamp(4px, 1vw, 6px);
-    }
-    
-    .message-meta {
-      display: flex;
-      justify-content: space-between;
-      margin-top: clamp(3px, 0.5vw, 4px);
-      padding: 0 clamp(3px, 0.5vw, 4px);
-      font-size: clamp(10px, 1.5vw, 11px);
-      color: #999;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-    
-    .message-bubble.agent .message-meta {
-      flex-direction: row-reverse;
-    }
-    
-    .message-sender {
-      font-weight: 500;
-      white-space: nowrap;
-    }
-    
-    .message-time {
-      opacity: 0.8;
-      white-space: nowrap;
-    }
-    
-    /* File attachments */
-    .attachment {
-      margin-top: clamp(8px, 1.5vw, 10px);
-      padding: clamp(8px, 1.5vw, 10px);
-      background: rgba(255,255,255,0.1);
-      border-radius: clamp(8px, 1.5vw, 10px);
-      border-left: clamp(2px, 0.5vw, 3px) solid #4CAF50;
-    }
-    
-    .message-bubble.user .attachment {
-      background: #f8f9fa;
-      border-left-color: #2196F3;
-    }
-    
-    .attachment-link {
-      display: flex;
-      align-items: center;
-      gap: clamp(6px, 1vw, 8px);
-      color: inherit;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: clamp(13px, 1.8vw, 14px);
-    }
-    
-    .attachment-link:active {
-      opacity: 0.8;
-    }
-    
-    .file-icon {
-      font-size: clamp(16px, 2vw, 18px);
-      flex-shrink: 0;
-    }
-    
-    .attachment-preview {
-      margin-top: clamp(6px, 1vw, 8px);
-    }
-    
-    .attachment-preview img {
-      max-width: 100%;
-      max-height: clamp(120px, 25vh, 150px);
-      border-radius: clamp(6px, 1vw, 8px);
-      border: 1px solid rgba(0,0,0,0.1);
-    }
-    
-    /* ===== INPUT AREA - FIXED 1/4 OF SCREEN ===== */
-    .chat-input-area {
-      flex: 1; /* Takes 1/4 of screen */
-      padding: clamp(16px, 2.5vw, 20px);
-      background: white;
-      border-top: 1px solid #e0e0e0;
-      display: flex;
-      gap: clamp(10px, 2vw, 12px);
-      align-items: flex-end;
-      flex-shrink: 0;
-      min-height: 80px;
-      max-height: 120px;
-    }
-    
-    .chat-input-wrapper {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: clamp(6px, 1vw, 8px);
-      min-width: 0;
-      height: 100%;
-    }
-    
-    .chat-message-input {
-      flex: 1;
-      padding: clamp(10px, 2vw, 12px) clamp(12px, 2.5vw, 16px);
-      border: 1px solid #e0e0e0;
-      border-radius: clamp(20px, 4vw, 24px);
-      font-size: clamp(14px, 2vw, 16px);
-      outline: none;
-      transition: border 0.2s;
-      resize: none;
-      min-height: clamp(40px, 8vh, 44px);
-      max-height: clamp(80px, 15vh, 120px);
-      font-family: inherit;
-      line-height: 1.4;
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-    }
-    
-    .chat-message-input:focus {
-      border-color: #667eea;
-    }
-    
-    .chat-message-input:disabled {
-      background: #f5f5f5;
-      cursor: not-allowed;
-    }
-    
-    .chat-input-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: clamp(11px, 1.5vw, 12px);
-      color: #666;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    
-    .chat-file-attachment {
-      display: flex;
-      align-items: center;
-      gap: clamp(6px, 1vw, 8px);
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 6px;
-      transition: background 0.2s;
-    }
-    
-    .chat-file-attachment:active {
-      background: #f0f0f0;
-    }
-    
-    .chat-send-button {
-      padding: clamp(8px, 2vw, 10px) clamp(16px, 3vw, 24px);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: clamp(18px, 4vw, 20px);
-      font-size: clamp(14px, 2vw, 16px);
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      display: flex;
-      align-items: center;
-      gap: clamp(4px, 1vw, 6px);
-      min-height: clamp(36px, 7vh, 40px);
-      flex-shrink: 0;
-    }
-    
-    .chat-send-button:active {
-      transform: scale(0.95);
-    }
-    
-    .chat-send-button:hover {
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
-    
-    .chat-send-button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-    
     /* ===== LOGIN SCREEN ===== */
     .login-screen { 
       position: fixed; 
@@ -713,7 +400,7 @@
       display: block;
       font-size: clamp(13px, 1.8vw, 14px);
       color: #333;
-      margin-bottom = clamp(6px, 1vw, 8px);
+      margin-bottom: clamp(6px, 1vw, 8px);
       font-weight: 500;
     }
     
@@ -783,11 +470,345 @@
       flex-shrink: 0;
     }
     
-    /* ===== UTILITIES ===== */
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
+    /* ================================================ */
+    /* NEW CHAT BOX IMPLEMENTATION (Three-Part Layout)  */
+    /* ================================================ */
+    
+    /* ===== CHAT DETAIL HEADER ===== */
+    .chat-detail-header {
+      padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      gap: clamp(12px, 2vw, 15px);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    .back-button {
+      padding: 8px;
+      background: #f5f5f5;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    
+    .back-button:active {
+      background: #e0e0e0;
+    }
+    
+    .chat-detail-user-avatar {
+      width: clamp(36px, 8vw, 44px);
+      height: clamp(36px, 8vw, 44px);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: clamp(14px, 3vw, 16px);
+      flex-shrink: 0;
+    }
+    
+    .chat-detail-user-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .chat-detail-user-name {
+      font-weight: 600;
+      color: #333;
+      font-size: clamp(14px, 2vw, 16px);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .chat-detail-user-number {
+      font-size: clamp(12px, 1.8vw, 13px);
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    /* ===== CHAT WRAPPER ===== */
+    .chat-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      min-height: 0;
+    }
+    
+    /* ===== A. MESSAGES SECTION ===== */
+    .messages-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+      position: relative;
+      background: #f8f9fa;
+    }
+    
+    /* Scrollable Messages Container */
+    #chatMessages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      scroll-behavior: auto;
+      will-change: transform;
+      backface-visibility: hidden;
+      transform: translateZ(0);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: #f8f9fa;
+    }
+    
+    /* Bottom padding for messages */
+    #chatMessages::after {
+      content: '';
+      flex: 0 0 16px;
+    }
+    
+    /* Optimized scrollbar */
+    #chatMessages::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    #chatMessages::-webkit-scrollbar-track {
+      background: rgba(241, 241, 241, 0.5);
+      border-radius: 3px;
+    }
+    
+    #chatMessages::-webkit-scrollbar-thumb {
+      background: rgba(102, 126, 234, 0.5);
+      border-radius: 3px;
+    }
+    
+    #chatMessages::-webkit-scrollbar-thumb:hover {
+      background: rgba(102, 126, 234, 0.7);
+    }
+    
+    /* Firefox scrollbar */
+    #chatMessages {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
+    }
+    
+    /* ===== C. SCROLL TO BOTTOM BUTTON ===== */
+    .scroll-to-bottom-btn {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #667eea;
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+      z-index: 5;
+      transition: all 0.3s ease;
+      opacity: 0;
+      visibility: hidden;
+    }
+    
+    .scroll-to-bottom-btn.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .scroll-to-bottom-btn:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+    }
+    
+    /* ===== B. INPUT SECTION ===== */
+    .input-section {
+      flex-shrink: 0;
+      background: white;
+      border-top: 1px solid #e8e8e8;
+      z-index: 10;
+      position: sticky;
+      bottom: 0;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+    
+    .input-area-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+    
+    .upload-progress {
+      width: 100%;
+      background-color: #f3f3f3;
+      border-radius: 10px;
+      margin: 8px 16px;
+      overflow: hidden;
+      display: none;
+      flex-shrink: 0;
+    }
+    
+    .progress-bar {
+      height: 6px;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      border-radius: 10px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .file-preview {
+      padding: 8px 16px;
+      background: #f8f9fa;
+      border-radius: 20px;
+      font-size: 14px;
+      color: #666;
+      margin: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    
+    .sending-indicator,
+    .error-message {
+      padding: 8px 16px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+      flex-shrink: 0;
+    }
+    
+    .sending-indicator {
+      color: #666;
+      background: #fff9c4;
+    }
+    
+    .error-message {
+      color: #d32f2f;
+      background: #ffebee;
+    }
+    
+    .input-area {
+      padding: 16px;
+      background: white;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    
+    #messageInput {
+      flex: 1;
+      border: 2px solid #e8e8e8;
+      margin: 0;
+      font-size: clamp(14px, 4vw, 16px);
+      padding: 14px 16px;
+      min-height: 50px;
+      max-height: 120px;
+      border-radius: 25px;
+      background: #f8f9fa;
+      resize: none;
+      overflow-y: auto;
+    }
+    
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .file-upload-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .file-upload-btn {
+      background: transparent;
+      color: #667eea;
+      border: none;
+      padding: 12px;
+      cursor: pointer;
+      font-size: 22px;
+      border-radius: 50%;
+      min-height: 50px;
+      min-width: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+    
+    .file-upload-btn:active {
+      background: rgba(102, 126, 234, 0.1);
+      transform: scale(0.95);
+    }
+    
+    .file-upload-label {
+      font-size: 11px;
+      color: #666;
+      margin-top: 2px;
+      display: none;
+    }
+    
+    .send-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 14px 24px;
+      border-radius: 25px;
+      font-weight: 600;
+      min-height: 50px;
+      min-width: 80px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .send-btn:active {
+      transform: scale(0.95);
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    }
+    
+    /* ===== MESSAGE BUBBLES (Updated to match user chat) ===== */
+    .message-container {
+      margin: 12px 0;
+      padding: 14px 18px;
+      border-radius: 20px;
+      max-width: 85%;
+      word-wrap: break-word;
+      position: relative;
+      animation: fadeIn 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      line-height: 1.4;
+      flex-shrink: 0;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
     
     @keyframes fadeIn {
@@ -801,39 +822,168 @@
       }
     }
     
+    .agent-message {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-left: auto;
+      margin-right: 8px;
+      border-bottom-right-radius: 6px;
+    }
+    
+    .user-message {
+      background: white;
+      border: 1px solid #e8e8e8;
+      margin-right: auto;
+      margin-left: 8px;
+      border-bottom-left-radius: 6px;
+    }
+    
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    
+    .message-sender {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .agent-message .message-sender {
+      color: rgba(255,255,255,0.95);
+    }
+    
+    .user-message .message-sender {
+      color: #444;
+    }
+    
+    .message-time {
+      font-size: 0.75rem;
+      opacity: 0.8;
+      font-weight: 400;
+    }
+    
+    .agent-message .message-time {
+      color: rgba(255,255,255,0.8);
+    }
+    
+    .user-message .message-time {
+      color: #666;
+    }
+    
+    .message-content {
+      word-wrap: break-word;
+      font-size: clamp(14px, 4vw, 16px);
+      line-height: 1.5;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    
+    /* ===== FILE UPLOAD ===== */
+    #fileInput {
+      display: none;
+    }
+    
+    /* ===== ATTACHMENTS ===== */
+    .attachment {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      border-left: 4px solid #4CAF50;
+    }
+    
+    .user-message .attachment {
+      background: #f8f9fa;
+      border-left-color: #667eea;
+    }
+    
+    .attachment a {
+      color: #2196F3;
+      text-decoration: none;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .attachment a:hover {
+      text-decoration: underline;
+    }
+    
+    .attachment img {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 8px;
+      margin-top: 8px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    /* ===== TYPING INDICATOR ===== */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 16px;
+      background: white;
+      border-radius: 20px;
+      margin: 8px 0;
+      width: fit-content;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background: #667eea;
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+    
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    
+    @keyframes typing {
+      0%, 60%, 100% {
+        transform: translateY(0);
+      }
+      30% {
+        transform: translateY(-6px);
+      }
+    }
+    
+    /* ===== EMPTY STATE ===== */
     .empty-state {
+      text-align: center;
+      color: #999;
+      padding: 40px 20px;
+      font-size: 16px;
+      flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: center;
       justify-content: center;
-      height: 100%;
-      color: #999;
-      text-align: center;
-      padding: clamp(30px, 6vw, 40px);
+      align-items: center;
+      min-height: 200px;
     }
     
-    .empty-state-icon {
-      font-size: clamp(36px, 8vw, 48px);
-      margin-bottom: clamp(16px, 3vw, 20px);
-      opacity: 0.5;
-    }
-    
-    .empty-state-title {
-      font-size: clamp(16px, 3vw, 18px);
-      color: #666;
-      margin-bottom: clamp(6px, 1vw, 8px);
-    }
-    
-    .empty-state-subtitle {
-      font-size: clamp(13px, 2vw, 14px);
-      max-width: 300px;
-      line-height: 1.5;
+    /* ===== UTILITIES ===== */
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
     }
     
     .hidden { display: none; }
     
     /* ===== MOBILE OPTIMIZATIONS ===== */
-    @media (max-width: 767px) {
+    @media (max-width: 768px) {
       .chat-detail-view {
         position: fixed;
       }
@@ -842,6 +992,84 @@
         width: 36px;
         height: 36px;
         font-size: 16px;
+      }
+      
+      .input-area {
+        padding: 12px;
+        gap: 8px;
+      }
+      
+      #messageInput {
+        padding: 12px 16px;
+        min-height: 46px;
+      }
+      
+      .file-upload-btn,
+      .send-btn {
+        min-height: 46px;
+        min-width: 46px;
+      }
+      
+      .message-container {
+        max-width: 90%;
+        padding: 12px 16px;
+        margin: 8px 0;
+      }
+      
+      .attachment img {
+        max-height: 150px;
+      }
+      
+      .scroll-to-bottom-btn {
+        bottom: 90px;
+        right: 16px;
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .chat-detail-header {
+        padding: 12px 16px;
+      }
+      
+      .back-button {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+      
+      .chat-detail-user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+      }
+      
+      .input-area {
+        padding: 10px;
+      }
+      
+      .message-container {
+        max-width: 92%;
+        padding: 10px 14px;
+      }
+      
+      .send-btn {
+        min-width: 70px;
+        padding: 12px 20px;
+      }
+      
+      .file-upload-btn {
+        font-size: 20px;
+      }
+      
+      .scroll-to-bottom-btn {
+        bottom: 85px;
+        right: 12px;
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
       }
     }
     
@@ -871,7 +1099,7 @@
         padding-right: max(16px, env(safe-area-inset-right));
       }
       
-      .sidebar-header, .chat-detail-header, .chat-input-area {
+      .sidebar-header, .chat-detail-header, .input-area {
         padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
         padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
       }
@@ -944,6 +1172,29 @@
       background: #f8f9fa;
       border-radius: 12px;
       margin: 0 8px;
+    }
+    
+    /* ===== CONNECTION STATUS ===== */
+    .connection-status-indicator {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      z-index: 1000;
+      display: none;
+    }
+    
+    .connected {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    .disconnected {
+      background: #f44336;
+      color: white;
     }
   </style>
 </head>
@@ -1067,44 +1318,60 @@
       </div>
     </div>
     
-    <!-- Messages Container - 3/4 of screen (scrollable) -->
-    <div id="chatMessages" class="chat-messages-container">
-      <div class="empty-state">
-        <div class="empty-state-icon">👈</div>
-        <div class="empty-state-title">Select a conversation</div>
-        <div class="empty-state-subtitle">Choose a user from the sidebar to start chatting</div>
-      </div>
-    </div>
-    
-    <!-- Input Area - 1/4 of screen (fixed at bottom) -->
-    <div class="chat-input-area">
-      <div class="chat-input-wrapper">
-        <textarea 
-          id="chatMessageInput" 
-          class="chat-message-input" 
-          placeholder="Type message..." 
-          disabled
-          rows="1"
-        ></textarea>
+    <!-- ================================================ -->
+    <!-- NEW THREE-PART CHAT LAYOUT -->
+    <!-- ================================================ -->
+    <div class="chat-wrapper">
+      <!-- A. Messages Section - Fixed box with scroll -->
+      <div class="messages-section">
+        <!-- Scroll to bottom button -->
+        <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
+          ↓
+        </button>
         
-        <div class="chat-input-actions">
-          <div class="chat-file-attachment" onclick="document.getElementById('chatFileInput').click()">
-            <span>📎</span>
-            <span>Attach file</span>
-          </div>
-          <div id="chatTypingIndicator" style="font-size: 12px; color: #666; display: none;">
-            Typing...
+        <!-- Scrollable messages box -->
+        <div id="chatMessages">
+          <div class="empty-state">
+            <div>Select a conversation to view messages</div>
           </div>
         </div>
       </div>
       
-      <button id="chatSendBtn" onclick="sendMessage()" class="chat-send-button" disabled>
-        <span>Send</span>
-        <span>➤</span>
-      </button>
-      
-      <input type="file" id="chatFileInput" style="display: none;" onchange="handleFileSelect()">
+      <!-- B. Input Section - Always fixed at bottom -->
+      <div class="input-section">
+        <div class="input-area-container">
+          <div class="upload-progress" id="uploadProgress">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          
+          <div class="file-preview" id="filePreview"></div>
+          
+          <div class="sending-indicator" id="sendingIndicator">Sending...</div>
+          <div class="error-message" id="errorMessage">Please wait before sending another message</div>
+          
+          <div class="input-area">
+            <textarea 
+              id="messageInput" 
+              placeholder="Type your message here..." 
+              rows="1"
+            ></textarea>
+            <div class="action-buttons">
+              <div class="file-upload-container">
+                <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                  📎
+                </button>
+                <span class="file-upload-label">file upload</span>
+              </div>
+              <button class="send-btn" onclick="sendMessage()" id="sendButton">
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+    
+    <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect()">
   </div>
 </div>
 
@@ -1119,67 +1386,145 @@
     password: "agent2", // Login password
     filename: window.location.pathname.split('/').pop() || "agent1.html" // Auto-detect filename
   };
-  // ================================================
-
+  
   let socket = null;
   let currentAgent = null;
   let selectedUser = null;
-  let users = new Map(); // Store users and their messages
+  let users = new Map();
   let isMuted = false;
   let autoReconnectAttempts = 0;
-  const MAX_RECONNECT_ATTEMPTS = 20; // Increased from 10
-  const RECONNECT_DELAY = 2000; // 2 seconds
+  const MAX_RECONNECT_ATTEMPTS = 20;
+  const RECONNECT_DELAY = 2000;
   let reconnectTimeout = null;
   let selectedFile = null;
   let isMobile = window.innerWidth < 768;
+  let isScrolledToBottom = true;
+  let duplicateManager = {
+    seenMessages: new Map(),
+    
+    isDuplicate(msg) {
+      if (!msg.id) return false;
+      
+      const key = msg.id;
+      const now = Date.now();
+      
+      // Clean old entries
+      for (const [oldKey, timestamp] of this.seenMessages.entries()) {
+        if (now - timestamp > 60000) {
+          this.seenMessages.delete(oldKey);
+        }
+      }
+      
+      if (this.seenMessages.has(key)) {
+        console.log('🔴 DUPLICATE DETECTED:', {
+          id: key,
+          timestamp: msg.timestamp,
+          sender: msg.sender
+        });
+        return true;
+      }
+      
+      this.seenMessages.set(key, now);
+      
+      if (this.seenMessages.size > 1000) {
+        const keys = Array.from(this.seenMessages.keys()).slice(0, 500);
+        keys.forEach(k => this.seenMessages.delete(k));
+      }
+      
+      return false;
+    },
+    
+    clear() {
+      this.seenMessages.clear();
+    }
+  };
+  
+  // ================================================
+  // SCROLL MANAGEMENT FUNCTIONS
+  // ================================================
+  function setupScrollListener() {
+    const messagesDiv = document.getElementById("chatMessages");
+    const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
+    
+    if (!messagesDiv || !scrollToBottomBtn) return;
+    
+    messagesDiv.addEventListener('scroll', function() {
+      const scrollTop = messagesDiv.scrollTop;
+      const scrollHeight = messagesDiv.scrollHeight;
+      const clientHeight = messagesDiv.clientHeight;
+      
+      isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
+      
+      if (!isScrolledToBottom) {
+        scrollToBottomBtn.classList.add('visible');
+      } else {
+        scrollToBottomBtn.classList.remove('visible');
+      }
+    }, { passive: true });
+    
+    scrollToBottomBtn.addEventListener('click', scrollToBottom);
+    
+    messagesDiv.style.transform = 'translateZ(0)';
+    messagesDiv.style.backfaceVisibility = 'hidden';
+    messagesDiv.style.perspective = '1000px';
+  }
+  
+  function scrollToBottom() {
+    const messagesDiv = document.getElementById("chatMessages");
+    if (messagesDiv) {
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      isScrolledToBottom = true;
+      document.getElementById("scrollToBottomBtn").classList.remove('visible');
+    }
+  }
+  
+  function scrollToBottomSmooth() {
+    const messagesDiv = document.getElementById("chatMessages");
+    if (messagesDiv && isScrolledToBottom) {
+      messagesDiv.scrollTo({
+        top: messagesDiv.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }
   
   // ================================================
   // PERSISTENT CONNECTION SYSTEM
   // ================================================
-  
-  // Persistent connection configuration
   const CONNECTION_CONFIG = {
-    heartbeatInterval: 25000, // 25 seconds (less than typical timeout)
-    heartbeatTimeout: 10000, // 10 seconds to wait for heartbeat response
+    heartbeatInterval: 25000,
+    heartbeatTimeout: 10000,
     maxReconnectAttempts: 20,
     baseReconnectDelay: 2000,
     maxReconnectDelay: 30000,
-    connectionCheckInterval: 5000, // Check connection health every 5 seconds
-    offlineBuffer: [], // Store messages when offline
+    connectionCheckInterval: 5000,
+    offlineBuffer: [],
     lastHeartbeat: null,
     heartbeatTimer: null,
     connectionCheckTimer: null,
-    isManualDisconnect: false, // Track if user manually disconnected
-    connectionState: 'disconnected', // 'connected', 'connecting', 'disconnected', 'error'
+    isManualDisconnect: false,
+    connectionState: 'disconnected',
     pingPongEnabled: true,
     lastActivity: null
   };
   
-  // Initialize persistent connection
   function initPersistentConnection() {
     console.log("🔄 Initializing persistent connection system");
     
-    // Clear any existing timers
     clearTimers();
     
-    // Reset connection state
     CONNECTION_CONFIG.connectionState = 'disconnected';
     CONNECTION_CONFIG.isManualDisconnect = false;
     CONNECTION_CONFIG.lastActivity = Date.now();
     
-    // Start connection monitoring
     startConnectionMonitoring();
     
-    // Set up beforeunload handler to prevent accidental disconnection
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    // Set up page visibility change handler
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     console.log("✅ Persistent connection system initialized");
   }
   
-  // Clear all timers
   function clearTimers() {
     if (CONNECTION_CONFIG.heartbeatTimer) {
       clearInterval(CONNECTION_CONFIG.heartbeatTimer);
@@ -1197,9 +1542,7 @@
     }
   }
   
-  // Start connection monitoring
   function startConnectionMonitoring() {
-    // Start connection health check
     CONNECTION_CONFIG.connectionCheckTimer = setInterval(() => {
       checkConnectionHealth();
     }, CONNECTION_CONFIG.connectionCheckInterval);
@@ -1207,7 +1550,6 @@
     console.log("🔍 Started connection monitoring");
   }
   
-  // Check connection health
   function checkConnectionHealth() {
     if (!socket || !currentAgent) return;
     
@@ -1215,21 +1557,17 @@
     const lastActivity = CONNECTION_CONFIG.lastActivity || now;
     const timeSinceLastActivity = now - lastActivity;
     
-    // If socket is connected but no activity for 60 seconds, send a ping
     if (socket.connected && timeSinceLastActivity > 60000) {
       console.log("🔄 No activity detected, sending keep-alive ping");
       sendHeartbeat();
     }
     
-    // Check if heartbeat response is overdue
     if (CONNECTION_CONFIG.lastHeartbeat && 
         now - CONNECTION_CONFIG.lastHeartbeat > CONNECTION_CONFIG.heartbeatTimeout + 5000) {
       console.warn("⚠️ Heartbeat response overdue, connection may be stale");
-      // Don't force reconnect here, let socket.io handle it
     }
   }
   
-  // Send heartbeat to keep connection alive
   function sendHeartbeat() {
     if (!socket || !socket.connected || !currentAgent) return;
     
@@ -1247,7 +1585,6 @@
     }
   }
   
-  // Start heartbeat system
   function startHeartbeat() {
     if (CONNECTION_CONFIG.heartbeatTimer) {
       clearInterval(CONNECTION_CONFIG.heartbeatTimer);
@@ -1262,18 +1599,14 @@
     console.log("❤️ Heartbeat system started");
   }
   
-  // Update activity timestamp
   function updateActivity() {
     CONNECTION_CONFIG.lastActivity = Date.now();
   }
   
-  // Handle beforeunload event
   function handleBeforeUnload(event) {
     if (currentAgent && socket && socket.connected) {
-      // Don't prevent unload, but cleanly disconnect
       CONNECTION_CONFIG.isManualDisconnect = true;
       
-      // Send disconnect notification
       if (socket && socket.connected) {
         socket.emit('agent_disconnect', {
           agentId: currentAgent.id,
@@ -1281,19 +1614,16 @@
         });
       }
       
-      // Give socket time to send the message
       setTimeout(() => {
         if (socket) socket.disconnect();
       }, 100);
     }
   }
   
-  // Handle visibility change
   function handleVisibilityChange() {
     if (!document.hidden && currentAgent && (!socket || !socket.connected)) {
       console.log("📱 Page became visible, checking connection...");
       
-      // If we're in a reconnection state but not currently reconnecting
       if (CONNECTION_CONFIG.connectionState === 'disconnected' && 
           !CONNECTION_CONFIG.isManualDisconnect) {
         console.log("🔄 Attempting reconnection after page visibility restored");
@@ -1302,7 +1632,6 @@
     }
   }
   
-  // Enhanced reconnect function with exponential backoff
   function reconnect() {
     if (CONNECTION_CONFIG.isManualDisconnect) {
       console.log("Reconnection cancelled - manual disconnect");
@@ -1323,7 +1652,6 @@
     
     updateConnectionStatus('connecting', `Reconnecting (${autoReconnectAttempts}/${CONNECTION_CONFIG.maxReconnectAttempts})`);
     
-    // Clear any existing timeout
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
     }
@@ -1334,30 +1662,26 @@
     }, delay);
   }
   
-  // Calculate reconnect delay with exponential backoff
   function calculateReconnectDelay() {
     const baseDelay = CONNECTION_CONFIG.baseReconnectDelay;
     const maxDelay = CONNECTION_CONFIG.maxReconnectDelay;
     const exponentialDelay = baseDelay * Math.pow(1.5, autoReconnectAttempts - 1);
-    const jitter = Math.random() * 1000; // Add random jitter
+    const jitter = Math.random() * 1000;
     
     return Math.min(exponentialDelay + jitter, maxDelay);
   }
   
-  // Perform the actual reconnection
   function performReconnection() {
     CONNECTION_CONFIG.connectionState = 'connecting';
     
-    // Clean up old socket
     if (socket) {
       socket.removeAllListeners();
       socket.disconnect();
     }
     
-    // Create new socket with persistent settings
     socket = io("https://chat-backend-p2b9.onrender.com", {
       transports: ['websocket', 'polling'],
-      reconnection: false, // We handle reconnection ourselves
+      reconnection: false,
       timeout: 30000,
       forceNew: true,
       multiplex: false,
@@ -1373,7 +1697,6 @@
     
     setupSocketListeners();
     
-    // Set connection timeout
     const connectionTimeout = setTimeout(() => {
       if (CONNECTION_CONFIG.connectionState === 'connecting') {
         console.log("Connection timeout");
@@ -1384,7 +1707,6 @@
       }
     }, 15000);
     
-    // Once connected, clear timeout and proceed
     socket.once('connect', () => {
       clearTimeout(connectionTimeout);
       CONNECTION_CONFIG.connectionState = 'connected';
@@ -1394,7 +1716,6 @@
       updateConnectionStatus('connected', 'Reconnected');
       showNotification('Connection restored successfully!', '#e8f5e9', '#2e7d32');
       
-      // Re-authenticate
       socket.emit('agent_login', { 
         agentId: AGENT_CONFIG.id, 
         password: AGENT_CONFIG.password,
@@ -1409,12 +1730,12 @@
     });
   }
   
-  // Enhanced connection status update
   function updateConnectionStatus(status, message = '') {
     const connectionDot = document.getElementById('connectionDot');
     const connectionStatus = document.getElementById('connectionStatus');
     
-    // Remove all classes
+    if (!connectionDot || !connectionStatus) return;
+    
     connectionDot.className = 'connection-dot';
     
     CONNECTION_CONFIG.connectionState = status;
@@ -1442,58 +1763,53 @@
         break;
     }
     
-    // Update last activity
     updateActivity();
   }
   
-  // Initialize on page load
+  function scheduleReconnect() {
+    reconnect();
+  }
+  
+  // ================================================
+  // INITIALIZATION
+  // ================================================
   window.onload = function() {
     const fileName = getCurrentFileName();
     AGENT_CONFIG.filename = fileName;
     
-    // Display agent info
     document.getElementById('agentFileName').textContent = fileName;
     document.getElementById('displayAgentId').textContent = AGENT_CONFIG.id;
     document.getElementById('displayAgentName').textContent = AGENT_CONFIG.name;
     
-    // Pre-fill login fields
     document.getElementById('agentId').value = AGENT_CONFIG.id;
     document.getElementById('agentPass').value = AGENT_CONFIG.password;
     
-    // Set up textarea auto-resize
-    const textarea = document.getElementById('chatMessageInput');
+    // Setup textarea auto-resize
+    const textarea = document.getElementById('messageInput');
     textarea.addEventListener('input', function() {
       this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     });
     
-    // Connect to server to register agent
     registerAgentOnServer();
-    
-    // Initialize persistent connection system
     initPersistentConnection();
     
-    // Handle window resize
     window.addEventListener('resize', handleResize);
     
-    // Focus on agent ID field
     setTimeout(() => {
       document.getElementById('agentId').focus();
     }, 300);
   };
   
-  // Handle window resize
   function handleResize() {
     isMobile = window.innerWidth < 768;
   }
   
-  // Detect current filename
   function getCurrentFileName() {
     const path = window.location.pathname;
     return path.split('/').pop() || "agent1.html";
   }
-
-  // Register this agent on the server
+  
   function registerAgentOnServer() {
     console.log("Registering agent on server:", AGENT_CONFIG);
     
@@ -1530,13 +1846,10 @@
       document.getElementById('agentStatus').className = "mute-status muted";
     });
   }
-
-  // Schedule reconnect (backward compatibility)
-  function scheduleReconnect() {
-    reconnect();
-  }
-
-  // Setup socket listeners
+  
+  // ================================================
+  // SOCKET SETUP
+  // ================================================
   function setupSocketListeners() {
     socket.on('connect', () => {
       console.log("✅ Connected to server, Socket ID:", socket.id);
@@ -1544,13 +1857,9 @@
       autoReconnectAttempts = 0;
       CONNECTION_CONFIG.connectionState = 'connected';
       
-      // Start heartbeat system
       startHeartbeat();
-      
-      // Update activity
       updateActivity();
       
-      // If we have currentAgent, re-login
       if (currentAgent) {
         console.log("🔄 Re-authenticating after reconnection...");
         socket.emit('agent_login', { 
@@ -1575,36 +1884,29 @@
         isMuted = res.muted || false;
         updateMuteStatus();
         
-        // Hide login screen, show main app
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').style.display = 'flex';
         document.getElementById('agentNameDisplay').textContent = currentAgent.name;
         document.getElementById('agentIdDisplay').textContent = currentAgent.id;
         document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
         
-        // Load all conversations and messages
         loadAllConversations();
-        
-        // Send connection established notification
         showNotification('Connected to server successfully!', '#e8f5e9', '#2e7d32');
         
       } else {
         console.error("❌ Login failed:", res.message);
         document.getElementById('loginError').textContent = res.message || 'Login failed';
         
-        // Re-enable login button on failure
         if (loginButton) {
           loginButton.disabled = false;
           loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
         }
         
-        // If we're already logged in but re-login failed, try reconnect
         if (currentAgent) {
           setTimeout(() => reconnect(), 3000);
         }
       }
       
-      // Update activity
       updateActivity();
     });
     
@@ -1613,19 +1915,16 @@
       updateConnectionStatus('error', 'Connection error');
       document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
       
-      // Re-enable login button on error
       const loginButton = document.getElementById('loginButton');
       if (loginButton) {
         loginButton.disabled = false;
         loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
       }
       
-      // Schedule reconnect if we have a current agent
       if (currentAgent && !CONNECTION_CONFIG.isManualDisconnect) {
         scheduleReconnect();
       }
       
-      // Update activity
       updateActivity();
     });
     
@@ -1634,15 +1933,13 @@
       updateConnectionStatus('disconnected');
       CONNECTION_CONFIG.connectionState = 'disconnected';
       
-      // Stop heartbeat
       if (CONNECTION_CONFIG.heartbeatTimer) {
         clearInterval(CONNECTION_CONFIG.heartbeatTimer);
         CONNECTION_CONFIG.heartbeatTimer = null;
       }
       
-      // Schedule reconnect if this wasn't a manual disconnect
       if (reason !== 'io client disconnect' && 
-          reason !== 'transport close' && // These are usually network issues
+          reason !== 'transport close' &&
           currentAgent && 
           !CONNECTION_CONFIG.isManualDisconnect) {
         
@@ -1650,36 +1947,35 @@
         scheduleReconnect();
       }
       
-      // If it was a manual disconnect, update status
       if (CONNECTION_CONFIG.isManualDisconnect) {
         console.log("Manual disconnect, not reconnecting");
         updateConnectionStatus('disconnected', 'Disconnected by user');
       }
       
-      // Update activity
       updateActivity();
     });
     
-    // Handle heartbeat response
     socket.on('heartbeat_response', (data) => {
       console.log("💓 Heartbeat response received");
       CONNECTION_CONFIG.lastHeartbeat = Date.now();
       updateActivity();
     });
     
-    // Handle pong from server
     socket.on('pong', () => {
       updateActivity();
     });
     
-    // Listen for ALL messages (incoming/outgoing)
     socket.on('new_message', (msg) => {
       console.log("📨 Received message:", msg);
       updateActivity();
       
+      if (duplicateManager.isDuplicate(msg)) {
+        console.log("🛑 Skipping duplicate message");
+        return;
+      }
+      
       const whatsapp = msg.whatsapp || 'unknown';
       
-      // Store in users map
       if (!users.has(whatsapp)) {
         users.set(whatsapp, {
           name: whatsapp,
@@ -1693,26 +1989,23 @@
       user.lastMsg = msg.text || msg.message || '[Attachment]';
       user.time = msg.timestamp || new Date().toISOString();
       
-      // Add message to user's messages
       user.messages.push({
         text: msg.text || msg.message,
         time: msg.timestamp || new Date().toISOString(),
         sender: msg.sender || 'unknown',
         attachment: msg.attachment,
         agentId: msg.agentId,
-        agentName: msg.agentName
+        agentName: msg.agentName,
+        id: msg.id
       });
       
-      // Update user list
       updateUserList();
       
-      // If this user is selected, show the message
       if (selectedUser === whatsapp) {
         showMessages();
       }
     });
     
-    // Listen for forwarded messages from super admin
     socket.on('forwarded_message', (data) => {
       updateActivity();
       if (data.type === 'user_message' && data.data) {
@@ -1723,7 +2016,6 @@
       }
     });
     
-    // Listen for message deletions
     socket.on('message_deleted', (data) => {
       console.log("🗑️ Message deleted:", data);
       updateActivity();
@@ -1740,7 +2032,6 @@
       }
     });
     
-    // Listen for chat deletions
     socket.on('chat_deleted', (data) => {
       console.log("🗑️ Chat deleted:", data.whatsapp);
       updateActivity();
@@ -1754,7 +2045,6 @@
       }
     });
     
-    // Listen for mute status updates
     socket.on('mute_status', (data) => {
       updateActivity();
       if (data.agentId === AGENT_CONFIG.id) {
@@ -1769,44 +2059,43 @@
       }
     });
     
-    // Listen for message history
     socket.on('message_history', (messages) => {
       updateActivity();
       if (selectedUser && messages) {
         const user = users.get(selectedUser);
         if (user) {
-          user.messages = messages;
+          // Filter duplicates from history
+          user.messages = messages.filter(msg => !duplicateManager.isDuplicate(msg));
           showMessages();
         }
       }
     });
     
-    // Listen for connection stability notifications
     socket.on('connection_stable', () => {
       console.log("✅ Connection is stable");
       updateConnectionStatus('connected', 'Stable connection');
       updateActivity();
     });
   }
-
-  // Load all conversations from server
+  
+  // ================================================
+  // USER MANAGEMENT
+  // ================================================
   function loadAllConversations() {
     if (!socket) return;
     
     console.log("📋 Loading all conversations...");
     updateActivity();
     
-    // Request existing users
     socket.emit('get_existing_users');
     
     socket.on('existing_users', (usersList) => {
       console.log("📋 Loaded existing users:", usersList.length);
       updateActivity();
       
-      // Clear existing data
       users.clear();
+      duplicateManager.clear();
       
-      // Process each user
       usersList.forEach(user => {
         if (user.whatsapp) {
           users.set(user.whatsapp, {
@@ -1820,7 +2109,6 @@
       
       updateUserList();
       
-      // Load messages for each user
       users.forEach((user, whatsapp) => {
         socket.emit('get_messages', { 
           whatsapp: whatsapp, 
@@ -1830,169 +2118,9 @@
       });
     });
   }
-
-  // Show typing indicator
-  function showTypingIndicator() {
-    const indicator = document.getElementById('chatTypingIndicator');
-    indicator.style.display = 'block';
-    updateActivity();
-  }
-
-  function hideTypingIndicator() {
-    const indicator = document.getElementById('chatTypingIndicator');
-    indicator.style.display = 'none';
-    updateActivity();
-  }
-
-  // Show notification
-  function showNotification(message, bgColor, textColor) {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    notification.style.cssText = `
-      background: ${bgColor}; 
-      color: ${textColor}; 
-      border: 1px solid ${textColor}33;
-    `;
-    notification.innerHTML = message;
-    document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
-    updateActivity();
-  }
-
-  // Login - FIXED VERSION with persistent connection
-  function login() {
-    const id = document.getElementById('agentId').value.trim();
-    const pass = document.getElementById('agentPass').value.trim();
-    
-    if (!id || !pass) {
-      document.getElementById('loginError').textContent = 'Please enter both ID and password';
-      return;
-    }
-    
-    if (id !== AGENT_CONFIG.id) {
-      document.getElementById('loginError').textContent = 'Invalid Agent ID';
-      return;
-    }
-    
-    if (pass !== AGENT_CONFIG.password) {
-      document.getElementById('loginError').textContent = 'Invalid password';
-      return;
-    }
-    
-    // Disable login button
-    const loginButton = document.getElementById('loginButton');
-    loginButton.disabled = true;
-    loginButton.innerHTML = '<span>🔄</span><span>Connecting...</span>';
-    
-    // Clear any existing reconnect timeout
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-      reconnectTimeout = null;
-    }
-    
-    // Reset reconnection attempts
-    autoReconnectAttempts = 0;
-    
-    // Clear any previous error
-    document.getElementById('loginError').textContent = '';
-    
-    // Reset manual disconnect flag
-    CONNECTION_CONFIG.isManualDisconnect = false;
-    
-    // Show connecting status
-    updateConnectionStatus('connecting');
-    
-    // Create socket connection with persistent settings
-    socket = io("https://chat-backend-p2b9.onrender.com", {
-      transports: ['websocket', 'polling'],
-      reconnection: false, // We handle reconnection ourselves
-      timeout: 30000,
-      forceNew: true,
-      multiplex: false,
-      upgrade: true,
-      rememberUpgrade: true,
-      path: '/socket.io/',
-      query: {
-        agentId: AGENT_CONFIG.id,
-        persistent: 'true'
-      }
-    });
-    
-    // Set up socket listeners
-    setupSocketListeners();
-    
-    // Send login credentials when connected
-    socket.once('connect', () => {
-      console.log("Socket connected, sending login credentials...");
-      socket.emit('agent_login', { 
-        agentId: AGENT_CONFIG.id, 
-        password: AGENT_CONFIG.password,
-        persistent: true
-      });
-    });
-    
-    // Handle connection timeout
-    const connectionTimeout = setTimeout(() => {
-      if (!currentAgent && loginButton.disabled) {
-        console.log("Connection timeout");
-        document.getElementById('loginError').textContent = 'Connection timeout. Please try again.';
-        loginButton.disabled = false;
-        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-        updateConnectionStatus('error', 'Connection timeout');
-        
-        // Disconnect socket if still trying
-        if (socket) {
-          socket.disconnect();
-        }
-        
-        // Try to reconnect
-        scheduleReconnect();
-      }
-    }, 15000);
-    
-    // Clear timeout on successful connection
-    socket.once('connect', () => {
-      clearTimeout(connectionTimeout);
-    });
-    
-    socket.once('connect_error', () => {
-      clearTimeout(connectionTimeout);
-    });
-    
-    updateActivity();
-  }
-
-  // Update mute status display
-  function updateMuteStatus() {
-    const muteIndicator = document.getElementById('muteIndicator');
-    const sendBtn = document.getElementById('chatSendBtn');
-    const messageInput = document.getElementById('chatMessageInput');
-    
-    if (isMuted) {
-      muteIndicator.textContent = "🔇 Muted";
-      muteIndicator.className = "mute-status muted";
-      if (sendBtn) sendBtn.disabled = true;
-      if (messageInput) {
-        messageInput.disabled = true;
-        messageInput.placeholder = "Account is muted by Super Admin";
-      }
-    } else {
-      muteIndicator.textContent = "⚡ Active";
-      muteIndicator.className = "mute-status unmuted";
-      if (sendBtn && selectedUser) sendBtn.disabled = false;
-      if (messageInput && selectedUser) {
-        messageInput.disabled = false;
-        messageInput.placeholder = "Type message...";
-      }
-    }
-    
-    updateActivity();
-  }
-
-  // Add user message (compatibility function)
+  
   function addUserMessage(userId, message, data) {
     updateActivity();
-    // Add to users map
     if (!users.has(userId)) {
       users.set(userId, {
         name: userId,
@@ -2007,26 +2135,23 @@
       text: message,
       time: data.timestamp || new Date().toISOString(),
       sender: data.sender || 'user',
-      attachment: data.attachment
+      attachment: data.attachment,
+      id: data.id
     });
     user.lastMsg = message || '[Attachment]';
     user.time = data.timestamp || new Date().toISOString();
     
-    // Update user list
     updateUserList();
     
-    // If this user is selected, show the message
     if (selectedUser === userId) {
       showMessages();
     }
   }
-
-  // Update user list UI
+  
   function updateUserList() {
     const userList = document.getElementById('userList');
     updateActivity();
     
-    // Sort users by last message time (newest first)
     const sortedUsers = Array.from(users.entries())
       .sort((a, b) => new Date(b[1].time) - new Date(a[1].time));
     
@@ -2068,29 +2193,28 @@
       userList.appendChild(div);
     });
   }
-
-  // Select a user
+  
+  // ================================================
+  // CHAT FUNCTIONS
+  // ================================================
   function selectUser(userId) {
     selectedUser = userId;
     const user = users.get(userId);
     updateActivity();
     
-    // Update chat detail header
     document.getElementById('currentUser').textContent = user.name;
     document.getElementById('whatsappNumber').textContent = `WhatsApp: ${userId}`;
     document.getElementById('chatDetailUserAvatar').textContent = userId.charAt(0).toUpperCase();
     
-    // Enable input if not muted
-    const messageInput = document.getElementById('chatMessageInput');
-    const sendBtn = document.getElementById('chatSendBtn');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendButton');
     
     if (!isMuted) {
       messageInput.disabled = false;
       sendBtn.disabled = false;
-      messageInput.placeholder = "Type message...";
+      messageInput.placeholder = "Type your message here...";
       messageInput.focus();
       
-      // Load message history for this user
       if (socket) {
         socket.emit('get_messages', { 
           whatsapp: userId, 
@@ -2100,35 +2224,29 @@
       }
     }
     
-    // Show messages
     showMessages();
-    
-    // Show chat detail view
     document.getElementById('chatDetailView').classList.add('active');
+    
+    setTimeout(setupScrollListener, 100);
   }
-
-  // Exit chat and return to chat list
+  
   function exitChat() {
     selectedUser = null;
     
-    // Hide chat detail view
     document.getElementById('chatDetailView').classList.remove('active');
     
-    // Disable input
-    const messageInput = document.getElementById('chatMessageInput');
-    const sendBtn = document.getElementById('chatSendBtn');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendButton');
     messageInput.disabled = true;
     sendBtn.disabled = true;
     messageInput.value = '';
     messageInput.placeholder = "Select a conversation to start chatting";
     
-    // Update user list to remove active state
     updateUserList();
     
     updateActivity();
   }
-
-  // Show messages for selected user
+  
   function showMessages() {
     if (!selectedUser) return;
     updateActivity();
@@ -2141,19 +2259,15 @@
     if (!user.messages || user.messages.length === 0) {
       messagesDiv.innerHTML = `
         <div class="empty-state">
-          <div class="empty-state-icon">💬</div>
-          <div class="empty-state-title">No messages yet</div>
-          <div class="empty-state-subtitle">Start the conversation with this user</div>
+          <div>No messages yet. Start the conversation!</div>
         </div>
       `;
       return;
     }
     
-    // Group messages by date
     const groupedMessages = groupMessagesByDate(user.messages);
     
     Object.keys(groupedMessages).forEach(date => {
-      // Add date separator
       if (Object.keys(groupedMessages).length > 1) {
         const dateDiv = document.createElement('div');
         dateDiv.className = 'date-separator';
@@ -2161,46 +2275,91 @@
         messagesDiv.appendChild(dateDiv);
       }
       
-      // Add messages for this date
       groupedMessages[date].forEach(msg => {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message-bubble ${msg.sender === 'agent' || msg.sender === 'admin' ? 'agent' : 'user'}`;
-        
-        let content = msg.text || msg.message || '';
-        let attachmentHtml = '';
-        
-        if (msg.attachment) {
-          attachmentHtml = formatAttachment(msg.attachment);
-        }
-        
-        const senderName = msg.sender === 'agent' || msg.sender === 'admin' 
-          ? (msg.agentName || currentAgent?.name || 'Agent') 
-          : 'User';
-        
-        const time = formatTime(msg.time);
-        
-        messageDiv.innerHTML = `
-          <div class="message-content">
-            ${content}
-            ${attachmentHtml}
-          </div>
-          <div class="message-meta">
-            <span class="message-sender">${senderName}</span>
-            <span class="message-time">${time}</span>
-          </div>
-        `;
-        
-        messagesDiv.appendChild(messageDiv);
+        const messageElement = createMessageElement(msg);
+        messagesDiv.appendChild(messageElement);
       });
     });
     
-    // Scroll to bottom
     setTimeout(() => {
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      scrollToBottom();
     }, 50);
   }
-
-  // Group messages by date
+  
+  function createMessageElement(msg) {
+    const messageDiv = document.createElement("div");
+    const isAgent = msg.sender === 'agent' || msg.sender === 'admin' || msg.agentId === AGENT_CONFIG.id;
+    
+    messageDiv.className = "message-container " + (isAgent ? "agent-message" : "user-message");
+    
+    let content = "";
+    if (msg.attachment) {
+      content = formatAttachment(msg.attachment);
+    }
+    
+    const senderName = isAgent 
+      ? (msg.agentName || currentAgent?.name || 'Agent') 
+      : 'User';
+    
+    messageDiv.innerHTML = `
+      <div class="message-header">
+        <span class="message-sender">${senderName}</span>
+        <span class="message-time" title="${formatDateTime(msg.time)}">
+          ${formatTime(msg.time)}
+        </span>
+      </div>
+      <div class="message-content">${msg.text || msg.message || ''}</div>
+      ${content}
+    `;
+    
+    messageDiv.dataset.messageId = msg.id || 'no-id';
+    
+    return messageDiv;
+  }
+  
+  function formatAttachment(attachment) {
+    if (!attachment) return '';
+    
+    const fileType = attachment.mimetype?.split('/')[0] || 'file';
+    let icon = '📄';
+    let preview = '';
+    
+    const fileUrl = attachment.url || attachment.path;
+    const fileName = attachment.originalname || attachment.filename || 'file';
+    const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
+    
+    if (fileType === 'image') {
+      icon = '🖼️';
+      preview = `<img src="${fileUrl}" alt="${fileName}" loading="lazy">`;
+    } else if (fileType === 'video') {
+      icon = '🎬';
+      preview = `<div><video src="${fileUrl}" controls preload="metadata"></video></div>`;
+    } else if (fileType === 'audio') {
+      icon = '🎵';
+      preview = `<div><audio src="${fileUrl}" controls preload="metadata"></audio></div>`;
+    } else if (attachment.mimetype?.includes('pdf')) {
+      icon = '📕';
+    }
+    
+    return `
+      <div class="attachment">
+        <a href="${fileUrl}" target="_blank" download="${fileName}">
+          ${icon} ${fileName}
+          ${fileSize ? `<span style="color: #666; font-size: 0.9em; margin-left: 8px;">(${fileSize})</span>` : ''}
+        </a>
+        ${preview}
+      </div>
+    `;
+  }
+  
+  function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+  
   function groupMessagesByDate(messages) {
     const grouped = {};
     
@@ -2214,53 +2373,89 @@
     
     return grouped;
   }
-
-  // Format attachment
-  function formatAttachment(attachment) {
-    if (!attachment) return '';
-    
-    const fileType = attachment.mimetype?.split('/')[0] || 'file';
-    let icon = '📄';
-    let preview = '';
-    
-    const fileUrl = attachment.url || attachment.path;
-    const fileName = attachment.originalname || attachment.filename || 'file';
-    
-    if (fileType === 'image') {
-      icon = '🖼️';
-      preview = `<div class="attachment-preview"><img src="${fileUrl}" alt="${fileName}" loading="lazy"></div>`;
-    } else if (fileType === 'video') {
-      icon = '🎬';
-    } else if (fileType === 'audio') {
-      icon = '🎵';
-    } else if (attachment.mimetype?.includes('pdf')) {
-      icon = '📕';
-    }
-    
-    return `
-      <div class="attachment">
-        <a href="${fileUrl}" target="_blank" class="attachment-link">
-          <span class="file-icon">${icon}</span>
-          <span>${fileName}</span>
-        </a>
-        ${preview}
-      </div>
-    `;
-  }
-
-  // Handle file selection
+  
+  // ================================================
+  // FILE HANDLING
+  // ================================================
   function handleFileSelect() {
-    const fileInput = document.getElementById('chatFileInput');
+    const fileInput = document.getElementById('fileInput');
+    const filePreview = document.getElementById('filePreview');
+    
     if (fileInput.files.length > 0) {
       selectedFile = fileInput.files[0];
-      console.log("File selected:", selectedFile.name);
-      // You could add a preview here
-      showNotification(`File selected: ${selectedFile.name}`, '#e3f2fd', '#1565c0');
+      filePreview.innerHTML = `📎 ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
+      filePreview.style.display = 'flex';
+    } else {
+      selectedFile = null;
+      filePreview.innerHTML = '';
+      filePreview.style.display = 'none';
     }
     updateActivity();
   }
-
-  // Send message
+  
+  function uploadFile(callback) {
+    if (!selectedFile) {
+      if (callback) callback(null);
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    
+    const xhr = new XMLHttpRequest();
+    const progressDiv = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('progressBar');
+    
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const percentComplete = (e.loaded / e.total) * 100;
+        progressBar.style.width = percentComplete + '%';
+      }
+    });
+    
+    xhr.addEventListener('load', function() {
+      progressDiv.style.display = 'none';
+      
+      if (xhr.status === 200) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (response.success && callback) {
+            callback(response.file);
+          } else {
+            alert('Upload failed: ' + (response.message || 'Unknown error'));
+            if (callback) callback(null);
+          }
+        } catch (e) {
+          alert('Upload failed: Invalid response from server');
+          if (callback) callback(null);
+        }
+      } else {
+        alert('Upload failed with status: ' + xhr.status);
+        if (callback) callback(null);
+      }
+      
+      document.getElementById('fileInput').value = '';
+      document.getElementById('filePreview').innerHTML = '';
+      document.getElementById('filePreview').style.display = 'none';
+      selectedFile = null;
+    });
+    
+    xhr.addEventListener('error', function() {
+      progressDiv.style.display = 'none';
+      alert('Upload failed. Please check your connection.');
+      if (callback) callback(null);
+    });
+    
+    xhr.open('POST', '/upload');
+    xhr.send(formData);
+  }
+  
+  // ================================================
+  // MESSAGE SENDING
+  // ================================================
   function sendMessage() {
     if (isMuted) {
       alert("Your account is muted by Super Admin. You cannot send messages.");
@@ -2274,54 +2469,262 @@
       return;
     }
     
-    const input = document.getElementById('chatMessageInput');
+    const input = document.getElementById('messageInput');
     const text = input.value.trim();
-    if (!text || !selectedUser) return;
+    const fileInput = document.getElementById('fileInput');
     
-    // Update activity before sending
+    if (!text && !fileInput.files.length) {
+      alert("Please enter a message or select a file");
+      return;
+    }
+    
     updateActivity();
     
-    // Add to local messages
+    if (fileInput.files.length > 0) {
+      uploadFile(function(fileInfo) {
+        if (fileInfo) {
+          sendMessageToServer(text, fileInfo);
+        } else {
+          if (text) {
+            sendMessageToServer(text);
+          }
+        }
+        
+        finishMessageSend();
+        input.value = "";
+        fileInput.value = "";
+        document.getElementById("filePreview").innerHTML = "";
+        document.getElementById("filePreview").style.display = 'none';
+        
+        input.style.height = 'auto';
+        input.style.height = '50px';
+      });
+    } else {
+      sendMessageToServer(text);
+      
+      setTimeout(() => {
+        finishMessageSend();
+        input.value = "";
+        
+        input.style.height = 'auto';
+        input.style.height = '50px';
+      }, 500);
+    }
+  }
+  
+  function sendMessageToServer(text, fileInfo = null) {
+    if (!selectedUser) return;
+    
+    const messageData = {
+      whatsapp: selectedUser,
+      message: text,
+      agentId: currentAgent.id,
+      agentName: currentAgent.name,
+      sender: 'agent'
+    };
+    
+    if (fileInfo) {
+      messageData.attachment = fileInfo;
+    }
+    
+    // Add to local messages immediately
     const user = users.get(selectedUser);
-    user.messages.push({
+    const tempMessage = {
       text: text,
       time: new Date().toISOString(),
       sender: 'agent',
       agentId: currentAgent.id,
-      agentName: currentAgent.name
-    });
+      agentName: currentAgent.name,
+      attachment: fileInfo
+    };
     
-    // Send message to server
-    socket.emit('agent_message', {
-      whatsapp: selectedUser,
-      message: text,
-      agentId: currentAgent.id,
-      agentName: currentAgent.name
-    });
+    if (user) {
+      user.messages.push(tempMessage);
+      user.lastMsg = text || '[Attachment]';
+      user.time = new Date().toISOString();
+      showMessages();
+    }
     
-    // Also send via send_message for backward compatibility
+    // Send to server
+    socket.emit('agent_message', messageData);
     socket.emit('send_message', {
       whatsapp: selectedUser,
       sender: 'agent',
       text: text,
       agentId: currentAgent.id,
-      agentName: currentAgent.name
+      agentName: currentAgent.name,
+      attachment: fileInfo
+    });
+  }
+  
+  function finishMessageSend() {
+    const sendButton = document.getElementById('sendButton');
+    const sendingIndicator = document.getElementById('sendingIndicator');
+    
+    if (sendButton) sendButton.disabled = false;
+    if (sendingIndicator) sendingIndicator.style.display = 'none';
+    
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) messageInput.focus();
+  }
+  
+  function showError(message) {
+    const errorMessage = document.getElementById('errorMessage');
+    if (errorMessage) {
+      errorMessage.textContent = message;
+      errorMessage.style.display = 'block';
+      
+      setTimeout(() => {
+        errorMessage.style.display = 'none';
+      }, 3000);
+    }
+  }
+  
+  // ================================================
+  // UTILITY FUNCTIONS
+  // ================================================
+  function login() {
+    const id = document.getElementById('agentId').value.trim();
+    const pass = document.getElementById('agentPass').value.trim();
+    
+    if (!id || !pass) {
+      document.getElementById('loginError').textContent = 'Please enter both ID and password';
+      return;
+    }
+    
+    if (id !== AGENT_CONFIG.id) {
+      document.getElementById('loginError').textContent = 'Invalid Agent ID';
+      return;
+    }
+    
+    if (pass !== AGENT_CONFIG.password) {
+      document.getElementById('loginError').textContent = 'Invalid password';
+      return;
+    }
+    
+    const loginButton = document.getElementById('loginButton');
+    loginButton.disabled = true;
+    loginButton.innerHTML = '<span>🔄</span><span>Connecting...</span>';
+    
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+    
+    autoReconnectAttempts = 0;
+    document.getElementById('loginError').textContent = '';
+    CONNECTION_CONFIG.isManualDisconnect = false;
+    
+    updateConnectionStatus('connecting');
+    
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websktop, 'polling'],
+      reconnection: false,
+      timeout: 30000,
+      forceNew: true,
+      multiplex: false,
+      upgrade: true,
+      rememberUpgrade: true,
+      path: '/socket.io/',
+      query: {
+        agentId: AGENT_CONFIG.id,
+        persistent: 'true'
+      }
     });
     
-    // Update UI
-    showMessages();
-    input.value = '';
-    input.style.height = 'auto';
-    input.focus();
+    setupSocketListeners();
+    
+    socket.once('connect', () => {
+      console.log("Socket connected, sending login credentials...");
+      socket.emit('agent_login', { 
+        agentId: AGENT_CONFIG.id, 
+        password: AGENT_CONFIG.password,
+        persistent: true
+      });
+    });
+    
+    const connectionTimeout = setTimeout(() => {
+      if (!currentAgent && loginButton.disabled) {
+        console.log("Connection timeout");
+        document.getElementById('loginError').textContent = 'Connection timeout. Please try again.';
+        loginButton.disabled = false;
+        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
+        updateConnectionStatus('error', 'Connection timeout');
+        
+        if (socket) {
+          socket.disconnect();
+        }
+        
+        scheduleReconnect();
+      }
+    }, 15000);
+    
+    socket.once('connect', () => {
+      clearTimeout(connectionTimeout);
+    });
+    
+    socket.once('connect_error', () => {
+      clearTimeout(connectionTimeout);
+    });
+    
+    updateActivity();
   }
-
-  // Helper: Format time
+  
+  function updateMuteStatus() {
+    const muteIndicator = document.getElementById('muteIndicator');
+    const sendBtn = document.getElementById('sendButton');
+    const messageInput = document.getElementById('messageInput');
+    
+    if (isMuted) {
+      muteIndicator.textContent = "🔇 Muted";
+      muteIndicator.className = "mute-status muted";
+      if (sendBtn) sendBtn.disabled = true;
+      if (messageInput) {
+        messageInput.disabled = true;
+        messageInput.placeholder = "Account is muted by Super Admin";
+      }
+    } else {
+      muteIndicator.textContent = "⚡ Active";
+      muteIndicator.className = "mute-status unmuted";
+      if (sendBtn && selectedUser) sendBtn.disabled = false;
+      if (messageInput && selectedUser) {
+        messageInput.disabled = false;
+        messageInput.placeholder = "Type your message here...";
+      }
+    }
+    
+    updateActivity();
+  }
+  
+  function showNotification(message, bgColor, textColor) {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.style.cssText = `
+      background: ${bgColor}; 
+      color: ${textColor}; 
+      border: 1px solid ${textColor}33;
+    `;
+    notification.innerHTML = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+    updateActivity();
+  }
+  
   function formatTime(timestamp) {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-
-  // Helper: Format date
+  
+  function formatDateTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString([], { 
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+  
   function formatDate(dateString) {
     const date = new Date(dateString);
     const today = new Date();
@@ -2336,13 +2739,15 @@
       return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
     }
   }
-
-  // Enter key support
+  
+  // ================================================
+  // EVENT LISTENERS
+  // ================================================
   document.getElementById('agentPass').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') login();
   });
   
-  document.getElementById('chatMessageInput').addEventListener('keypress', (e) => {
+  document.getElementById('messageInput').addEventListener('keypress', (e) => {
     updateActivity();
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -2350,7 +2755,11 @@
     }
   });
   
-  // Handle back button on mobile (browser back button)
+  document.getElementById('messageInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+  
   window.addEventListener('popstate', function() {
     updateActivity();
     if (selectedUser) {
@@ -2358,7 +2767,6 @@
     }
   });
   
-  // Prevent zoom on mobile
   document.addEventListener('touchmove', function(e) {
     if (e.scale !== 1) { e.preventDefault(); }
   }, { passive: false });
