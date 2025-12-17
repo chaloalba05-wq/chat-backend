@@ -87,6 +87,8 @@
       background: #fafafa;
       border-radius: 10px;
       flex: 1;
+      display: flex;
+      flex-direction: column;
     }
     
     input, button { 
@@ -108,12 +110,15 @@
       margin-top: 10px;
     }
     
-    /* Updated message styles */
+    /* Updated message styles - FIXED FOR VERTICAL DISPLAY */
     .message-container {
       margin: 8px 0;
       padding: 10px 15px;
       border-radius: 12px;
       max-width: 80%;
+      word-wrap: break-word;
+      display: block;
+      clear: both;
     }
     
     .user-message { 
@@ -122,6 +127,8 @@
       margin-left: auto;
       margin-right: 10px;
       text-align: right;
+      float: right;
+      clear: both;
     }
     
     .other-message { 
@@ -130,6 +137,8 @@
       margin-right: auto;
       margin-left: 10px;
       text-align: left;
+      float: left;
+      clear: both;
     }
     
     .unread-message {
@@ -172,6 +181,7 @@
     .message-content {
       word-wrap: break-word;
       line-height: 1.4;
+      display: block;
     }
     
     .read-status {
@@ -370,6 +380,7 @@
   let isSending = false;
   let sendCooldown = false;
   let sentMessageIds = new Set(); // Track sent message IDs to prevent duplicates
+  let pendingMessageId = null; // Track the ID of the message we just sent
   let debounceTimer = null;
   
   // ===== FORMAT FUNCTIONS =====
@@ -421,7 +432,14 @@
       }
     }
     
-    // Skip if this is our own message that was just sent
+    // FIX: Check if this is our own pending message
+    if (pendingMessageId && messageId === pendingMessageId) {
+      console.log("This is our own pending message, we already showed it");
+      pendingMessageId = null; // Clear pending flag
+      return; // Don't show it again
+    }
+    
+    // Skip if this is our own message that was just sent (fallback)
     if (msg.sender === "user" && msg.whatsapp === whatsapp && lastMessageTime) {
       const messageTime = new Date(msg.timestamp).getTime();
       const timeDiff = Math.abs(messageTime - lastMessageTime);
@@ -454,7 +472,7 @@
   function generateMessageId(msg) {
     if (msg.id) return msg.id;
     if (msg.timestamp && msg.sender && msg.whatsapp) {
-      return `${msg.sender}_${msg.whatsapp}_${msg.timestamp}_${msg.text?.substring(0, 20)}`;
+      return `${msg.sender}_${msg.whatsapp}_${msg.timestamp}_${(msg.text || msg.message || '').substring(0, 20)}`;
     }
     return `${Date.now()}_${Math.random()}`;
   }
@@ -631,7 +649,7 @@
     xhr.send(formData);
   }
 
-  // ===== MESSAGE SENDING WITH ROBUST ANTI-DUPLICATE PROTECTION =====
+  // ===== MESSAGE SENDING - FIXED DUPLICATE ISSUE =====
   function sendMessage() {
     // DEBOUNCE: Prevent rapid multiple clicks
     if (debounceTimer) {
@@ -693,6 +711,7 @@
     // Create unique message ID for this send
     const messageId = `user_${whatsapp}_${Date.now()}_${text.substring(0, 20)}`;
     sentMessageIds.add(messageId);
+    pendingMessageId = messageId; // Set as pending message
     
     // Send message logic
     if (fileInput.files.length > 0) {
