@@ -667,17 +667,20 @@ io.on("connection", (socket) => {
     }
     
     const whatsapp = data.whatsapp || 'unknown';
-    const messageId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Create message object
+    // ===== CRITICAL: Generate timestamp-based ID =====
+    const timestamp = new Date().toISOString();
+    const messageId = timestamp; // Use timestamp as ID
+    
+    // Create message object with timestamp ID
     const message = {
       sender: 'agent',
       agentId: userData.agentId,
       agentName: agent.name,
       text: data.message || '',
-      timestamp: new Date().toISOString(),
+      timestamp: timestamp, // Same as ID
       read: true,
-      id: messageId,
+      id: messageId, // Use timestamp as ID
       whatsapp: whatsapp,
       messageType: 'agent_message'
     };
@@ -687,9 +690,19 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
+    // ===== DEDUPLICATION CHECK =====
+    const conversation = conversations.get(whatsapp);
+    if (conversation && conversation.messages) {
+      const existingMessage = conversation.messages.find(msg => msg.id === messageId);
+      if (existingMessage) {
+        console.log(`🛑 DUPLICATE AGENT MESSAGE BLOCKED: ${messageId}`);
+        return;
+      }
+    }
+    
     // ===== SAVE TO MEMORY =====
     saveMessageToMemory(whatsapp, message);
-    console.log("✓ Agent message saved to memory");
+    console.log(`✓ Agent message saved with ID: ${messageId}`);
     
     // ===== BROADCAST TO ALL =====
     
@@ -720,6 +733,7 @@ io.on("connection", (socket) => {
     logActivity('agent_message_sent', {
       agentId: userData.agentId,
       agentName: agent.name,
+      messageId: messageId,
       message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
       to: whatsapp
     });
@@ -736,15 +750,17 @@ io.on("connection", (socket) => {
       return;
     }
     
-    const messageId = `${whatsapp}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // ===== CRITICAL: Generate timestamp-based ID =====
+    const timestamp = new Date().toISOString();
+    const messageId = timestamp; // Use timestamp as ID
     
-    // Create a clean message object
+    // Create a clean message object with timestamp ID
     const message = {
       whatsapp: whatsapp,
       userId: data.userId || whatsapp,
       message: data.message || '',
-      timestamp: new Date().toISOString(),
-      id: messageId,
+      timestamp: timestamp, // Use same timestamp
+      id: messageId, // Use timestamp as ID
       sender: "user",
       type: data.type || "text",
       read: false,
@@ -758,9 +774,25 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
+    // ===== DEDUPLICATION CHECK =====
+    // Check if we already have a message with this ID
+    const conversation = conversations.get(whatsapp);
+    if (conversation && conversation.messages) {
+      const existingMessage = conversation.messages.find(msg => msg.id === messageId);
+      if (existingMessage) {
+        console.log(`🛑 DUPLICATE BLOCKED: Message ${messageId} already exists`);
+        // Send acknowledgment to client but don't process
+        socket.emit("new_message", {
+          ...existingMessage,
+          isDuplicate: true
+        });
+        return;
+      }
+    }
+    
     // ===== SAVE TO MEMORY =====
     saveMessageToMemory(whatsapp, message);
-    console.log(`✓ User message saved to memory for ${whatsapp}`);
+    console.log(`✓ User message saved with ID: ${messageId}`);
     
     // ===== BROADCAST TO EVERYONE =====
     
@@ -782,7 +814,7 @@ io.on("connection", (socket) => {
       sender: "user"
     });
     
-    console.log(`📢 Broadcast to: Super Admin, Admin, and all agents`);
+    console.log(`📢 Broadcast message ID: ${messageId}`);
     
     // Update active chats
     activeChats.set(whatsapp, {
@@ -794,6 +826,7 @@ io.on("connection", (socket) => {
     
     logActivity('user_message_received', {
       from: whatsapp,
+      messageId: messageId,
       message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
       hasAttachment: !!data.attachment,
       forwardedToAllAgents: true

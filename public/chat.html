@@ -878,33 +878,17 @@
   let whatsapp = "";
   let selectedFile = null;
   let isScrolledToBottom = true;
+  let pendingMessages = new Map(); // Track pending messages by their timestamp ID
   
   // ===== ENHANCED DEDUPLICATION SYSTEM =====
   const duplicateManager = {
-    seenMessages: new Map(), // Use Map for better performance
-    timeThreshold: 5000, // 5 seconds - messages within this time are considered duplicates
+    seenMessages: new Map(),
     
-    generateMessageKey(msg) {
-      // Create a unique key based on timestamp, sender, and content
-      const timestamp = Math.floor(new Date(msg.timestamp).getTime() / this.timeThreshold) * this.timeThreshold;
-      const sender = msg.sender || 'unknown';
-      const contentHash = this.hashString((msg.text || msg.message || '').trim());
-      
-      return `${timestamp}_${sender}_${contentHash}`;
-    },
-    
-    hashString(str) {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      return Math.abs(hash).toString(36);
-    },
-    
+    // Updated to use server-generated timestamp ID
     isDuplicate(msg) {
-      const key = this.generateMessageKey(msg);
+      if (!msg.id) return false;
+      
+      const key = msg.id; // Use the server's timestamp ID
       const now = Date.now();
       
       // Clean old entries (older than 1 minute)
@@ -916,7 +900,7 @@
       
       if (this.seenMessages.has(key)) {
         console.log('🔴 DUPLICATE DETECTED:', {
-          key,
+          id: key,
           timestamp: msg.timestamp,
           sender: msg.sender,
           preview: (msg.text || msg.message || '').substring(0, 50)
@@ -1246,7 +1230,9 @@
     console.log("✅ Connected to server with ID:", socket.id);
     PersistentConnection.showConnectionStatus('connected', 'Connected');
     PersistentConnection.resetReconnection();
-    duplicateManager.clear();
+    
+    // CRITICAL CHANGE: Don't clear duplicates on reconnect
+    // duplicateManager.clear(); // REMOVED THIS LINE!
     
     // Re-register if we have a whatsapp number
     if (whatsapp) {
@@ -1302,15 +1288,22 @@
 
   socket.on("new_message", (msg) => {
     console.log("📨 New message received:", {
+      id: msg.id,
       sender: msg.sender,
       timestamp: msg.timestamp,
       preview: (msg.text || msg.message || '').substring(0, 50)
     });
     
-    // FIXED: Check for duplicates BEFORE displaying message
+    // Check for duplicates using server's timestamp ID
     if (duplicateManager.isDuplicate(msg)) {
-      console.log("🛑 Skipping duplicate message");
-      return; // Stop here if duplicate
+      console.log("🛑 Skipping duplicate message with ID:", msg.id);
+      return;
+    }
+    
+    // If this is our own message that we sent, check if it's already displayed
+    if (msg.sender === "user" && pendingMessages.has(msg.timestamp)) {
+      console.log("🔄 Updating pending message with server ID:", msg.id);
+      pendingMessages.delete(msg.timestamp);
     }
     
     displayMessage(msg);
@@ -1340,19 +1333,13 @@
     );
     
     // Filter out duplicates while processing history
-    const uniqueMessages = [];
     sortedMessages.forEach(msg => {
       if (!duplicateManager.isDuplicate(msg)) {
-        uniqueMessages.push(msg);
+        const messageElement = createMessageElement(msg);
+        fragment.appendChild(messageElement);
       } else {
-        console.log("🛑 Skipping duplicate in history");
+        console.log("🛑 Skipping duplicate in history:", msg.id);
       }
-    });
-    
-    // Display unique messages
-    uniqueMessages.forEach(msg => {
-      const messageElement = createMessageElement(msg);
-      fragment.appendChild(messageElement);
     });
     
     messagesDiv.appendChild(fragment);
@@ -1390,6 +1377,9 @@
       ${content}
       ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
     `;
+    
+    // Store the message ID as a data attribute for debugging
+    messageDiv.dataset.messageId = msg.id || 'no-id';
     
     return messageDiv;
   }
@@ -1474,6 +1464,7 @@
     
     duplicateManager.clear();
     sendController.reset();
+    pendingMessages.clear();
     
     // Setup scroll listener after chat is visible
     setTimeout(setupScrollListener, 100);
@@ -1589,40 +1580,65 @@
     sendingIndicator.style.display = 'block';
     errorMessage.style.display = 'none';
     
-    const clientMsgId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    // Generate a temporary timestamp for the pending message
+    const clientTimestamp = new Date().toISOString();
     
-    const messageToSend = {
-      id: clientMsgId,
+    // Create temporary message object (without server ID yet)
+    const tempMessage = {
       sender: "user",
       whatsapp: whatsapp,
       text: text,
-      timestamp: new Date().toISOString(),
+      timestamp: clientTimestamp,
       read: false
     };
+    
+    // ===== CLIENT-SIDE DEDUPLICATION CHECK =====
+    // Check if we already have a similar pending message
+    let isDuplicate = false;
+    for (const [timestamp, pendingMsg] of pendingMessages) {
+      if (pendingMsg.text === text && 
+          (!selectedFile || (selectedFile && pendingMsg.attachment))) {
+        const timeDiff = Math.abs(new Date(clientTimestamp).getTime() - new Date(timestamp).getTime());
+        if (timeDiff < 1000) { // Within 1 second
+          console.log("🛑 Client-side duplicate detected, not displaying temporary message");
+          isDuplicate = true;
+          break;
+        }
+      }
+    }
+    
+    // Only display and store if NOT a duplicate
+    if (!isDuplicate) {
+      // Store this as a pending message
+      pendingMessages.set(clientTimestamp, tempMessage);
+      
+      // Display the temporary message immediately
+      displayMessage(tempMessage);
+    } else {
+      console.log("📝 Message not displayed (client-side duplicate)");
+    }
     
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
-          console.log("📤 Sending message with attachment:", fileInfo);
+          console.log("📤 Sending message with attachment to server");
           
-          messageToSend.attachment = fileInfo;
-          displayMessage(messageToSend);
-          
+          // Send to server - server will assign the real timestamp ID
           socket.emit("user_message", {
             whatsapp: whatsapp,
             userId: whatsapp,
             message: text,
-            attachment: fileInfo,
-            clientMsgId: clientMsgId
+            attachment: fileInfo
+            // NO clientMsgId - let server generate timestamp ID
           });
         } else {
           if (text) {
-            displayMessage(messageToSend);
+            // Send to server - server will assign the real timestamp ID
             socket.emit("user_message", {
               whatsapp: whatsapp,
               userId: whatsapp,
-              message: text,
-              clientMsgId: clientMsgId
+              message: text
+              // NO clientMsgId - let server generate timestamp ID
             });
           }
         }
@@ -1639,15 +1655,14 @@
         messageInput.style.height = '50px';
       });
     } else {
-      console.log("📤 Sending text message:", text);
+      console.log("📤 Sending text message to server");
       
-      displayMessage(messageToSend);
-      
+      // Send to server - server will assign the real timestamp ID
       socket.emit("user_message", {
         whatsapp: whatsapp,
         userId: whatsapp,
-        message: text,
-        clientMsgId: clientMsgId
+        message: text
+        // NO clientMsgId - let server generate timestamp ID
       });
       
       setTimeout(() => {
@@ -1705,19 +1720,14 @@
     }
   });
 
-  // Auto-resize message input (fixed to prevent layout shift)
+  // FIXED: Auto-resize message input WITHOUT changing container heights
   document.getElementById("messageInput").addEventListener("input", function() {
     this.style.height = 'auto';
     const newHeight = Math.min(this.scrollHeight, 120);
     this.style.height = newHeight + 'px';
     
-    // Adjust messages container height when input expands
-    const messagesDiv = document.getElementById("messages");
-    const inputHeight = newHeight > 50 ? newHeight - 50 : 0;
-    const messagesHeight = `calc(100vh - ${220 + inputHeight}px)`;
-    
-    messagesDiv.style.height = messagesHeight;
-    messagesDiv.style.maxHeight = messagesHeight;
+    // REMOVED: The problematic section that was dynamically changing messages container height
+    // This was causing the chat box to resize and lose its fixed position
   });
 
   // Handle keyboard show/hide on mobile
@@ -1763,6 +1773,7 @@
     }
     
     duplicateManager.clear();
+    pendingMessages.clear();
     console.log('🧹 Cleanup completed');
   });
 
@@ -1776,13 +1787,20 @@
 
   // Auto-cleanup duplicate manager every 5 minutes
   setInterval(() => {
-    duplicateManager.clear();
+    // Only clean old entries, don't clear everything
+    const now = Date.now();
+    for (const [key, timestamp] of duplicateManager.seenMessages.entries()) {
+      if (now - timestamp > 5 * 60 * 1000) { // 5 minutes
+        duplicateManager.seenMessages.delete(key);
+      }
+    }
+    console.log('🧹 Cleaned old duplicate entries');
   }, 5 * 60 * 1000);
   
   // Focus on WhatsApp input on page load
   window.addEventListener('DOMContentLoaded', function() {
     document.getElementById("whatsapp").focus();
-    console.log('🚀 Chat application loaded with persistent connection');
+    console.log('🚀 Chat application loaded with timestamp-based deduplication');
   });
 </script>
 </body>
