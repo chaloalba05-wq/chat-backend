@@ -182,23 +182,57 @@
       background: white;
     }
 
-    /* ===== FIXED CHAT LAYOUT ===== */
+    /* ===== FIXED CHAT LAYOUT - UPDATED FOR 3/4 & 1/4 SPLIT ===== */
     .chat-wrapper {
       flex: 1;
       display: flex;
       flex-direction: column;
-      overflow: hidden; /* Prevents content from overflowing the wrapper */
+      overflow: hidden;
       position: relative;
-      height: 100%;
+      height: 100vh;
+      height: -webkit-fill-available;
     }
 
-    /* ===== MESSAGES AREA - NOW SCROLLABLE ===== */
+    /* ===== MESSAGES AREA - TAKES 3/4 OF SCREEN ===== */
+    .messages-section {
+      flex: 3; /* Takes 3/4 of available space */
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      min-height: 0; /* Important for flex children to respect overflow */
+    }
+
+    /* Chat header inside messages section */
+    .chat-header {
+      padding: 16px;
+      background: white;
+      border-bottom: 1px solid #e8e8e8;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .chat-header h3 {
+      margin: 0;
+      color: #333;
+      font-size: clamp(1.1rem, 4vw, 1.3rem);
+      font-weight: 600;
+    }
+
+    .chat-header span {
+      color: #667eea;
+      font-weight: 500;
+    }
+
+    /* Messages wrapper for scrollable content */
     .messages-wrapper {
       flex: 1;
       position: relative;
-      overflow: hidden; /* Hide scrollbar from wrapper */
+      overflow: hidden;
+      background: #f8f9fa;
     }
 
+    /* Main messages container - Now scrollable independently */
     #messages {
       position: absolute;
       top: 0;
@@ -208,12 +242,13 @@
       overflow-y: auto;
       overflow-x: hidden;
       padding: 16px;
-      background: #f8f9fa;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       scroll-behavior: smooth;
       display: flex;
       flex-direction: column;
+      will-change: transform; /* Hardware acceleration for smooth scrolling */
+      backface-visibility: hidden;
     }
 
     /* Ensure messages container grows with content */
@@ -222,129 +257,98 @@
       flex: 0 0 16px; /* Add bottom padding */
     }
 
-    /* Custom scrollbar for messages */
+    /* Custom scrollbar for messages - optimized for performance */
     #messages::-webkit-scrollbar {
-      width: 6px;
+      width: 8px;
     }
 
     #messages::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 3px;
+      background: rgba(241, 241, 241, 0.8);
+      border-radius: 4px;
     }
 
     #messages::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 3px;
+      background: rgba(193, 193, 193, 0.8);
+      border-radius: 4px;
     }
 
     #messages::-webkit-scrollbar-thumb:hover {
-      background: #a8a8a8;
+      background: rgba(168, 168, 168, 0.8);
     }
 
     /* Hide scrollbar for Firefox */
     #messages {
       scrollbar-width: thin;
-      scrollbar-color: #c1c1c1 #f1f1f1;
+      scrollbar-color: rgba(193, 193, 193, 0.8) rgba(241, 241, 241, 0.8);
     }
 
-    /* ===== MESSAGE BUBBLES ===== */
-    .message-container {
-      margin: 12px 0;
-      padding: 14px 18px;
-      border-radius: 20px;
-      max-width: 85%;
-      word-wrap: break-word;
-      position: relative;
-      animation: fadeIn 0.3s ease;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      line-height: 1.4;
-      flex-shrink: 0; /* Prevent messages from shrinking */
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .user-message {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      margin-left: auto;
-      margin-right: 8px;
-      border-bottom-right-radius: 6px;
-    }
-
-    .other-message {
-      background: white;
-      border: 1px solid #e8e8e8;
-      margin-right: auto;
-      margin-left: 8px;
-      border-bottom-left-radius: 6px;
-    }
-
-    .message-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-      flex-wrap: wrap;
-    }
-
-    .message-sender {
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-
-    .user-message .message-sender {
-      color: rgba(255,255,255,0.95);
-    }
-
-    .other-message .message-sender {
-      color: #444;
-    }
-
-    .message-time {
-      font-size: 0.75rem;
-      opacity: 0.8;
-      font-weight: 400;
-    }
-
-    .user-message .message-time {
-      color: rgba(255,255,255,0.8);
-    }
-
-    .other-message .message-time {
-      color: #666;
-    }
-
-    .message-content {
-      word-wrap: break-word;
-      font-size: clamp(14px, 4vw, 16px);
-      line-height: 1.5;
-      overflow-wrap: break-word;
-      word-break: break-word;
-    }
-
-    .read-status {
-      font-size: 0.75rem;
-      color: rgba(255,255,255,0.8);
-      margin-top: 6px;
-      text-align: right;
-      font-style: italic;
-    }
-
-    /* ===== INPUT AREA - ALWAYS VISIBLE AT BOTTOM ===== */
+    /* ===== INPUT SECTION - TAKES 1/4 OF SCREEN ===== */
     .input-section {
+      flex: 1; /* Takes 1/4 of available space */
+      display: flex;
+      flex-direction: column;
       background: white;
       border-top: 1px solid #e8e8e8;
-      flex-shrink: 0; /* Prevent input area from shrinking */
-      z-index: 10; /* Keep above messages */
+      flex-shrink: 0;
+      z-index: 10;
+      min-height: 0; /* Important for flex children */
+    }
+
+    .input-area-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .upload-progress {
+      width: 100%;
+      background-color: #f3f3f3;
+      border-radius: 10px;
+      margin: 8px 16px;
+      overflow: hidden;
+      display: none;
+      flex-shrink: 0;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: linear-gradient(90deg, #4CAF50, #8BC34A);
+      border-radius: 10px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .file-preview {
+      padding: 8px 16px;
+      background: #f8f9fa;
+      border-radius: 20px;
+      font-size: 14px;
+      color: #666;
+      margin: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .sending-indicator,
+    .error-message {
+      padding: 8px 16px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+      flex-shrink: 0;
+    }
+
+    .sending-indicator {
+      color: #666;
+      background: #fff9c4;
+    }
+
+    .error-message {
+      color: #d32f2f;
+      background: #ffebee;
     }
 
     .input-area {
@@ -428,22 +432,102 @@
       box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
     }
 
+    /* ===== MESSAGE BUBBLES ===== */
+    .message-container {
+      margin: 12px 0;
+      padding: 14px 18px;
+      border-radius: 20px;
+      max-width: 85%;
+      word-wrap: break-word;
+      position: relative;
+      animation: fadeIn 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      line-height: 1.4;
+      flex-shrink: 0; /* Prevent messages from shrinking */
+      transform: translateZ(0); /* Hardware acceleration */
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .user-message {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-left: auto;
+      margin-right: 8px;
+      border-bottom-right-radius: 6px;
+    }
+
+    .other-message {
+      background: white;
+      border: 1px solid #e8e8e8;
+      margin-right: auto;
+      margin-left: 8px;
+      border-bottom-left-radius: 6px;
+    }
+
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
+    .message-sender {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .user-message .message-sender {
+      color: rgba(255,255,255,0.95);
+    }
+
+    .other-message .message-sender {
+      color: #444;
+    }
+
+    .message-time {
+      font-size: 0.75rem;
+      opacity: 0.8;
+      font-weight: 400;
+    }
+
+    .user-message .message-time {
+      color: rgba(255,255,255,0.8);
+    }
+
+    .other-message .message-time {
+      color: #666;
+    }
+
+    .message-content {
+      word-wrap: break-word;
+      font-size: clamp(14px, 4vw, 16px);
+      line-height: 1.5;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    .read-status {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.8);
+      margin-top: 6px;
+      text-align: right;
+      font-style: italic;
+    }
+
     /* ===== FILE UPLOAD ===== */
     #fileInput {
       display: none;
-    }
-
-    .file-preview {
-      padding: 8px 16px;
-      background: #f8f9fa;
-      border-radius: 20px;
-      font-size: 14px;
-      color: #666;
-      margin: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
     }
 
     /* ===== ATTACHMENTS ===== */
@@ -481,62 +565,89 @@
       border: 1px solid #e0e0e0;
     }
 
-    /* ===== PROGRESS BAR ===== */
-    .upload-progress {
-      width: 100%;
-      background-color: #f3f3f3;
-      border-radius: 10px;
-      margin: 12px 0;
-      overflow: hidden;
-      display: none;
+    /* ===== SCROLL TO BOTTOM BUTTON ===== */
+    .scroll-to-bottom-btn {
+      position: absolute;
+      bottom: 100px; /* Position above input area */
+      right: 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #667eea;
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+      z-index: 5;
+      transition: all 0.3s ease;
+      opacity: 0;
+      visibility: hidden;
+    }
+    
+    .scroll-to-bottom-btn.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .scroll-to-bottom-btn:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
     }
 
-    .progress-bar {
-      height: 6px;
-      background: linear-gradient(90deg, #4CAF50, #8BC34A);
-      border-radius: 10px;
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-
-    /* ===== STATUS INDICATORS ===== */
-    .sending-indicator,
-    .error-message {
+    /* ===== TYPING INDICATOR ===== */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       padding: 8px 16px;
-      font-size: 14px;
-      text-align: center;
-      display: none;
-      flex-shrink: 0;
-    }
-
-    .sending-indicator {
-      color: #666;
-      background: #fff9c4;
-    }
-
-    .error-message {
-      color: #d32f2f;
-      background: #ffebee;
-    }
-
-    /* ===== CHAT HEADER ===== */
-    .chat-header {
-      padding: 16px;
       background: white;
-      border-bottom: 1px solid #e8e8e8;
-      flex-shrink: 0;
+      border-radius: 20px;
+      margin: 8px 0;
+      width: fit-content;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    .chat-header h3 {
-      margin: 0;
-      color: #333;
-      font-size: clamp(1.1rem, 4vw, 1.3rem);
-      font-weight: 600;
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background: #667eea;
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
     }
 
-    .chat-header span {
-      color: #667eea;
-      font-weight: 500;
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+      0%, 60%, 100% {
+        transform: translateY(0);
+      }
+      30% {
+        transform: translateY(-6px);
+      }
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center;
+      color: #999;
+      padding: 40px 20px;
+      font-size: 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 200px;
     }
 
     /* ===== RESPONSIVE ADJUSTMENTS ===== */
@@ -579,6 +690,13 @@
 
       .attachment img {
         max-height: 150px;
+      }
+      
+      .scroll-to-bottom-btn {
+        bottom: 90px;
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
       }
     }
 
@@ -631,6 +749,14 @@
       #messages {
         padding: 12px;
       }
+      
+      .scroll-to-bottom-btn {
+        bottom: 80px;
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+        right: 12px;
+      }
     }
 
     /* ===== SAFE AREA SUPPORT FOR NOTCHED PHONES ===== */
@@ -646,58 +772,6 @@
       opacity: 0.6;
       cursor: not-allowed;
       transform: none !important;
-    }
-
-    /* ===== EMPTY STATE ===== */
-    .empty-state {
-      text-align: center;
-      color: #999;
-      padding: 40px 20px;
-      font-size: 16px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      min-height: 200px;
-    }
-
-    /* ===== TYPING INDICATOR ===== */
-    .typing-indicator {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 8px 16px;
-      background: white;
-      border-radius: 20px;
-      margin: 8px 0;
-      width: fit-content;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background: #667eea;
-      border-radius: 50%;
-      animation: typing 1.4s infinite;
-    }
-
-    .typing-dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-
-    .typing-dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-
-    @keyframes typing {
-      0%, 60%, 100% {
-        transform: translateY(0);
-      }
-      30% {
-        transform: translateY(-6px);
-      }
     }
 
     /* ===== CONNECTION STATUS ===== */
@@ -721,39 +795,6 @@
     .disconnected {
       background: #f44336;
       color: white;
-    }
-    
-    /* ===== SCROLL TO BOTTOM BUTTON ===== */
-    .scroll-to-bottom-btn {
-      position: absolute;
-      bottom: 90px;
-      right: 20px;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #667eea;
-      color: white;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-      z-index: 5;
-      transition: all 0.3s ease;
-      opacity: 0;
-      visibility: hidden;
-    }
-    
-    .scroll-to-bottom-btn.visible {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .scroll-to-bottom-btn:hover {
-      background: #764ba2;
-      transform: translateY(-2px);
     }
   </style>
 </head>
@@ -779,47 +820,53 @@
 
 <!-- Chat section -->
 <div id="chat">
-  <div class="chat-header">
-    <h3>Chat: <span id="chatNumber"></span></h3>
-  </div>
-  
-  <!-- Scroll to bottom button -->
-  <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
-    ↓
-  </button>
-  
   <div class="chat-wrapper">
-    <div class="messages-wrapper">
-      <div id="messages">
-        <!-- Messages will appear here -->
-        <div class="empty-state">
-          <div>No messages yet. Start the conversation!</div>
+    <!-- Messages Section (3/4 of screen) -->
+    <div class="messages-section">
+      <div class="chat-header">
+        <h3>Chat: <span id="chatNumber"></span></h3>
+      </div>
+      
+      <!-- Scroll to bottom button -->
+      <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
+        ↓
+      </button>
+      
+      <div class="messages-wrapper">
+        <div id="messages">
+          <!-- Messages will appear here -->
+          <div class="empty-state">
+            <div>No messages yet. Start the conversation!</div>
+          </div>
         </div>
       </div>
     </div>
     
-    <div class="upload-progress" id="uploadProgress">
-      <div class="progress-bar" id="progressBar"></div>
-    </div>
-    
-    <div class="file-preview" id="filePreview"></div>
-    
-    <div class="sending-indicator" id="sendingIndicator">Sending...</div>
-    <div class="error-message" id="errorMessage">Please wait before sending another message</div>
-    
+    <!-- Input Section (1/4 of screen) -->
     <div class="input-section">
-      <div class="input-area">
-        <input id="messageInput" placeholder="Type your message here...">
-        <div class="action-buttons">
-          <div class="file-upload-container">
-            <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-              📎
+      <div class="input-area-container">
+        <div class="upload-progress" id="uploadProgress">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div class="file-preview" id="filePreview"></div>
+        
+        <div class="sending-indicator" id="sendingIndicator">Sending...</div>
+        <div class="error-message" id="errorMessage">Please wait before sending another message</div>
+        
+        <div class="input-area">
+          <input id="messageInput" placeholder="Type your message here...">
+          <div class="action-buttons">
+            <div class="file-upload-container">
+              <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                📎
+              </button>
+              <span class="file-upload-label">file upload</span>
+            </div>
+            <button class="send-btn" onclick="sendMessage()" id="sendButton">
+              Send
             </button>
-            <span class="file-upload-label">file upload</span>
           </div>
-          <button class="send-btn" onclick="sendMessage()" id="sendButton">
-            Send
-          </button>
         </div>
       </div>
     </div>
@@ -1006,6 +1053,7 @@
     const messagesDiv = document.getElementById("messages");
     const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
     
+    // Use passive event listener for better performance
     messagesDiv.addEventListener('scroll', function() {
       const scrollTop = messagesDiv.scrollTop;
       const scrollHeight = messagesDiv.scrollHeight;
@@ -1020,16 +1068,24 @@
       } else {
         scrollToBottomBtn.classList.remove('visible');
       }
-    });
+    }, { passive: true });
     
     // Scroll to bottom button click handler
     scrollToBottomBtn.addEventListener('click', scrollToBottom);
+    
+    // Optimize scroll performance
+    messagesDiv.style.webkitOverflowScrolling = 'touch';
+    messagesDiv.style.overscrollBehavior = 'contain';
   }
   
   function scrollToBottom() {
     const messagesDiv = document.getElementById("messages");
     if (messagesDiv) {
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      // Use smooth scroll for better UX
+      messagesDiv.scrollTo({
+        top: messagesDiv.scrollHeight,
+        behavior: 'smooth'
+      });
       isScrolledToBottom = true;
       document.getElementById("scrollToBottomBtn").classList.remove('visible');
     }
@@ -1129,7 +1185,10 @@
     
     // Only auto-scroll if we're at the bottom or this is our own message
     if (scroll && (isScrolledToBottom || msg.sender === "user")) {
-      scrollToBottom();
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        scrollToBottom();
+      });
     }
   }
 
@@ -1146,13 +1205,13 @@
     
     if (fileType === 'image') {
       icon = '🖼️';
-      preview = `<img src="${fileUrl}" alt="${fileName}" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 8px; border: 1px solid #e0e0e0;">`;
+      preview = `<img src="${fileUrl}" alt="${fileName}" loading="lazy" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 8px; border: 1px solid #e0e0e0;">`;
     } else if (fileType === 'video') {
       icon = '🎬';
-      preview = `<div style="margin-top: 8px;"><video src="${fileUrl}" controls style="max-width: 100%; max-height: 200px; border-radius: 8px;"></video></div>`;
+      preview = `<div style="margin-top: 8px;"><video src="${fileUrl}" controls preload="metadata" style="max-width: 100%; max-height: 200px; border-radius: 8px;"></video></div>`;
     } else if (fileType === 'audio') {
       icon = '🎵';
-      preview = `<div style="margin-top: 8px;"><audio src="${fileUrl}" controls style="width: 100%;"></audio></div>`;
+      preview = `<div style="margin-top: 8px;"><audio src="${fileUrl}" controls preload="metadata" style="width: 100%;"></audio></div>`;
     } else if (attachment.mimetype && attachment.mimetype.includes('pdf')) {
       icon = '📕';
     }
@@ -1430,7 +1489,9 @@
     
     // Auto-scroll messages if input is growing
     if (this.scrollHeight > 70) {
-      scrollToBottom();
+      requestAnimationFrame(() => {
+        scrollToBottom();
+      });
     }
   });
 
@@ -1442,7 +1503,11 @@
     
     // If keyboard is shown/hidden (viewport height changed significantly)
     if (Math.abs(viewportHeight - newViewportHeight) > 100) {
-      setTimeout(scrollToBottom, 300); // Wait for keyboard animation
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom();
+        });
+      }, 300); // Wait for keyboard animation
     }
     
     viewportHeight = newViewportHeight;

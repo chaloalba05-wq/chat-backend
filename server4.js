@@ -3,19 +3,13 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const path = require("path");
-const { MongoClient, ObjectId } = require("mongodb");
 const multer = require("multer");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 
 // ===== SUPER ADMIN CONFIGURATION =====
-const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN"; // Change this if needed
+const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
 // =====================================
-
-// ===== MongoDB Configuration =====
-const MONGO_URI = "mongodb+srv://chaloalba05_db_user:lam08Xnkf8v0zV3W@albastuzbackup.frhubzf.mongodb.net/?appName=Albastuzbackup";
-const DB_NAME = "chat_system";
-// =================================
 
 // ===== File Upload Configuration =====
 const UPLOADS_DIR = path.join(__dirname, "uploads");
@@ -35,29 +29,18 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 // =====================================
 
-// ---- In-memory storage ----
-const users = new Map();          // socketId -> { type, agentId, whatsapp }
-const agents = new Map();         // agentId -> { name, password, muted, socketId, filename?, restrictions? }
-const agentUsers = new Map();     // agentId -> Set(whatsapp)
-const userAssignments = new Map(); // whatsapp -> agentId
-const activeChats = new Map();    // whatsapp -> { lastMessage, lastMessageTime }
-const userMessages = [];          // All user messages for Super Admin
-const activityLog = [];           // Activity log
+// ===== SIMPLE IN-MEMORY STORAGE =====
+const users = new Map();           // socketId -> { type, agentId, whatsapp }
+const agents = new Map();          // agentId -> { name, password, muted, socketId, filename? }
+const conversations = new Map();   // whatsapp -> { messages: [], lastUpdated, createdAt }
+const activeChats = new Map();     // whatsapp -> { lastMessage, lastMessageTime }
+const activityLog = [];            // Activity log
 
-// ---- MongoDB Collections ----
-let db;
-let conversationsCollection;
-let agentsCollection;
-
-// ===== NEW: Configuration =====
-const MIN_MESSAGES_FOR_PERSISTENCE = 7; // Only save chats with 7+ messages
-const AUTO_CLEANUP_DAYS = 30; // Auto-delete chats older than 30 days with < 7 messages
-
-// ---- Enhanced Helper Functions ----
+// ===== SIMPLE HELPER FUNCTIONS =====
 function logActivity(type, details) {
   const log = {
     type,
@@ -70,164 +53,39 @@ function logActivity(type, details) {
   return log;
 }
 
-async function connectToMongoDB() {
+// ===== SAVE MESSAGE TO MEMORY =====
+function saveMessageToMemory(whatsapp, message) {
   try {
-    const client = new MongoClient(MONGO_URI);
-    await client.connect();
-    db = client.db(DB_NAME);
-    conversationsCollection = db.collection("conversations");
-    agentsCollection = db.collection("agents");
-    
-    // Create indexes for better performance
-    await conversationsCollection.createIndex({ whatsapp: 1 });
-    await conversationsCollection.createIndex({ "messages.timestamp": 1 });
-    await conversationsCollection.createIndex({ lastUpdated: -1 });
-    await conversationsCollection.createIndex({ "messages.readBy": 1 });
-    await agentsCollection.createIndex({ name: 1 }, { unique: true });
-    
-    console.log("✓ Connected to MongoDB");
-    
-    // Run cleanup on startup
-    await cleanupOldChats();
-    
-    return true;
-  } catch (error) {
-    console.error("MongoDB connection error:", error);
-    return false;
-  }
-}
-
-// NEW: Clean up old chats with few messages
-async function cleanupOldChats() {
-  try {
-    if (!conversationsCollection) return;
-    
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - AUTO_CLEANUP_DAYS);
-    
-    const result = await conversationsCollection.deleteMany({
-      $and: [
-        { lastUpdated: { $lt: cutoffDate } },
-        { $expr: { $lt: [{ $size: "$messages" }, MIN_MESSAGES_FOR_PERSISTENCE] } }
-      ]
-    });
-    
-    if (result.deletedCount > 0) {
-      console.log(`🗑️  Cleaned up ${result.deletedCount} old chats with < ${MIN_MESSAGES_FOR_PERSISTENCE} messages`);
-    }
-  } catch (error) {
-    console.error("Error cleaning up old chats:", error);
-  }
-}
-
-async function loadAgentsFromDB() {
-  try {
-    if (!agentsCollection) return;
-    
-    const agentsFromDB = await agentsCollection.find({}).toArray();
-    agentsFromDB.forEach(agentDoc => {
-      const agentId = agentDoc._id.toString();
-      agents.set(agentId, {
-        ...agentDoc,
-        muted: agentDoc.muted || false,
-        socketId: null,
-        lastSeen: null
+    if (!conversations.has(whatsapp)) {
+      // Create new conversation
+      conversations.set(whatsapp, {
+        whatsapp: whatsapp,
+        messages: [message],
+        createdAt: new Date(),
+        lastUpdated: new Date(),
+        lastMessage: message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
+        lastMessageTime: message.timestamp,
+        archived: false
       });
-      
-      if (!agentUsers.has(agentId)) {
-        agentUsers.set(agentId, new Set());
-      }
-    });
-    
-    console.log(`✓ Loaded ${agentsFromDB.length} agents from DB`);
-  } catch (error) {
-    console.error("Error loading agents from DB:", error);
-  }
-}
-
-async function saveAgentToDB(agentId, agentData) {
-  try {
-    if (!agentsCollection) return false;
-    
-    await agentsCollection.updateOne(
-      { _id: new ObjectId(agentId) },
-      { $set: { ...agentData, updatedAt: new Date() } },
-      { upsert: true }
-    );
-    return true;
-  } catch (error) {
-    console.error("Error saving agent to DB:", error);
-    return false;
-  }
-}
-
-// ===== ENHANCED: Save ALL messages to MongoDB =====
-async function saveMessageToMongoDB(whatsapp, message, forceSave = false) {
-  try {
-    if (!conversationsCollection) return false;
-    
-    const conversation = await conversationsCollection.findOne({ whatsapp });
-    
-    if (conversation) {
-      // Update existing conversation
-      await conversationsCollection.updateOne(
-        { whatsapp },
-        {
-          $push: { messages: message },
-          $set: { 
-            lastUpdated: new Date(),
-            lastMessage: message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
-            lastMessageTime: message.timestamp
-          }
-        }
-      );
-      return true;
     } else {
-      // Only save new conversations if they have enough messages OR forceSave is true
-      if (forceSave || MIN_MESSAGES_FOR_PERSISTENCE <= 1) {
-        await conversationsCollection.insertOne({
-          whatsapp,
-          messages: [message],
-          createdAt: new Date(),
-          lastUpdated: new Date(),
-          lastMessage: message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
-          lastMessageTime: message.timestamp,
-          archived: false,
-          messageCount: 1
-        });
-        return true;
-      } else {
-        // Store temporarily in memory only (not in DB)
-        console.log(`📝 Chat with ${whatsapp} has < ${MIN_MESSAGES_FOR_PERSISTENCE} messages, not saving to DB yet`);
-        return false; // Not saved to DB
-      }
+      // Update existing conversation
+      const conversation = conversations.get(whatsapp);
+      conversation.messages.push(message);
+      conversation.lastUpdated = new Date();
+      conversation.lastMessage = message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : '');
+      conversation.lastMessageTime = message.timestamp;
     }
-  } catch (error) {
-    console.error("Error saving message to MongoDB:", error);
-    return false;
-  }
-}
-
-// ===== NEW: Function to check if chat should be moved from memory to DB =====
-async function checkAndSaveChatToDB(whatsapp) {
-  try {
-    if (!conversationsCollection) return false;
     
-    // Check if chat exists in memory (activeChats)
-    const chatInMemory = activeChats.get(whatsapp);
-    if (!chatInMemory) return false;
-    
-    // For now, we'll save all active chats to DB for persistence
-    // But we can add logic here to check message count if we track it
+    console.log(`💾 Saved message for ${whatsapp} (Total: ${conversations.get(whatsapp)?.messages.length} messages)`);
     return true;
   } catch (error) {
-    console.error("Error checking chat:", error);
+    console.error("Error saving message to memory:", error);
     return false;
   }
 }
 
-// ===== NEW: Broadcast message to ALL agents =====
-async function broadcastToAllAgents(messageData, excludeSocketId = null) {
+// ===== BROADCAST TO ALL AGENTS =====
+function broadcastToAllAgents(messageData, excludeSocketId = null) {
   try {
     // Send to all non-muted agents
     agents.forEach((agent, agentId) => {
@@ -239,7 +97,6 @@ async function broadcastToAllAgents(messageData, excludeSocketId = null) {
         });
       }
     });
-    
     return true;
   } catch (error) {
     console.error("Error broadcasting to agents:", error);
@@ -247,91 +104,53 @@ async function broadcastToAllAgents(messageData, excludeSocketId = null) {
   }
 }
 
-// ===== NEW: Send all active chats to an agent when they login =====
-async function sendAllActiveChatsToAgent(agentSocketId) {
+// ===== SEND ALL CHATS TO AGENT ON LOGIN =====
+function sendAllActiveChatsToAgent(agentSocketId) {
   try {
-    if (!conversationsCollection) return;
-    
-    // Get all conversations from DB
-    const conversations = await conversationsCollection.find({ 
-      archived: { $ne: true },
-      "messages.0": { $exists: true } // Has at least one message
-    })
-    .sort({ lastUpdated: -1 })
-    .limit(50) // Limit to recent 50 chats
-    .toArray();
-    
-    // Send each chat's messages to the agent
-    conversations.forEach(conv => {
-      if (conv.messages && conv.messages.length > 0) {
+    // Send all conversations to the agent
+    conversations.forEach((conv, whatsapp) => {
+      if (!conv.archived && conv.messages && conv.messages.length > 0) {
+        // Send each message
         conv.messages.forEach(message => {
           io.to(agentSocketId).emit("new_message", {
             ...message,
-            whatsapp: conv.whatsapp,
+            whatsapp: whatsapp,
             isHistorical: true
           });
         });
       }
     });
     
-    console.log(`📨 Sent ${conversations.length} chat histories to agent`);
+    console.log(`📨 Sent ${conversations.size} chat histories to agent`);
   } catch (error) {
     console.error("Error sending chat history to agent:", error);
   }
 }
 
-// ===== NEW: Delete entire chat =====
-async function deleteChatFromDB(whatsapp) {
-  try {
-    if (!conversationsCollection) return false;
-    
-    const result = await conversationsCollection.deleteOne({ whatsapp });
-    
-    if (result.deletedCount > 0) {
-      // Remove from active chats
-      activeChats.delete(whatsapp);
-      
-      // Notify all agents and admins
-      io.emit("chat_deleted", { whatsapp });
-      
-      logActivity('chat_deleted', { whatsapp, messagesDeleted: true });
-      console.log(`🗑️  Deleted chat: ${whatsapp}`);
-      
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error("Error deleting chat from DB:", error);
-    return false;
+// ===== DELETE CHAT =====
+function deleteChat(whatsapp) {
+  if (conversations.delete(whatsapp)) {
+    activeChats.delete(whatsapp);
+    io.emit("chat_deleted", { whatsapp });
+    logActivity('chat_deleted', { whatsapp });
+    console.log(`🗑️  Deleted chat: ${whatsapp}`);
+    return true;
   }
+  return false;
 }
 
-// ===== NEW: Archive chat (soft delete) =====
-async function archiveChat(whatsapp) {
-  try {
-    if (!conversationsCollection) return false;
-    
-    const result = await conversationsCollection.updateOne(
-      { whatsapp },
-      { $set: { archived: true, archivedAt: new Date() } }
-    );
-    
-    if (result.modifiedCount > 0) {
-      // Notify all agents and admins
-      io.emit("chat_archived", { whatsapp });
-      
-      logActivity('chat_archived', { whatsapp });
-      console.log(`📁 Archived chat: ${whatsapp}`);
-      
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error("Error archiving chat:", error);
-    return false;
+// ===== ARCHIVE CHAT =====
+function archiveChat(whatsapp) {
+  const conversation = conversations.get(whatsapp);
+  if (conversation) {
+    conversation.archived = true;
+    conversation.archivedAt = new Date();
+    io.emit("chat_archived", { whatsapp });
+    logActivity('chat_archived', { whatsapp });
+    console.log(`📁 Archived chat: ${whatsapp}`);
+    return true;
   }
+  return false;
 }
 
 // ---- Setup server ----
@@ -356,7 +175,7 @@ app.use("/uploads", express.static(UPLOADS_DIR));
 app.use(express.static(path.join(__dirname, "public")));
 
 // ---- Routes ----
-app.get("/", (req, res) => res.send("Chat backend running"));
+app.get("/", (req, res) => res.send("Chat backend running - IN-MEMORY MODE"));
 app.get("/chat", (req, res) => res.sendFile(path.join(__dirname, "public", "chat.html")));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 app.get("/superadmin", (req, res) => res.sendFile(path.join(__dirname, "public", "superadmin.html")));
@@ -374,45 +193,38 @@ app.get("/agent:num.html", (req, res) => {
 });
 
 // New route: Fetch all conversations for agent dashboard
-app.get("/agent/conversations", async (req, res) => {
+app.get("/agent/conversations", (req, res) => {
   try {
-    if (!conversationsCollection) {
-      return res.status(500).json({ success: false, message: "Database not connected" });
-    }
+    const conversationsList = Array.from(conversations.values())
+      .filter(conv => !conv.archived)
+      .map(conv => ({
+        whatsapp: conv.whatsapp,
+        lastMessage: conv.lastMessage,
+        lastMessageTime: conv.lastUpdated,
+        createdAt: conv.createdAt,
+        lastUpdated: conv.lastUpdated,
+        messageCount: conv.messages?.length || 0
+      }))
+      .sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
     
-    const conversations = await conversationsCollection.find({ archived: { $ne: true } })
-      .sort({ lastUpdated: -1 })
-      .project({ 
-        whatsapp: 1, 
-        lastMessage: 1, 
-        lastMessageTime: 1, 
-        createdAt: 1,
-        lastUpdated: 1,
-        messageCount: { $size: "$messages" } 
-      })
-      .toArray();
-    res.json({ success: true, conversations });
+    res.json({ success: true, conversations: conversationsList });
   } catch (error) {
     console.error("Error fetching conversations:", error);
-    res.status(500).json({ success: false, message: "Database error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-// ===== NEW ROUTE: Delete chat =====
-app.delete("/chat/:whatsapp", async (req, res) => {
+// Delete chat route
+app.delete("/chat/:whatsapp", (req, res) => {
   try {
     const { whatsapp } = req.params;
-    const { archive } = req.query; // Optional: archive instead of delete
-    
-    if (!conversationsCollection) {
-      return res.status(500).json({ success: false, message: "Database not connected" });
-    }
+    const { archive } = req.query;
     
     let success;
     if (archive === 'true') {
-      success = await archiveChat(whatsapp);
+      success = archiveChat(whatsapp);
     } else {
-      success = await deleteChatFromDB(whatsapp);
+      success = deleteChat(whatsapp);
     }
     
     if (success) {
@@ -432,46 +244,36 @@ app.delete("/chat/:whatsapp", async (req, res) => {
   }
 });
 
-// ===== NEW ROUTE: Get archived chats =====
-app.get("/chats/archived", async (req, res) => {
+// Get archived chats
+app.get("/chats/archived", (req, res) => {
   try {
-    if (!conversationsCollection) {
-      return res.status(500).json({ success: false, message: "Database not connected" });
-    }
-    
-    const archivedChats = await conversationsCollection.find({ archived: true })
-      .sort({ archivedAt: -1 })
-      .project({ 
-        whatsapp: 1, 
-        lastMessage: 1, 
-        lastMessageTime: 1,
-        archivedAt: 1,
-        messageCount: { $size: "$messages" } 
-      })
-      .toArray();
+    const archivedChats = Array.from(conversations.values())
+      .filter(conv => conv.archived)
+      .map(conv => ({
+        whatsapp: conv.whatsapp,
+        lastMessage: conv.lastMessage,
+        lastMessageTime: conv.lastMessageTime,
+        archivedAt: conv.archivedAt,
+        messageCount: conv.messages?.length || 0
+      }))
+      .sort((a, b) => new Date(b.archivedAt) - new Date(a.archivedAt));
     
     res.json({ success: true, chats: archivedChats });
   } catch (error) {
     console.error("Error fetching archived chats:", error);
-    res.status(500).json({ success: false, message: "Database error" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-// ===== NEW ROUTE: Restore archived chat =====
-app.post("/chat/:whatsapp/restore", async (req, res) => {
+// Restore archived chat
+app.post("/chat/:whatsapp/restore", (req, res) => {
   try {
     const { whatsapp } = req.params;
+    const conversation = conversations.get(whatsapp);
     
-    if (!conversationsCollection) {
-      return res.status(500).json({ success: false, message: "Database not connected" });
-    }
-    
-    const result = await conversationsCollection.updateOne(
-      { whatsapp },
-      { $unset: { archived: "", archivedAt: "" } }
-    );
-    
-    if (result.modifiedCount > 0) {
+    if (conversation) {
+      conversation.archived = false;
+      conversation.archivedAt = undefined;
       res.json({ success: true, message: "Chat restored" });
     } else {
       res.status(404).json({ success: false, message: "Chat not found" });
@@ -483,7 +285,7 @@ app.post("/chat/:whatsapp/restore", async (req, res) => {
 });
 
 // File upload endpoint
-app.post("/upload", upload.single("file"), async (req, res) => {
+app.post("/upload", upload.single("file"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
@@ -506,34 +308,15 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// Test MongoDB route
-app.get("/test-mongo", async (req, res) => {
-  try {
-    if (!conversationsCollection) {
-      return res.json({ status: "MongoDB not connected" });
-    }
-    
-    const count = await conversationsCollection.countDocuments();
-    const recentMessages = await conversationsCollection.find({})
-      .sort({ lastUpdated: -1 })
-      .limit(5)
-      .toArray();
-    
-    res.json({
-      status: "MongoDB connected",
-      totalConversations: count,
-      minMessagesForPersistence: MIN_MESSAGES_FOR_PERSISTENCE,
-      recentConversations: recentMessages.map(c => ({
-        whatsapp: c.whatsapp,
-        messageCount: c.messages?.length || 0,
-        lastMessage: c.lastMessage,
-        lastUpdated: c.lastUpdated,
-        archived: c.archived || false
-      }))
-    });
-  } catch (error) {
-    res.json({ status: "Error", error: error.message });
-  }
+// Test route
+app.get("/test", (req, res) => {
+  res.json({
+    status: "IN-MEMORY MODE ACTIVE",
+    totalConversations: conversations.size,
+    totalAgents: agents.size,
+    activeChats: activeChats.size,
+    storageInfo: "All messages stored in memory only"
+  });
 });
 
 // ---- Socket.IO events ----
@@ -542,7 +325,7 @@ io.on("connection", (socket) => {
   users.set(socket.id, { type: 'unknown' });
 
   // ===== SUPER ADMIN EVENTS =====
-  socket.on("super_admin_login", async ({ password }) => {
+  socket.on("super_admin_login", ({ password }) => {
     if (password === SUPER_ADMIN_PASSWORD) {
       users.set(socket.id, { type: 'super_admin' });
       socket.join("super_admin");
@@ -573,7 +356,7 @@ io.on("connection", (socket) => {
   });
 
   // ===== PERMANENT AGENT REGISTRATION =====
-  socket.on("register_permanent_agent", async (data) => {
+  socket.on("register_permanent_agent", (data) => {
     const { id, name, password, filename } = data;
     
     if (!id || !name || !password) {
@@ -615,21 +398,6 @@ io.on("connection", (socket) => {
           filename: filename || null,
           createdAt: new Date(),
           lastSeen: null
-        });
-        
-        // Initialize agent users set
-        if (!agentUsers.has(id)) {
-          agentUsers.set(id, new Set());
-        }
-        
-        // Save to MongoDB
-        await saveAgentToDB(id, {
-          name,
-          password,
-          muted: false,
-          filename: filename || null,
-          createdAt: new Date(),
-          updatedAt: new Date()
         });
         
         socket.emit("agent_registered", { 
@@ -683,7 +451,7 @@ io.on("connection", (socket) => {
   });
 
   // Save/Update agent credentials
-  socket.on("save_agent", async ({ name, id, password }) => {
+  socket.on("save_agent", ({ name, id, password }) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'super_admin') return;
     
@@ -694,14 +462,6 @@ io.on("connection", (socket) => {
       // Update existing agent
       existingAgent.name = name;
       existingAgent.password = password;
-      
-      // Save to MongoDB
-      await saveAgentToDB(agentId, {
-        name,
-        password,
-        muted: existingAgent.muted || false,
-        updatedAt: new Date()
-      });
     } else {
       // Create new agent
       agentId = id || `agent_${Date.now()}`;
@@ -711,20 +471,6 @@ io.on("connection", (socket) => {
         muted: false,
         socketId: null,
         createdAt: new Date()
-      });
-      
-      // Initialize agent users set
-      if (!agentUsers.has(agentId)) {
-        agentUsers.set(agentId, new Set());
-      }
-      
-      // Save to MongoDB
-      await saveAgentToDB(agentId, {
-        name,
-        password,
-        muted: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
       });
     }
     
@@ -745,7 +491,7 @@ io.on("connection", (socket) => {
   });
 
   // Toggle agent mute status
-  socket.on("toggle_agent_mute", async ({ agentId }) => {
+  socket.on("toggle_agent_mute", ({ agentId }) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'super_admin') return;
     
@@ -754,12 +500,6 @@ io.on("connection", (socket) => {
     
     // Toggle mute status
     agent.muted = !agent.muted;
-    
-    // Save to MongoDB
-    await saveAgentToDB(agentId, {
-      muted: agent.muted,
-      updatedAt: new Date()
-    });
     
     logActivity('agent_mute_toggled', { 
       agentId, 
@@ -812,8 +552,8 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Get super admin data with ALL info
-  socket.on("get_super_admin_data", async () => {
+  // Get super admin data
+  socket.on("get_super_admin_data", () => {
     const userData = users.get(socket.id);
     if (userData?.type === 'super_admin') {
       try {
@@ -823,8 +563,7 @@ io.on("connection", (socket) => {
           muted: agent.muted || false,
           isOnline: agent.socketId ? true : false,
           socketId: agent.socketId,
-          filename: agent.filename || null,
-          userCount: agentUsers.get(id) ? agentUsers.get(id).size : 0
+          filename: agent.filename || null
         }));
         
         const activeChatsList = Array.from(activeChats.values());
@@ -837,7 +576,8 @@ io.on("connection", (socket) => {
             totalAgents: agents.size,
             onlineAgents: Array.from(agents.values()).filter(a => a.socketId).length,
             activeChats: activeChatsList.length,
-            mutedAgents: Array.from(agents.values()).filter(a => a.muted).length
+            mutedAgents: Array.from(agents.values()).filter(a => a.muted).length,
+            totalConversations: conversations.size
           }
         });
       } catch (error) {
@@ -846,8 +586,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ===== ENHANCED: AGENT EVENTS =====
-  socket.on("agent_login", async ({ agentId, password }) => {
+  // ===== AGENT LOGIN =====
+  socket.on("agent_login", ({ agentId, password }) => {
     const agent = agents.get(agentId);
     
     if (!agent) {
@@ -888,15 +628,12 @@ io.on("connection", (socket) => {
     });
     
     // Send all active chats history to this agent
-    await sendAllActiveChatsToAgent(socket.id);
+    sendAllActiveChatsToAgent(socket.id);
     
     socket.emit("agent_login_response", {
       success: true,
       name: agent.name,
-      muted: agent.muted || false,
-      config: {
-        minMessagesForPersistence: MIN_MESSAGES_FOR_PERSISTENCE
-      }
+      muted: agent.muted || false
     });
     
     // Notify Super Admin
@@ -913,8 +650,8 @@ io.on("connection", (socket) => {
     io.to("super_admin").emit("agent_updated", { agentId });
   });
 
-  // ===== ENHANCED: Agent sends message =====
-  socket.on("agent_message", async (data) => {
+  // ===== AGENT SENDS MESSAGE =====
+  socket.on("agent_message", (data) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'agent') return;
     
@@ -950,13 +687,11 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // ===== SAVE TO MONGODB (ALWAYS for agent messages) =====
-    if (conversationsCollection) {
-      await saveMessageToMongoDB(whatsapp, message, true); // forceSave = true for agent messages
-      console.log("✓ Agent message saved to MongoDB");
-    }
+    // ===== SAVE TO MEMORY =====
+    saveMessageToMemory(whatsapp, message);
+    console.log("✓ Agent message saved to memory");
     
-    // ===== BROADCAST TO ALL AGENTS, ADMINS, AND SUPER ADMINS =====
+    // ===== BROADCAST TO ALL =====
     
     // 1. Send to super_admin and admin
     io.to("super_admin").to("admin").emit("new_message", message);
@@ -965,14 +700,13 @@ io.on("connection", (socket) => {
     if (whatsapp !== 'unknown') {
       io.to(whatsapp).emit("new_message", {
         ...message,
-        // Don't include agent details to user
         agentId: undefined,
         agentName: undefined
       });
     }
     
     // 3. Broadcast to all other agents (excluding the sender)
-    await broadcastToAllAgents(message, socket.id);
+    broadcastToAllAgents(message, socket.id);
     
     // Update active chats
     activeChats.set(whatsapp, {
@@ -987,13 +721,12 @@ io.on("connection", (socket) => {
       agentId: userData.agentId,
       agentName: agent.name,
       message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
-      to: whatsapp,
-      savedToDB: true
+      to: whatsapp
     });
   });
 
-  // ===== ENHANCED: USER MESSAGES =====
-  socket.on("user_message", async (data) => {
+  // ===== USER MESSAGES =====
+  socket.on("user_message", (data) => {
     console.log("📨 Received user_message event:", data);
     
     // Ensure we have whatsapp/userId
@@ -1025,34 +758,28 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // ===== SAVE TO MONGODB =====
-    let savedToDB = false;
-    if (conversationsCollection) {
-      savedToDB = await saveMessageToMongoDB(whatsapp, message);
-      console.log(`✓ User message ${savedToDB ? 'saved to MongoDB' : 'stored in memory only'}`);
-    }
+    // ===== SAVE TO MEMORY =====
+    saveMessageToMemory(whatsapp, message);
+    console.log(`✓ User message saved to memory for ${whatsapp}`);
     
     // ===== BROADCAST TO EVERYONE =====
     
     // 1. Send confirmation to the user who sent it
     socket.emit("new_message", {
       ...message,
-      sender: "user",
-      savedToDB: savedToDB
+      sender: "user"
     });
     
     // 2. Send to super_admin and admin
     io.to("super_admin").to("admin").emit("new_message", {
       ...message,
-      sender: "user",
-      savedToDB: savedToDB
+      sender: "user"
     });
     
     // 3. Broadcast to all agents
-    await broadcastToAllAgents({
+    broadcastToAllAgents({
       ...message,
-      sender: "user",
-      savedToDB: savedToDB
+      sender: "user"
     });
     
     console.log(`📢 Broadcast to: Super Admin, Admin, and all agents`);
@@ -1062,39 +789,31 @@ io.on("connection", (socket) => {
       whatsapp: whatsapp,
       lastMessage: data.message || (data.attachment ? `[${data.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
       lastMessageTime: message.timestamp,
-      unread: true,
-      savedToDB: savedToDB
+      unread: true
     });
     
     logActivity('user_message_received', {
       from: whatsapp,
       message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
       hasAttachment: !!data.attachment,
-      savedToDB: savedToDB,
       forwardedToAllAgents: true
     });
   });
 
-  // ===== OLD FUNCTIONALITY (RETAINED) =====
-  
-  // Admin connect
-  socket.on("admin_connect", async () => {
+  // ===== ADMIN CONNECT =====
+  socket.on("admin_connect", () => {
     console.log("✓ Admin connected:", socket.id);
     users.set(socket.id, { type: 'admin' });
     socket.join("admin");
 
-    try {
-      if (conversationsCollection) {
-        const conversationsFromDB = await conversationsCollection.find({ archived: { $ne: true } }).toArray();
-        conversationsFromDB.forEach(conv => {
-          if (conv.messages) {
-            conv.messages.forEach(msg => socket.emit("new_message", msg));
-          }
+    // Send all existing messages to admin
+    conversations.forEach((conv, whatsapp) => {
+      if (conv.messages && conv.messages.length > 0) {
+        conv.messages.forEach(msg => {
+          socket.emit("new_message", msg);
         });
       }
-    } catch (error) {
-      console.error("Error loading messages for admin:", error);
-    }
+    });
   });
 
   // User register (with whatsapp)
@@ -1106,99 +825,10 @@ io.on("connection", (socket) => {
     console.log(`✓ Registered: ${whatsapp} with socket ${socket.id}`);
   });
 
-  // LEGACY: send_message handler for backward compatibility
-  socket.on("send_message", async ({ whatsapp, sender, text, agentId, agentName, attachment }) => {
-    console.log("⚠️ LEGACY send_message event received - converting to appropriate format");
-    
-    if (!whatsapp) return;
-    
-    // Convert legacy format
-    const userData = users.get(socket.id);
-    
-    if (sender === "user" || !sender) {
-      // Use user_message format
-      socket.emit("user_message", {
-        whatsapp: whatsapp,
-        userId: whatsapp,
-        message: text || '',
-        attachment: attachment || null
-      });
-    } 
-    else if (sender === "agent" || sender === "admin") {
-      // Use agent_message format
-      const messageData = {
-        whatsapp: whatsapp,
-        message: text || '',
-        timestamp: new Date().toISOString(),
-        attachment: attachment || null
-      };
-      
-      // Save to MongoDB
-      if (conversationsCollection) {
-        const message = {
-          sender: sender,
-          agentId: agentId || 'admin',
-          agentName: agentName || 'Admin',
-          text: text,
-          timestamp: new Date().toISOString(),
-          read: true,
-          id: `legacy_${Date.now()}`
-        };
-        
-        if (attachment) {
-          message.attachment = attachment;
-        }
-        
-        await saveMessageToMongoDB(whatsapp, message, true);
-      }
-      
-      // Send to user
-      io.to(whatsapp).emit("new_message", {
-        sender: sender,
-        agentId: agentId,
-        agentName: agentName,
-        message: text,
-        whatsapp: whatsapp,
-        timestamp: new Date().toISOString(),
-        attachment: attachment || null,
-        messageType: 'agent_message'
-      });
-      
-      // Send to super_admin and admin
-      io.to("super_admin").to("admin").emit("new_message", {
-        sender: sender,
-        agentId: agentId,
-        agentName: agentName,
-        message: text,
-        whatsapp: whatsapp,
-        timestamp: new Date().toISOString(),
-        attachment: attachment || null,
-        messageType: 'agent_message'
-      });
-      
-      // Broadcast to all agents
-      await broadcastToAllAgents({
-        sender: sender,
-        agentId: agentId,
-        agentName: agentName,
-        message: text,
-        whatsapp: whatsapp,
-        timestamp: new Date().toISOString(),
-        attachment: attachment || null,
-        messageType: 'agent_message'
-      }, socket.id);
-    }
-  });
-
-  // Get messages - ENHANCED VERSION with read tracking
-  socket.on("get_messages", async ({ whatsapp, agentId, markAsRead = true }) => {
+  // Get messages for a specific whatsapp
+  socket.on("get_messages", ({ whatsapp, agentId, markAsRead = true }) => {
     try {
-      if (!conversationsCollection) {
-        socket.emit("message_history", []);
-        return;
-      }
-      
-      const conversation = await conversationsCollection.findOne({ whatsapp });
+      const conversation = conversations.get(whatsapp);
       if (!conversation || !conversation.messages) {
         socket.emit("message_history", []);
         return;
@@ -1206,39 +836,18 @@ io.on("connection", (socket) => {
       
       // Mark unread messages as read by this agent
       if (markAsRead && agentId) {
-        const messagesToUpdate = [];
-        conversation.messages.forEach((msg, index) => {
-          if (msg.sender === "user" && (!msg.readBy || !msg.readBy.includes(agentId))) {
-            messagesToUpdate.push(index);
+        conversation.messages.forEach((msg) => {
+          if (msg.sender === "user") {
+            if (!msg.readBy) msg.readBy = [];
+            if (!msg.readBy.includes(agentId)) {
+              msg.readBy.push(agentId);
+            }
+            msg.read = true;
           }
         });
-        
-        if (messagesToUpdate.length > 0) {
-          const updatePromises = messagesToUpdate.map(async (index) => {
-            await conversationsCollection.updateOne(
-              { whatsapp, [`messages.${index}.sender`]: "user" },
-              { 
-                $addToSet: { [`messages.${index}.readBy`]: agentId },
-                $set: { [`messages.${index}.read`]: true }
-              }
-            );
-          });
-          
-          await Promise.all(updatePromises);
-          
-          // Refresh conversation after updates
-          const updatedConversation = await conversationsCollection.findOne({ whatsapp });
-          if (updatedConversation) {
-            socket.emit("message_history", updatedConversation.messages);
-          } else {
-            socket.emit("message_history", conversation.messages);
-          }
-        } else {
-          socket.emit("message_history", conversation.messages);
-        }
-      } else {
-        socket.emit("message_history", conversation.messages);
       }
+      
+      socket.emit("message_history", conversation.messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
       socket.emit("message_history", []);
@@ -1246,21 +855,18 @@ io.on("connection", (socket) => {
   });
 
   // Get existing users for agent interface
-  socket.on("get_existing_users", async () => {
+  socket.on("get_existing_users", () => {
     try {
-      if (!conversationsCollection) {
-        socket.emit("existing_users", []);
-        return;
-      }
-      
-      const conversations = await conversationsCollection.find({ archived: { $ne: true } }).toArray();
-      const usersList = conversations.map(c => ({
-        whatsapp: c.whatsapp,
-        lastMessage: c.lastMessage,
-        lastMessageTime: c.lastUpdated,
-        messageCount: c.messages?.length || 0,
-        archived: c.archived || false
-      }));
+      const usersList = Array.from(conversations.values())
+        .filter(conv => !conv.archived)
+        .map(conv => ({
+          whatsapp: conv.whatsapp,
+          lastMessage: conv.lastMessage,
+          lastMessageTime: conv.lastUpdated,
+          messageCount: conv.messages?.length || 0,
+          archived: conv.archived || false
+        }))
+        .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
       
       socket.emit("existing_users", usersList);
     } catch (error) {
@@ -1269,8 +875,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ===== NEW: Delete entire chat =====
-  socket.on("delete_chat", async ({ whatsapp, archiveOnly = false }) => {
+  // Delete chat
+  socket.on("delete_chat", ({ whatsapp, archiveOnly = false }) => {
     try {
       const userData = users.get(socket.id);
       
@@ -1285,9 +891,9 @@ io.on("connection", (socket) => {
       
       let success;
       if (archiveOnly) {
-        success = await archiveChat(whatsapp);
+        success = archiveChat(whatsapp);
       } else {
-        success = await deleteChatFromDB(whatsapp);
+        success = deleteChat(whatsapp);
       }
       
       if (success) {
@@ -1312,13 +918,13 @@ io.on("connection", (socket) => {
       console.error("Error deleting chat:", error);
       socket.emit("delete_chat_response", { 
         success: false, 
-        message: "Database error" 
+        message: "Server error" 
       });
     }
   });
 
   // Delete individual message
-  socket.on("delete_message", async ({ whatsapp, messageId, deleteForAll = false }) => {
+  socket.on("delete_message", ({ whatsapp, messageId, deleteForAll = false }) => {
     try {
       const userData = users.get(socket.id);
       if (!userData) {
@@ -1326,38 +932,42 @@ io.on("connection", (socket) => {
         return;
       }
       
-      if (!conversationsCollection) {
-        socket.emit("delete_message_response", { success: false, message: "Database not connected" });
+      const conversation = conversations.get(whatsapp);
+      if (!conversation || !conversation.messages) {
+        socket.emit("delete_message_response", { success: false, message: "Conversation not found" });
         return;
       }
       
-      let updateOperation;
+      let canDelete = false;
+      let messageIndex = -1;
       
-      if (deleteForAll || userData.type === 'super_admin' || userData.type === 'admin') {
-        // Super admin or admin can delete any message for everyone
-        updateOperation = { $pull: { messages: { id: messageId } } };
-      } else if (userData.type === 'agent') {
-        // Agents can only delete their own messages
-        updateOperation = { 
-          $pull: { 
-            messages: { 
-              id: messageId,
-              sender: "agent",
-              agentId: userData.agentId
-            } 
-          } 
-        };
-      } else {
-        socket.emit("delete_message_response", { success: false, message: "Unauthorized" });
-        return;
-      }
+      // Find the message
+      conversation.messages.forEach((msg, index) => {
+        if (msg.id === messageId) {
+          messageIndex = index;
+          if (deleteForAll || userData.type === 'super_admin' || userData.type === 'admin') {
+            canDelete = true;
+          } else if (userData.type === 'agent' && msg.sender === "agent" && msg.agentId === userData.agentId) {
+            canDelete = true;
+          }
+        }
+      });
       
-      const result = await conversationsCollection.updateOne(
-        { whatsapp },
-        updateOperation
-      );
-      
-      if (result.modifiedCount > 0) {
+      if (canDelete && messageIndex !== -1) {
+        // Remove the message
+        conversation.messages.splice(messageIndex, 1);
+        
+        // Update conversation metadata
+        if (conversation.messages.length > 0) {
+          const lastMsg = conversation.messages[conversation.messages.length - 1];
+          conversation.lastMessage = lastMsg.text || (lastMsg.attachment ? `[${lastMsg.attachment.mimetype?.split('/')[0] || 'File'}]` : '');
+          conversation.lastMessageTime = lastMsg.timestamp;
+        } else {
+          conversation.lastMessage = null;
+          conversation.lastMessageTime = null;
+        }
+        conversation.lastUpdated = new Date();
+        
         // Notify all connected clients about the deletion
         io.to(whatsapp).emit("message_deleted", { whatsapp, messageId });
         io.to("super_admin").to("admin").emit("message_deleted", { whatsapp, messageId });
@@ -1382,25 +992,19 @@ io.on("connection", (socket) => {
       }
     } catch (error) {
       console.error("Error deleting message:", error);
-      socket.emit("delete_message_response", { success: false, message: "Database error" });
+      socket.emit("delete_message_response", { success: false, message: "Server error" });
     }
   });
 
   // Clear chat
-  socket.on("clear_chat", async ({ whatsapp }) => {
+  socket.on("clear_chat", ({ whatsapp }) => {
     try {
-      if (conversationsCollection) {
-        await conversationsCollection.updateOne(
-          { whatsapp },
-          { 
-            $set: { 
-              messages: [], 
-              lastUpdated: new Date(),
-              lastMessage: null,
-              lastMessageTime: null
-            } 
-          }
-        );
+      const conversation = conversations.get(whatsapp);
+      if (conversation) {
+        conversation.messages = [];
+        conversation.lastUpdated = new Date();
+        conversation.lastMessage = null;
+        conversation.lastMessageTime = null;
         
         activeChats.delete(whatsapp);
         
@@ -1411,7 +1015,7 @@ io.on("connection", (socket) => {
       } else {
         socket.emit("clear_chat_response", { 
           success: false, 
-          message: "Database not connected" 
+          message: "Chat not found" 
         });
       }
     } catch (error) {
@@ -1423,52 +1027,24 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ===== NEW: Get chat statistics =====
-  socket.on("get_chat_stats", async () => {
+  // Get chat statistics
+  socket.on("get_chat_stats", () => {
     try {
       const userData = users.get(socket.id);
       if (!userData || (userData.type !== 'super_admin' && userData.type !== 'admin')) {
         return;
       }
       
-      if (!conversationsCollection) {
-        socket.emit("chat_stats", { error: "Database not connected" });
-        return;
-      }
-      
-      const totalChats = await conversationsCollection.countDocuments({ archived: { $ne: true } });
-      const archivedChats = await conversationsCollection.countDocuments({ archived: true });
-      const totalMessages = await conversationsCollection.aggregate([
-        { $match: { archived: { $ne: true } } },
-        { $project: { messageCount: { $size: "$messages" } } },
-        { $group: { _id: null, total: { $sum: "$messageCount" } } }
-      ]).toArray();
-      
-      const chatsByMessageCount = await conversationsCollection.aggregate([
-        { $match: { archived: { $ne: true } } },
-        { $project: { messageCount: { $size: "$messages" } } },
-        { $group: { 
-          _id: { 
-            $cond: [
-              { $lt: ["$messageCount", MIN_MESSAGES_FOR_PERSISTENCE] },
-              "below_threshold",
-              "above_threshold"
-            ]
-          }, 
-          count: { $sum: 1 } 
-        }}
-      ]).toArray();
+      const totalChats = Array.from(conversations.values()).filter(c => !c.archived).length;
+      const archivedChats = Array.from(conversations.values()).filter(c => c.archived).length;
+      const totalMessages = Array.from(conversations.values()).reduce((sum, conv) => sum + (conv.messages?.length || 0), 0);
       
       socket.emit("chat_stats", {
         totalChats,
         archivedChats,
-        totalMessages: totalMessages[0]?.total || 0,
-        minMessagesForPersistence: MIN_MESSAGES_FOR_PERSISTENCE,
-        chatsByMessageCount: chatsByMessageCount.reduce((acc, curr) => {
-          acc[curr._id] = curr.count;
-          return acc;
-        }, {}),
-        autoCleanupDays: AUTO_CLEANUP_DAYS
+        totalMessages,
+        storageMode: "IN-MEMORY ONLY",
+        note: "Data will be lost on server restart"
       });
     } catch (error) {
       console.error("Error getting chat stats:", error);
@@ -1504,49 +1080,28 @@ io.on("connection", (socket) => {
 });
 
 // Initialize and start server
-async function startServer() {
+function startServer() {
   const PORT = process.env.PORT || 3000;
-  
-  try {
-    const mongoConnected = await connectToMongoDB();
-    if (!mongoConnected) {
-      console.error("❌ Failed to connect to MongoDB. Server will still run but messages won't be saved.");
-    } else {
-      console.log("✓ MongoDB connected successfully");
-      await loadAgentsFromDB();
-    }
 
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
-      console.log(`📁 Available routes:`);
-      console.log(`   /chat - User chat interface`);
-      console.log(`   /admin - Original admin panel`);
-      console.log(`   /superadmin - Super admin panel`);
-      console.log(`   /agent - Agent panel`);
-      console.log(`   /agent/conversations - Get all conversations`);
-      console.log(`   DELETE /chat/:whatsapp - Delete a chat`);
-      console.log(`   GET /chats/archived - Get archived chats`);
-      console.log(`   POST /chat/:whatsapp/restore - Restore archived chat`);
-      console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
-      console.log(`🔍 Test MongoDB: http://localhost:${PORT}/test-mongo`);
-      console.log(`\n✅ System is ready with ALL functionality!`);
-      console.log(`🔧 Permanent Agent System: Agents auto-register via agentX.html files`);
-      console.log(`🔍 NEW FEATURES IMPLEMENTED:`);
-      console.log(`   • ALL messages saved to MongoDB under WhatsApp numbers`);
-      console.log(`   • Chat persistence across sessions`);
-      console.log(`   • Only save chats with ≥ ${MIN_MESSAGES_FOR_PERSISTENCE} messages`);
-      console.log(`   • Auto-delete old chats (< ${MIN_MESSAGES_FOR_PERSISTENCE} messages, > ${AUTO_CLEANUP_DAYS} days)`);
-      console.log(`   • Delete chat option for admins`);
-      console.log(`   • Archive chat option (soft delete)`);
-      console.log(`   • ALL agents see ALL messages in real-time`);
-      console.log(`   • Broadcast messages to all agents automatically`);
-      console.log(`   • Agents get chat history when they login`);
-    });
-  } catch (error) {
-    console.error("❌ Failed to start server:", error);
-    process.exit(1);
-  }
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
+    console.log(`📁 Available routes:`);
+    console.log(`   /chat - User chat interface`);
+    console.log(`   /admin - Original admin panel`);
+    console.log(`   /superadmin - Super admin panel`);
+    console.log(`   /agent - Agent panel`);
+    console.log(`   /agent/conversations - Get all conversations`);
+    console.log(`   DELETE /chat/:whatsapp - Delete a chat`);
+    console.log(`   GET /chats/archived - Get archived chats`);
+    console.log(`   POST /chat/:whatsapp/restore - Restore archived chat`);
+    console.log(`   /test - Test endpoint`);
+    console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
+    console.log(`\n✅ System is ready with SIMPLE IN-MEMORY STORAGE!`);
+    console.log(`📝 ALL MESSAGES SAVED UNDER WHATSAPP NUMBERS`);
+    console.log(`🔧 Agents can access all saved messages on login`);
+    console.log(`⚠️  WARNING: Data is ephemeral - will be lost on server restart`);
+  });
 }
 
 startServer();

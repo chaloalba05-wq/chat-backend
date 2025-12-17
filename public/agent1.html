@@ -26,40 +26,22 @@
       padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
     
-    /* ===== LAYOUT ===== */
+    /* ===== MAIN LAYOUT ===== */
     .container { 
       display: flex; 
-      flex-direction: column;
       height: 100vh;
       height: -webkit-fill-available;
       width: 100%;
     }
     
-    /* Mobile-first layout */
-    @media (min-width: 768px) {
-      .container {
-        flex-direction: row;
-      }
-    }
-    
     /* ===== SIDEBAR ===== */
     .sidebar { 
-      width: 100%;
+      width: clamp(280px, 25vw, 320px);
       background: white; 
-      border-bottom: 1px solid #e0e0e0;
+      border-right: 1px solid #e0e0e0;
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
-      max-height: 40vh;
-    }
-    
-    @media (min-width: 768px) {
-      .sidebar {
-        width: clamp(280px, 25vw, 320px);
-        border-right: 1px solid #e0e0e0;
-        border-bottom: none;
-        max-height: none;
-      }
     }
     
     .sidebar-header { 
@@ -155,6 +137,8 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: #c1c1c1 #f1f1f1;
     }
     
     .user-list-title {
@@ -255,7 +239,7 @@
       display: flex; 
       flex-direction: column;
       background: #f8f9fa;
-      min-height: 60vh;
+      min-width: 0;
     }
     
     /* Chat Header */
@@ -306,20 +290,33 @@
       text-overflow: ellipsis;
     }
     
-    /* Messages Container - VERTICAL LAYOUT */
+    /* ===== NEW: MESSAGES CONTAINER - 3/4 OF SCREEN ===== */
     .messages-container {
-      flex: 1;
+      flex: 3; /* 3/4 of the space */
       overflow-y: auto;
       padding: clamp(16px, 2.5vw, 20px);
       display: flex;
       flex-direction: column;
-      gap: clamp(6px, 1vw, 8px);
+      gap: clamp(8px, 1vw, 10px);
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       scroll-behavior: smooth;
+      scrollbar-width: thin;
+      scrollbar-color: #c1c1c1 #f1f1f1;
+      will-change: transform;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
     }
     
-    /* Message Bubbles - VERTICAL STACK */
+    /* Force hardware acceleration for smooth scrolling */
+    .messages-container {
+      transform: translate3d(0, 0, 0);
+      -webkit-transform: translate3d(0, 0, 0);
+    }
+    
+    /* Message Bubbles */
     .message-bubble {
       max-width: 85%;
       margin: clamp(3px, 0.5vw, 4px) 0;
@@ -348,6 +345,7 @@
       word-wrap: break-word;
       line-height: 1.4;
       font-size: clamp(14px, 2vw, 16px);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     
     .message-bubble.user .message-content {
@@ -431,8 +429,9 @@
       border: 1px solid rgba(0,0,0,0.1);
     }
     
-    /* Input Area */
+    /* ===== NEW: INPUT AREA - FIXED 1/4 OF SCREEN ===== */
     .input-area {
+      flex: 1; /* 1/4 of the space */
       padding: clamp(16px, 2.5vw, 20px);
       background: white;
       border-top: 1px solid #e0e0e0;
@@ -440,6 +439,8 @@
       gap: clamp(10px, 2vw, 12px);
       align-items: flex-end;
       flex-shrink: 0;
+      min-height: 80px;
+      max-height: 120px;
     }
     
     .input-wrapper {
@@ -448,6 +449,7 @@
       flex-direction: column;
       gap: clamp(6px, 1vw, 8px);
       min-width: 0;
+      height: 100%;
     }
     
     .message-input {
@@ -465,6 +467,7 @@
       line-height: 1.4;
       -webkit-appearance: none;
       appearance: none;
+      width: 100%;
     }
     
     .message-input:focus {
@@ -532,7 +535,7 @@
       box-shadow: none;
     }
     
-    /* ===== LOGIN SCREEN - FIXED ===== */
+    /* ===== LOGIN SCREEN ===== */
     .login-screen { 
       position: fixed; 
       top: 0; 
@@ -792,24 +795,18 @@
     
     /* ===== MOBILE OPTIMIZATIONS ===== */
     @media (max-width: 767px) {
-      /* Sidebar slide-in/out for mobile */
+      .container {
+        flex-direction: column;
+      }
+      
       .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100%;
-        z-index: 100;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-        max-height: none;
-        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        width: 100%;
+        height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
       }
       
-      .sidebar.open {
-        transform: translateX(0);
-      }
-      
-      /* Toggle button for mobile sidebar */
+      /* Mobile sidebar toggle */
       .mobile-sidebar-toggle {
         position: fixed;
         top: 16px;
@@ -826,25 +823,33 @@
         cursor: pointer;
       }
       
-      /* Chat area full width on mobile */
+      /* Chat area adjustments for mobile */
       .chat-area {
-        width: 100%;
+        height: 60vh;
+      }
+      
+      .messages-container {
+        flex: 2.5; /* Slightly adjusted for mobile */
+      }
+      
+      .input-area {
+        flex: 1;
       }
     }
     
     /* ===== SCROLLBAR STYLING ===== */
     ::-webkit-scrollbar {
-      width: 6px;
+      width: 8px;
     }
     
     ::-webkit-scrollbar-track {
       background: #f1f1f1;
-      border-radius: 3px;
+      border-radius: 4px;
     }
     
     ::-webkit-scrollbar-thumb {
       background: #c1c1c1;
-      border-radius: 3px;
+      border-radius: 4px;
     }
     
     ::-webkit-scrollbar-thumb:hover {
@@ -931,13 +936,6 @@
       background: #f8f9fa;
       border-radius: 12px;
       margin: 0 8px;
-    }
-    
-    /* ===== ENSURE SCROLLABILITY ===== */
-    .scrollable-content {
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
     }
   </style>
 </head>
@@ -1062,7 +1060,7 @@
       </div>
     </div>
     
-    <!-- Messages Container -->
+    <!-- Messages Container - 3/4 of screen -->
     <div id="messages" class="messages-container">
       <div class="empty-state">
         <div class="empty-state-icon">👈</div>
@@ -1071,7 +1069,7 @@
       </div>
     </div>
     
-    <!-- Input Area -->
+    <!-- Input Area - 1/4 of screen -->
     <div class="input-area">
       <div class="input-wrapper">
         <textarea 
@@ -1152,7 +1150,7 @@
     const textarea = document.getElementById('messageInput');
     textarea.addEventListener('input', function() {
       this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+      this.style.height = Math.min(this.scrollHeight, 80) + 'px';
     });
     
     // Initialize mobile sidebar toggle
@@ -1922,7 +1920,7 @@
     // Scroll to bottom
     setTimeout(() => {
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }, 100);
+    }, 50);
   }
 
   // Group messages by date
