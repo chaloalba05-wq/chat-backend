@@ -261,219 +261,6 @@
       word-break: break-word;
     }
     
-    /* ===== LOGIN SCREEN ===== */
-    .login-screen { 
-      position: fixed; 
-      top: 0; 
-      left: 0; 
-      width: 100%; 
-      height: 100%; 
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex; 
-      justify-content: center; 
-      align-items: center;
-      z-index: 1000;
-      padding: 20px;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-    }
-    
-    .login-container {
-      width: 100%;
-      max-width: min(420px, 90vw);
-      background: white;
-      border-radius: clamp(12px, 3vw, 16px);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-      overflow: hidden;
-      margin: auto;
-      display: flex;
-      flex-direction: column;
-      max-height: 90vh;
-    }
-    
-    .login-header {
-      padding: clamp(20px, 4vw, 30px);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      text-align: center;
-      color: white;
-      flex-shrink: 0;
-    }
-    
-    .login-title {
-      font-size: clamp(20px, 4vw, 24px);
-      font-weight: 700;
-      margin-bottom: clamp(6px, 1vw, 8px);
-      line-height: 1.2;
-    }
-    
-    .login-subtitle {
-      font-size: clamp(13px, 2vw, 14px);
-      opacity: 0.9;
-    }
-    
-    .login-body {
-      padding: clamp(20px, 4vw, 30px);
-      flex: 1;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .agent-info-section {
-      background: #f8f9fa;
-      padding: clamp(16px, 3vw, 20px);
-      border-radius: clamp(10px, 2vw, 12px);
-      margin-bottom: clamp(20px, 3vw, 25px);
-      border-left: 4px solid #667eea;
-      flex-shrink: 0;
-    }
-    
-    .agent-info-title {
-      font-size: clamp(14px, 2vw, 15px);
-      font-weight: 600;
-      color: #333;
-      margin-bottom: clamp(12px, 2vw, 15px);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .agent-details-grid {
-      display: grid;
-      grid-template-columns: repeat(1, 1fr);
-      gap: clamp(10px, 2vw, 12px);
-      margin-bottom: clamp(12px, 2vw, 15px);
-    }
-    
-    @media (min-width: 480px) {
-      .agent-details-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-    
-    .agent-field {
-      background: white;
-      padding: clamp(10px, 2vw, 12px);
-      border-radius: clamp(6px, 1.5vw, 8px);
-      border: 1px solid #e0e0e0;
-      min-height: 60px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    
-    .field-label {
-      font-size: clamp(11px, 1.5vw, 12px);
-      color: #666;
-      margin-bottom: clamp(3px, 0.5vw, 4px);
-    }
-    
-    .field-value {
-      font-size: clamp(13px, 1.8vw, 14px);
-      font-weight: 600;
-      color: #333;
-      word-break: break-word;
-      line-height: 1.3;
-    }
-    
-    .file-info {
-      background: #e8f5e9;
-      padding: clamp(10px, 2vw, 12px);
-      border-radius: clamp(6px, 1.5vw, 8px);
-      font-size: clamp(12px, 1.8vw, 13px);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-    
-    .form-group {
-      margin-bottom: clamp(16px, 2.5vw, 20px);
-      flex-shrink: 0;
-    }
-    
-    .form-label {
-      display: block;
-      font-size: clamp(13px, 1.8vw, 14px);
-      color: #333;
-      margin-bottom: clamp(6px, 1vw, 8px);
-      font-weight: 500;
-    }
-    
-    .form-input {
-      width: 100%;
-      padding: clamp(10px, 2vw, 12px) clamp(12px, 2.5vw, 16px);
-      border: 2px solid #e0e0e0;
-      border-radius: clamp(6px, 1.5vw, 8px);
-      font-size: clamp(14px, 2vw, 16px);
-      transition: border 0.2s;
-      -webkit-appearance: none;
-      appearance: none;
-      min-height: 48px;
-    }
-    
-    .form-input:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-    
-    .login-error {
-      color: #d32f2f;
-      font-size: clamp(13px, 1.8vw, 14px);
-      margin: clamp(8px, 1.5vw, 10px) 0;
-      min-height: clamp(18px, 2vw, 20px);
-      text-align: center;
-      line-height: 1.3;
-      flex-shrink: 0;
-    }
-    
-    .login-button {
-      width: 100%;
-      padding: clamp(12px, 2.5vw, 14px);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: clamp(6px, 1.5vw, 8px);
-      font-size: clamp(15px, 2.5vw, 16px);
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: clamp(44px, 8vh, 48px);
-      flex-shrink: 0;
-      margin-top: auto;
-    }
-    
-    .login-button:active {
-      transform: scale(0.98);
-    }
-    
-    .login-button:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-      transform: none;
-    }
-    
-    .login-note {
-      font-size: clamp(11px, 1.5vw, 12px);
-      color: #666;
-      text-align: center;
-      margin-top: clamp(16px, 2.5vw, 20px);
-      line-height: 1.5;
-      flex-shrink: 0;
-    }
-    
-    /* ================================================ */
-    /* NEW CHAT BOX IMPLEMENTATION (Three-Part Layout)  */
-    /* ================================================ */
-    
     /* ===== CHAT DETAIL HEADER ===== */
     .chat-detail-header {
       padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
@@ -545,434 +332,6 @@
       text-overflow: ellipsis;
     }
     
-    /* ===== CHAT WRAPPER ===== */
-    .chat-wrapper {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      min-height: 0;
-    }
-    
-    /* ===== A. MESSAGES SECTION ===== */
-    .messages-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-height: 0;
-      position: relative;
-      background: #f8f9fa;
-    }
-    
-    /* Scrollable Messages Container */
-    #chatMessages {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 16px;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      scroll-behavior: auto;
-      will-change: transform;
-      backface-visibility: hidden;
-      transform: translateZ(0);
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      background: #f8f9fa;
-    }
-    
-    /* Bottom padding for messages */
-    #chatMessages::after {
-      content: '';
-      flex: 0 0 16px;
-    }
-    
-    /* Optimized scrollbar */
-    #chatMessages::-webkit-scrollbar {
-      width: 6px;
-    }
-    
-    #chatMessages::-webkit-scrollbar-track {
-      background: rgba(241, 241, 241, 0.5);
-      border-radius: 3px;
-    }
-    
-    #chatMessages::-webkit-scrollbar-thumb {
-      background: rgba(102, 126, 234, 0.5);
-      border-radius: 3px;
-    }
-    
-    #chatMessages::-webkit-scrollbar-thumb:hover {
-      background: rgba(102, 126, 234, 0.7);
-    }
-    
-    /* Firefox scrollbar */
-    #chatMessages {
-      scrollbar-width: thin;
-      scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
-    }
-    
-    /* ===== C. SCROLL TO BOTTOM BUTTON ===== */
-    .scroll-to-bottom-btn {
-      position: absolute;
-      bottom: 100px;
-      right: 20px;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #667eea;
-      color: white;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-      z-index: 5;
-      transition: all 0.3s ease;
-      opacity: 0;
-      visibility: hidden;
-    }
-    
-    .scroll-to-bottom-btn.visible {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .scroll-to-bottom-btn:hover {
-      background: #764ba2;
-      transform: translateY(-2px);
-    }
-    
-    /* ===== B. INPUT SECTION ===== */
-    .input-section {
-      flex-shrink: 0;
-      background: white;
-      border-top: 1px solid #e8e8e8;
-      z-index: 10;
-      position: sticky;
-      bottom: 0;
-      padding-bottom: max(16px, env(safe-area-inset-bottom));
-    }
-    
-    .input-area-container {
-      display: flex;
-      flex-direction: column;
-      width: 100%;
-    }
-    
-    .upload-progress {
-      width: 100%;
-      background-color: #f3f3f3;
-      border-radius: 10px;
-      margin: 8px 16px;
-      overflow: hidden;
-      display: none;
-      flex-shrink: 0;
-    }
-    
-    .progress-bar {
-      height: 6px;
-      background: linear-gradient(90deg, #4CAF50, #8BC34A);
-      border-radius: 10px;
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-    
-    .file-preview {
-      padding: 8px 16px;
-      background: #f8f9fa;
-      border-radius: 20px;
-      font-size: 14px;
-      color: #666;
-      margin: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    
-    .sending-indicator,
-    .error-message {
-      padding: 8px 16px;
-      font-size: 14px;
-      text-align: center;
-      display: none;
-      flex-shrink: 0;
-    }
-    
-    .sending-indicator {
-      color: #666;
-      background: #fff9c4;
-    }
-    
-    .error-message {
-      color: #d32f2f;
-      background: #ffebee;
-    }
-    
-    .input-area {
-      padding: 16px;
-      background: white;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    
-    #messageInput {
-      flex: 1;
-      border: 2px solid #e8e8e8;
-      margin: 0;
-      font-size: clamp(14px, 4vw, 16px);
-      padding: 14px 16px;
-      min-height: 50px;
-      max-height: 120px;
-      border-radius: 25px;
-      background: #f8f9fa;
-      resize: none;
-      overflow-y: auto;
-    }
-    
-    .action-buttons {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .file-upload-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .file-upload-btn {
-      background: transparent;
-      color: #667eea;
-      border: none;
-      padding: 12px;
-      cursor: pointer;
-      font-size: 22px;
-      border-radius: 50%;
-      min-height: 50px;
-      min-width: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-    
-    .file-upload-btn:active {
-      background: rgba(102, 126, 234, 0.1);
-      transform: scale(0.95);
-    }
-    
-    .file-upload-label {
-      font-size: 11px;
-      color: #666;
-      margin-top: 2px;
-      display: none;
-    }
-    
-    .send-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 14px 24px;
-      border-radius: 25px;
-      font-weight: 600;
-      min-height: 50px;
-      min-width: 80px;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
-    
-    .send-btn:active {
-      transform: scale(0.95);
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
-    }
-    
-    /* ===== MESSAGE BUBBLES (Updated to match user chat) ===== */
-    .message-container {
-      margin: 12px 0;
-      padding: 14px 18px;
-      border-radius: 20px;
-      max-width: 85%;
-      word-wrap: break-word;
-      position: relative;
-      animation: fadeIn 0.3s ease;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      line-height: 1.4;
-      flex-shrink: 0;
-      transform: translateZ(0);
-      backface-visibility: hidden;
-    }
-    
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    .agent-message {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      margin-left: auto;
-      margin-right: 8px;
-      border-bottom-right-radius: 6px;
-    }
-    
-    .user-message {
-      background: white;
-      border: 1px solid #e8e8e8;
-      margin-right: auto;
-      margin-left: 8px;
-      border-bottom-left-radius: 6px;
-    }
-    
-    .message-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-      flex-wrap: wrap;
-    }
-    
-    .message-sender {
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-    
-    .agent-message .message-sender {
-      color: rgba(255,255,255,0.95);
-    }
-    
-    .user-message .message-sender {
-      color: #444;
-    }
-    
-    .message-time {
-      font-size: 0.75rem;
-      opacity: 0.8;
-      font-weight: 400;
-    }
-    
-    .agent-message .message-time {
-      color: rgba(255,255,255,0.8);
-    }
-    
-    .user-message .message-time {
-      color: #666;
-    }
-    
-    .message-content {
-      word-wrap: break-word;
-      font-size: clamp(14px, 4vw, 16px);
-      line-height: 1.5;
-      overflow-wrap: break-word;
-      word-break: break-word;
-    }
-    
-    /* ===== FILE UPLOAD ===== */
-    #fileInput {
-      display: none;
-    }
-    
-    /* ===== ATTACHMENTS ===== */
-    .attachment {
-      margin-top: 12px;
-      padding: 12px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 12px;
-      border-left: 4px solid #4CAF50;
-    }
-    
-    .user-message .attachment {
-      background: #f8f9fa;
-      border-left-color: #667eea;
-    }
-    
-    .attachment a {
-      color: #2196F3;
-      text-decoration: none;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .attachment a:hover {
-      text-decoration: underline;
-    }
-    
-    .attachment img {
-      max-width: 100%;
-      max-height: 200px;
-      border-radius: 8px;
-      margin-top: 8px;
-      border: 1px solid #e0e0e0;
-    }
-    
-    /* ===== TYPING INDICATOR ===== */
-    .typing-indicator {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 8px 16px;
-      background: white;
-      border-radius: 20px;
-      margin: 8px 0;
-      width: fit-content;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background: #667eea;
-      border-radius: 50%;
-      animation: typing 1.4s infinite;
-    }
-    
-    .typing-dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    
-    .typing-dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-    
-    @keyframes typing {
-      0%, 60%, 100% {
-        transform: translateY(0);
-      }
-      30% {
-        transform: translateY(-6px);
-      }
-    }
-    
-    /* ===== EMPTY STATE ===== */
-    .empty-state {
-      text-align: center;
-      color: #999;
-      padding: 40px 20px;
-      font-size: 16px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      min-height: 200px;
-    }
-    
     /* ===== UTILITIES ===== */
     @keyframes pulse {
       0% { opacity: 1; }
@@ -989,40 +348,6 @@
       }
       
       .back-button {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
-      }
-      
-      .input-area {
-        padding: 12px;
-        gap: 8px;
-      }
-      
-      #messageInput {
-        padding: 12px 16px;
-        min-height: 46px;
-      }
-      
-      .file-upload-btn,
-      .send-btn {
-        min-height: 46px;
-        min-width: 46px;
-      }
-      
-      .message-container {
-        max-width: 90%;
-        padding: 12px 16px;
-        margin: 8px 0;
-      }
-      
-      .attachment img {
-        max-height: 150px;
-      }
-      
-      .scroll-to-bottom-btn {
-        bottom: 90px;
-        right: 16px;
         width: 36px;
         height: 36px;
         font-size: 16px;
@@ -1045,51 +370,6 @@
         height: 32px;
         font-size: 14px;
       }
-      
-      .input-area {
-        padding: 10px;
-      }
-      
-      .message-container {
-        max-width: 92%;
-        padding: 10px 14px;
-      }
-      
-      .send-btn {
-        min-width: 70px;
-        padding: 12px 20px;
-      }
-      
-      .file-upload-btn {
-        font-size: 20px;
-      }
-      
-      .scroll-to-bottom-btn {
-        bottom: 85px;
-        right: 12px;
-        width: 32px;
-        height: 32px;
-        font-size: 14px;
-      }
-    }
-    
-    /* ===== SCROLLBAR STYLING ===== */
-    ::-webkit-scrollbar {
-      width: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-      background: #a8a8a8;
     }
     
     /* ===== SAFE AREA SUPPORT ===== */
@@ -1099,21 +379,10 @@
         padding-right: max(16px, env(safe-area-inset-right));
       }
       
-      .sidebar-header, .chat-detail-header, .input-area {
+      .sidebar-header, .chat-detail-header {
         padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
         padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
       }
-      
-      .login-screen {
-        padding-top: max(20px, env(safe-area-inset-top));
-        padding-bottom: max(20px, env(safe-area-inset-bottom));
-      }
-    }
-    
-    /* ===== LOADING STATES ===== */
-    .loading {
-      opacity: 0.6;
-      pointer-events: none;
     }
     
     /* ===== NOTIFICATION ===== */
@@ -1146,34 +415,6 @@
       }
     }
     
-    /* ===== DATE SEPARATOR ===== */
-    .date-separator {
-      text-align: center;
-      margin: clamp(16px, 3vw, 20px) 0;
-      color: #666;
-      font-size: clamp(11px, 1.5vw, 12px);
-      font-weight: 500;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .date-separator::before,
-    .date-separator::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: #e0e0e0;
-    }
-    
-    .date-separator span {
-      padding: 4px 12px;
-      background: #f8f9fa;
-      border-radius: 12px;
-      margin: 0 8px;
-    }
-    
     /* ===== CONNECTION STATUS ===== */
     .connection-status-indicator {
       position: fixed;
@@ -1197,78 +438,10 @@
       color: white;
     }
   </style>
+  <!-- Link to external display box CSS -->
+  <link rel="stylesheet" href="display-box.css">
 </head>
 <body>
-
-<!-- Login Screen -->
-<div id="loginScreen" class="login-screen">
-  <div class="login-container">
-    <div class="login-header">
-      <div class="login-title">🔐 Agent Login</div>
-      <div class="login-subtitle">Permanent Agent Account</div>
-    </div>
-    
-    <div class="login-body">
-      <!-- Agent Information Section -->
-      <div class="agent-info-section">
-        <div class="agent-info-title">
-          <span>📋 Agent Configuration</span>
-        </div>
-        
-        <div class="file-info">
-          <span>📁</span>
-          <span><strong>Agent File:</strong> <span id="agentFileName">Loading...</span></span>
-        </div>
-        
-        <div class="agent-details-grid">
-          <div class="agent-field">
-            <div class="field-label">Agent ID</div>
-            <div class="field-value" id="displayAgentId">Loading...</div>
-          </div>
-          <div class="agent-field">
-            <div class="field-label">Agent Name</div>
-            <div class="field-value" id="displayAgentName">Loading...</div>
-          </div>
-          <div class="agent-field">
-            <div class="field-label">Status</div>
-            <div id="agentStatus" class="mute-status unmuted">⚡ Ready</div>
-          </div>
-          <div class="agent-field">
-            <div class="field-label">Server</div>
-            <div class="field-value">chat-backend-p2b9.onrender.com</div>
-          </div>
-        </div>
-        
-        <div class="note" style="font-size: 11px; color: #666; font-style: italic; margin-top: 10px;">
-          This agent account is permanently created on the server.
-        </div>
-      </div>
-      
-      <!-- Login Form -->
-      <div class="form-group">
-        <label class="form-label">Agent ID</label>
-        <input type="text" id="agentId" class="form-input" placeholder="Enter Agent ID">
-      </div>
-      
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" id="agentPass" class="form-input" placeholder="Enter Password">
-      </div>
-      
-      <div id="loginError" class="login-error"></div>
-      
-      <button onclick="login()" id="loginButton" class="login-button">
-        <span>🔓</span>
-        <span>Login as Agent</span>
-      </button>
-      
-      <div class="login-note">
-        <div><strong>Note:</strong> This agent is automatically registered on the server.</div>
-        <div style="margin-top: 5px;">Credentials are hardcoded for permanent access.</div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Main App -->
 <div id="app" class="container" style="display: none;">
@@ -1318,58 +491,8 @@
       </div>
     </div>
     
-    <!-- ================================================ -->
-    <!-- NEW THREE-PART CHAT LAYOUT -->
-    <!-- ================================================ -->
-    <div class="chat-wrapper">
-      <!-- A. Messages Section - Fixed box with scroll -->
-      <div class="messages-section">
-        <!-- Scroll to bottom button -->
-        <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
-          ↓
-        </button>
-        
-        <!-- Scrollable messages box -->
-        <div id="chatMessages">
-          <div class="empty-state">
-            <div>Select a conversation to view messages</div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- B. Input Section - Always fixed at bottom -->
-      <div class="input-section">
-        <div class="input-area-container">
-          <div class="upload-progress" id="uploadProgress">
-            <div class="progress-bar" id="progressBar"></div>
-          </div>
-          
-          <div class="file-preview" id="filePreview"></div>
-          
-          <div class="sending-indicator" id="sendingIndicator">Sending...</div>
-          <div class="error-message" id="errorMessage">Please wait before sending another message</div>
-          
-          <div class="input-area">
-            <textarea 
-              id="messageInput" 
-              placeholder="Type your message here..." 
-              rows="1"
-            ></textarea>
-            <div class="action-buttons">
-              <div class="file-upload-container">
-                <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-                  📎
-                </button>
-                <span class="file-upload-label">file upload</span>
-              </div>
-              <button class="send-btn" onclick="sendMessage()" id="sendButton">
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Display Box Container -->
+    <div id="displayBoxContainer"></div>
     
     <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect()">
   </div>
@@ -1381,10 +504,20 @@
   // AGENT CONFIGURATION - FIXED VALUES
   // ================================================
   const AGENT_CONFIG = {
-    id: "agent2", // FIXED: Always use "agent1" for consistent login
+    id: "agent2", // FIXED: Always use "agent2" for consistent login
     name: "agent2", // Display name
     password: "agent2", // Login password
-    filename: window.location.pathname.split('/').pop() || "agent1.html" // Auto-detect filename
+    filename: window.location.pathname.split('/').pop() || "agent2.html" // Auto-detect filename
+  };
+  
+  // ================================================
+  // DUAL-ROOM SYSTEM CONSTANTS
+  // ================================================
+  const DUAL_ROOM_CONFIG = {
+    currentRoom: 'broadcast', // 'broadcast' or 'user'
+    currentWhatsapp: null,
+    broadcastHistoryLoaded: false,
+    userHistoryLoaded: new Map() // Track which users have loaded history
   };
   
   let socket = null;
@@ -1438,55 +571,6 @@
       this.seenMessages.clear();
     }
   };
-  
-  // ================================================
-  // SCROLL MANAGEMENT FUNCTIONS
-  // ================================================
-  function setupScrollListener() {
-    const messagesDiv = document.getElementById("chatMessages");
-    const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
-    
-    if (!messagesDiv || !scrollToBottomBtn) return;
-    
-    messagesDiv.addEventListener('scroll', function() {
-      const scrollTop = messagesDiv.scrollTop;
-      const scrollHeight = messagesDiv.scrollHeight;
-      const clientHeight = messagesDiv.clientHeight;
-      
-      isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
-      
-      if (!isScrolledToBottom) {
-        scrollToBottomBtn.classList.add('visible');
-      } else {
-        scrollToBottomBtn.classList.remove('visible');
-      }
-    }, { passive: true });
-    
-    scrollToBottomBtn.addEventListener('click', scrollToBottom);
-    
-    messagesDiv.style.transform = 'translateZ(0)';
-    messagesDiv.style.backfaceVisibility = 'hidden';
-    messagesDiv.style.perspective = '1000px';
-  }
-  
-  function scrollToBottom() {
-    const messagesDiv = document.getElementById("chatMessages");
-    if (messagesDiv) {
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-      isScrolledToBottom = true;
-      document.getElementById("scrollToBottomBtn").classList.remove('visible');
-    }
-  }
-  
-  function scrollToBottomSmooth() {
-    const messagesDiv = document.getElementById("chatMessages");
-    if (messagesDiv && isScrolledToBottom) {
-      messagesDiv.scrollTo({
-        top: messagesDiv.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }
   
   // ================================================
   // PERSISTENT CONNECTION SYSTEM
@@ -1717,7 +801,7 @@
       showNotification('Connection restored successfully!', '#e8f5e9', '#2e7d32');
       
       socket.emit('agent_login', { 
-        agentId: AGENT_CONFIG.id, 
+        agentId: currentAgent.id, 
         password: AGENT_CONFIG.password,
         reconnect: true
       });
@@ -1771,47 +855,50 @@
   }
   
   // ================================================
-  // INITIALIZATION
+  // INITIALIZATION - MODIFIED FOR LOGIN.HTML
   // ================================================
   window.onload = function() {
-    const fileName = getCurrentFileName();
-    AGENT_CONFIG.filename = fileName;
+    // Check if user is logged in via localStorage
+    const agentData = localStorage.getItem('agentData');
     
-    // Set agent details immediately
-    document.getElementById('agentFileName').textContent = fileName;
-    document.getElementById('displayAgentId').textContent = AGENT_CONFIG.id;
-    document.getElementById('displayAgentName').textContent = AGENT_CONFIG.name;
+    if (!agentData) {
+      // Not logged in, redirect to login page
+      window.location.href = 'login.html';
+      return;
+    }
     
-    document.getElementById('agentId').value = AGENT_CONFIG.id;
-    document.getElementById('agentPass').value = AGENT_CONFIG.password;
-    
-    // Setup textarea auto-resize
-    const textarea = document.getElementById('messageInput');
-    textarea.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-    });
-    
-    initPersistentConnection();
+    try {
+      // Parse agent data from localStorage
+      currentAgent = JSON.parse(agentData);
+      
+      // Update UI with agent info
+      document.getElementById('agentNameDisplay').textContent = currentAgent.name;
+      document.getElementById('agentIdDisplay').textContent = currentAgent.id;
+      document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
+      
+      // Show the app
+      document.getElementById('app').style.display = 'flex';
+      
+      // Initialize connection
+      initPersistentConnection();
+      initializeSocketConnection();
+      
+    } catch (error) {
+      console.error('Error loading agent data:', error);
+      // Clear invalid data and redirect to login
+      localStorage.removeItem('agentData');
+      window.location.href = 'login.html';
+    }
     
     window.addEventListener('resize', handleResize);
-    
-    setTimeout(() => {
-      document.getElementById('agentId').focus();
-    }, 300);
   };
   
   function handleResize() {
     isMobile = window.innerWidth < 768;
   }
   
-  function getCurrentFileName() {
-    const path = window.location.pathname;
-    return path.split('/').pop() || "agent1.html";
-  }
-  
   // ================================================
-  // SOCKET SETUP
+  // SOCKET SETUP - UPDATED FOR DUAL-ROOM SYSTEM
   // ================================================
   function setupSocketListeners() {
     socket.on('connect', () => {
@@ -1824,9 +911,9 @@
       updateActivity();
       
       if (currentAgent) {
-        console.log("🔄 Re-authenticating after reconnection...");
+        console.log("🔄 Authenticating with server...");
         socket.emit('agent_login', { 
-          agentId: AGENT_CONFIG.id, 
+          agentId: currentAgent.id, 
           password: AGENT_CONFIG.password,
           reconnect: true
         });
@@ -1834,40 +921,43 @@
     });
     
     socket.on('agent_login_response', (res) => {
-      const loginButton = document.getElementById('loginButton');
-      
       if (res.success) {
         console.log("✅ Login successful:", res);
-        currentAgent = { 
-          id: AGENT_CONFIG.id, 
-          name: res.name || AGENT_CONFIG.name,
-          muted: res.muted || false
-        };
+        
+        // Update currentAgent with server data
+        currentAgent.name = res.name || currentAgent.name;
+        currentAgent.muted = res.muted || false;
         
         isMuted = res.muted || false;
         updateMuteStatus();
         
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
+        // Update UI with agent info
         document.getElementById('agentNameDisplay').textContent = currentAgent.name;
         document.getElementById('agentIdDisplay').textContent = currentAgent.id;
         document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
         
+        // Request broadcast room messages on login
+        if (socket && socket.connected) {
+          console.log("📡 Requesting broadcast room messages...");
+          socket.emit('get_broadcast_messages', {
+            agentId: currentAgent.id
+          });
+        }
+        
+        // Load user conversations
         loadAllConversations();
         showNotification('Connected to server successfully!', '#e8f5e9', '#2e7d32');
         
       } else {
         console.error("❌ Login failed:", res.message);
-        document.getElementById('loginError').textContent = res.message || 'Login failed';
         
-        if (loginButton) {
-          loginButton.disabled = false;
-          loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-        }
+        // If login fails, clear localStorage and redirect to login
+        localStorage.removeItem('agentData');
+        showNotification('Session expired. Please login again.', '#ffebee', '#c62828');
         
-        if (currentAgent) {
-          setTimeout(() => reconnect(), 3000);
-        }
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 2000);
       }
       
       updateActivity();
@@ -1876,13 +966,6 @@
     socket.on('connect_error', (error) => {
       console.error("❌ Connection error:", error);
       updateConnectionStatus('error', 'Connection error');
-      document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
-      
-      const loginButton = document.getElementById('loginButton');
-      if (loginButton) {
-        loginButton.disabled = false;
-        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-      }
       
       if (currentAgent && !CONNECTION_CONFIG.isManualDisconnect) {
         scheduleReconnect();
@@ -1928,12 +1011,94 @@
       updateActivity();
     });
     
-    socket.on('new_message', (msg) => {
-      console.log("📨 Received message:", msg);
+    // ================================================
+    // BROADCAST ROOM EVENTS - NEW FOR DUAL-ROOM SYSTEM
+    // ================================================
+    socket.on('broadcast_message', (msg) => {
+      console.log("📢 BROADCAST message received:", msg);
       updateActivity();
       
       if (duplicateManager.isDuplicate(msg)) {
-        console.log("🛑 Skipping duplicate message");
+        console.log("🛑 Skipping duplicate broadcast message");
+        return;
+      }
+      
+      const whatsapp = msg.whatsapp || 'unknown';
+      
+      // Handle historical broadcast messages
+      if (msg.isHistorical) {
+        console.log("📜 Loading historical broadcast message");
+        if (!users.has(whatsapp)) {
+          users.set(whatsapp, {
+            name: whatsapp,
+            lastMsg: msg.text || msg.message || '[Attachment]',
+            time: msg.timestamp || new Date().toISOString(),
+            messages: []
+          });
+        }
+      }
+      
+      // Update user data from broadcast message
+      if (!users.has(whatsapp)) {
+        users.set(whatsapp, {
+          name: whatsapp,
+          lastMsg: msg.text || msg.message || '[Attachment]',
+          time: msg.timestamp || new Date().toISOString(),
+          messages: []
+        });
+      }
+      
+      const user = users.get(whatsapp);
+      user.lastMsg = msg.text || msg.message || '[Attachment]';
+      user.time = msg.timestamp || new Date().toISOString();
+      
+      // Only add to messages if not historical or if we're in user room
+      if (!msg.isHistorical || selectedUser === whatsapp) {
+        user.messages.push({
+          text: msg.text || msg.message,
+          time: msg.timestamp || new Date().toISOString(),
+          sender: msg.sender || 'unknown',
+          attachment: msg.attachment,
+          agentId: msg.agentId,
+          agentName: msg.agentName,
+          id: msg.id,
+          fromBroadcast: true
+        });
+      }
+      
+      updateUserList();
+      
+      if (selectedUser === whatsapp) {
+        showMessages();
+      }
+    });
+    
+    socket.on('broadcast_message_deleted', (data) => {
+      console.log("🗑️ Broadcast message deleted:", data);
+      updateActivity();
+      
+      if (data.whatsapp && users.has(data.whatsapp)) {
+        const user = users.get(data.whatsapp);
+        const index = user.messages.findIndex(m => m.id === data.messageId);
+        if (index > -1) {
+          user.messages.splice(index, 1);
+        }
+      }
+      
+      if (selectedUser === data.whatsapp) {
+        showMessages();
+      }
+    });
+    
+    // ================================================
+    // USER ROOM EVENTS - UPDATED FOR DUAL-ROOM SYSTEM
+    // ================================================
+    socket.on('new_message', (msg) => {
+      console.log("📨 USER ROOM message received:", msg);
+      updateActivity();
+      
+      if (duplicateManager.isDuplicate(msg)) {
+        console.log("🛑 Skipping duplicate user room message");
         return;
       }
       
@@ -1959,13 +1124,84 @@
         attachment: msg.attachment,
         agentId: msg.agentId,
         agentName: msg.agentName,
-        id: msg.id
+        id: msg.id,
+        fromUserRoom: true
       });
       
       updateUserList();
       
       if (selectedUser === whatsapp) {
         showMessages();
+      }
+    });
+    
+    socket.on('user_chat_history', (data) => {
+      console.log("📜 USER CHAT HISTORY received:", data);
+      updateActivity();
+      
+      if (data.whatsapp && data.messages) {
+        const user = users.get(data.whatsapp);
+        if (user) {
+          // Clear existing messages for this user
+          user.messages = [];
+          
+          // Add historical messages
+          data.messages.forEach(msg => {
+            if (!duplicateManager.isDuplicate(msg)) {
+              user.messages.push({
+                text: msg.text || msg.message,
+                time: msg.timestamp || msg.time,
+                sender: msg.sender || 'unknown',
+                attachment: msg.attachment,
+                agentId: msg.agentId,
+                agentName: msg.agentName,
+                id: msg.id,
+                isHistorical: true
+              });
+            }
+          });
+          
+          // Mark user history as loaded
+          DUAL_ROOM_CONFIG.userHistoryLoaded.set(data.whatsapp, true);
+          
+          if (selectedUser === data.whatsapp) {
+            showMessages();
+          }
+        }
+      }
+    });
+    
+    socket.on('user_room_joined', (data) => {
+      console.log("✅ Joined user room:", data.whatsapp);
+      updateActivity();
+      
+      DUAL_ROOM_CONFIG.currentRoom = 'user';
+      DUAL_ROOM_CONFIG.currentWhatsapp = data.whatsapp;
+      
+      if (data.history) {
+        console.log("📜 Received user room history");
+        const user = users.get(data.whatsapp);
+        if (user) {
+          user.messages = data.history.filter(msg => !duplicateManager.isDuplicate(msg));
+          
+          if (selectedUser === data.whatsapp) {
+            showMessages();
+          }
+        }
+      }
+    });
+    
+    socket.on('user_message_update', (data) => {
+      console.log("📝 User message update:", data);
+      updateActivity();
+      
+      if (data.whatsapp && users.has(data.whatsapp)) {
+        const user = users.get(data.whatsapp);
+        if (data.type === 'typing' && data.typing) {
+          // Handle typing indicator
+          showTypingIndicator(data.whatsapp);
+        }
+        // Other update types can be handled here
       }
     });
     
@@ -2010,7 +1246,7 @@
     
     socket.on('mute_status', (data) => {
       updateActivity();
-      if (data.agentId === AGENT_CONFIG.id) {
+      if (data.agentId === currentAgent.id) {
         isMuted = data.muted;
         updateMuteStatus();
         
@@ -2042,10 +1278,37 @@
   }
   
   // ================================================
-  // USER MANAGEMENT
+  // SOCKET INITIALIZATION FUNCTION
+  // ================================================
+  function initializeSocketConnection() {
+    console.log("🔄 Initializing socket connection...");
+    
+    updateConnectionStatus('connecting');
+    
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: false,
+      timeout: 30000,
+      forceNew: true,
+      multiplex: false,
+      upgrade: true,
+      rememberUpgrade: true,
+      path: '/socket.io/',
+      query: {
+        agentId: currentAgent.id,
+        persistent: 'true',
+        fromMainApp: 'true'
+      }
+    });
+    
+    setupSocketListeners();
+  }
+  
+  // ================================================
+  // USER MANAGEMENT - UPDATED FOR DUAL-ROOM
   // ================================================
   function loadAllConversations() {
-    if (!socket) return;
+    if (!socket || !socket.connected) return;
     
     console.log("📋 Loading all conversations...");
     updateActivity();
@@ -2065,20 +1328,13 @@
             name: user.whatsapp,
             lastMsg: user.lastMessage || 'No messages yet',
             time: user.lastMessageTime || new Date().toISOString(),
-            messages: []
+            messages: [],
+            historyLoaded: false
           });
         }
       });
       
       updateUserList();
-      
-      users.forEach((user, whatsapp) => {
-        socket.emit('get_messages', { 
-          whatsapp: whatsapp, 
-          agentId: AGENT_CONFIG.id,
-          markAsRead: true 
-        });
-      });
     });
   }
   
@@ -2089,7 +1345,8 @@
         name: userId,
         lastMsg: message || '[Attachment]',
         time: data.timestamp || new Date().toISOString(),
-        messages: []
+        messages: [],
+        historyLoaded: false
       });
     }
     
@@ -2158,7 +1415,7 @@
   }
   
   // ================================================
-  // CHAT FUNCTIONS
+  // CHAT FUNCTIONS - UPDATED FOR DUAL-ROOM
   // ================================================
   function selectUser(userId) {
     selectedUser = userId;
@@ -2178,10 +1435,19 @@
       messageInput.placeholder = "Type your message here...";
       messageInput.focus();
       
-      if (socket) {
+      // Join user room and request history
+      if (socket && socket.connected) {
+        console.log(`🚪 Joining user room: ${userId}`);
+        socket.emit('join_user_room', {
+          whatsapp: userId,
+          agentId: currentAgent.id,
+          agentName: currentAgent.name
+        });
+        
+        // Also request specific user messages
         socket.emit('get_messages', { 
           whatsapp: userId, 
-          agentId: AGENT_CONFIG.id,
+          agentId: currentAgent.id,
           markAsRead: true 
         });
       }
@@ -2190,11 +1456,14 @@
     showMessages();
     document.getElementById('chatDetailView').classList.add('active');
     
-    setTimeout(setupScrollListener, 100);
+    // Load the display box
+    loadDisplayBox();
   }
   
   function exitChat() {
     selectedUser = null;
+    DUAL_ROOM_CONFIG.currentRoom = 'broadcast';
+    DUAL_ROOM_CONFIG.currentWhatsapp = null;
     
     document.getElementById('chatDetailView').classList.remove('active');
     
@@ -2216,6 +1485,8 @@
     
     const messagesDiv = document.getElementById('chatMessages');
     const user = users.get(selectedUser);
+    
+    if (!messagesDiv || !user) return;
     
     messagesDiv.innerHTML = '';
     
@@ -2251,9 +1522,15 @@
   
   function createMessageElement(msg) {
     const messageDiv = document.createElement("div");
-    const isAgent = msg.sender === 'agent' || msg.sender === 'admin' || msg.agentId === AGENT_CONFIG.id;
+    const isAgent = msg.sender === 'agent' || msg.sender === 'admin' || msg.agentId === currentAgent.id;
     
     messageDiv.className = "message-container " + (isAgent ? "agent-message" : "user-message");
+    
+    // Add broadcast indicator if from broadcast room
+    let broadcastIndicator = '';
+    if (msg.fromBroadcast) {
+      broadcastIndicator = '<span style="font-size: 10px; opacity: 0.7; margin-left: 5px;">📢</span>';
+    }
     
     let content = "";
     if (msg.attachment) {
@@ -2266,7 +1543,10 @@
     
     messageDiv.innerHTML = `
       <div class="message-header">
-        <span class="message-sender">${senderName}</span>
+        <span class="message-sender">
+          ${senderName}
+          ${broadcastIndicator}
+        </span>
         <span class="message-time" title="${formatDateTime(msg.time)}">
           ${formatTime(msg.time)}
         </span>
@@ -2335,6 +1615,36 @@
     });
     
     return grouped;
+  }
+  
+  function showTypingIndicator(whatsapp) {
+    if (selectedUser !== whatsapp) return;
+    
+    const messagesDiv = document.getElementById('chatMessages');
+    const existingIndicator = messagesDiv.querySelector('.typing-indicator');
+    
+    if (existingIndicator) {
+      existingIndicator.remove();
+    }
+    
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'typing-indicator';
+    typingDiv.innerHTML = `
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <span style="margin-left: 8px; font-size: 12px; color: #666;">User is typing...</span>
+    `;
+    
+    messagesDiv.appendChild(typingDiv);
+    scrollToBottom();
+    
+    // Remove typing indicator after 3 seconds
+    setTimeout(() => {
+      if (typingDiv.parentNode) {
+        typingDiv.remove();
+      }
+    }, 3000);
   }
   
   // ================================================
@@ -2417,7 +1727,7 @@
   }
   
   // ================================================
-  // MESSAGE SENDING
+  // MESSAGE SENDING - UPDATED FOR DUAL-ROOM
   // ================================================
   function sendMessage() {
     if (isMuted) {
@@ -2508,8 +1818,10 @@
       showMessages();
     }
     
-    // Send to server
+    // Send to server - will be broadcast to both rooms
     socket.emit('agent_message', messageData);
+    
+    // Also emit to user room directly
     socket.emit('send_message', {
       whatsapp: selectedUser,
       sender: 'agent',
@@ -2546,93 +1858,6 @@
   // ================================================
   // UTILITY FUNCTIONS
   // ================================================
-  function login() {
-    const id = document.getElementById('agentId').value.trim();
-    const pass = document.getElementById('agentPass').value.trim();
-    
-    if (!id || !pass) {
-      document.getElementById('loginError').textContent = 'Please enter both ID and password';
-      return;
-    }
-    
-    if (id !== AGENT_CONFIG.id) {
-      document.getElementById('loginError').textContent = 'Invalid Agent ID';
-      return;
-    }
-    
-    if (pass !== AGENT_CONFIG.password) {
-      document.getElementById('loginError').textContent = 'Invalid password';
-      return;
-    }
-    
-    const loginButton = document.getElementById('loginButton');
-    loginButton.disabled = true;
-    loginButton.innerHTML = '<span>🔄</span><span>Connecting...</span>';
-    
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-      reconnectTimeout = null;
-    }
-    
-    autoReconnectAttempts = 0;
-    document.getElementById('loginError').textContent = '';
-    CONNECTION_CONFIG.isManualDisconnect = false;
-    
-    updateConnectionStatus('connecting');
-    
-    socket = io("https://chat-backend-p2b9.onrender.com", {
-      transports: ['websocket', 'polling'],
-      reconnection: false,
-      timeout: 30000,
-      forceNew: true,
-      multiplex: false,
-      upgrade: true,
-      rememberUpgrade: true,
-      path: '/socket.io/',
-      query: {
-        agentId: AGENT_CONFIG.id,
-        persistent: 'true'
-      }
-    });
-    
-    setupSocketListeners();
-    
-    socket.once('connect', () => {
-      console.log("Socket connected, sending login credentials...");
-      socket.emit('agent_login', { 
-        agentId: AGENT_CONFIG.id, 
-        password: AGENT_CONFIG.password,
-        persistent: true
-      });
-    });
-    
-    const connectionTimeout = setTimeout(() => {
-      if (!currentAgent && loginButton.disabled) {
-        console.log("Connection timeout");
-        document.getElementById('loginError').textContent = 'Connection timeout. Please try again.';
-        loginButton.disabled = false;
-        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-        updateConnectionStatus('error', 'Connection timeout');
-        
-        if (socket) {
-          socket.disconnect();
-        }
-        
-        scheduleReconnect();
-      }
-    }, 15000);
-    
-    socket.once('connect', () => {
-      clearTimeout(connectionTimeout);
-    });
-    
-    socket.once('connect_error', () => {
-      clearTimeout(connectionTimeout);
-    });
-    
-    updateActivity();
-  }
-  
   function updateMuteStatus() {
     const muteIndicator = document.getElementById('muteIndicator');
     const sendBtn = document.getElementById('sendButton');
@@ -2704,25 +1929,149 @@
   }
   
   // ================================================
+  // DISPLAY BOX FUNCTIONS
+  // ================================================
+  function loadDisplayBox() {
+    const container = document.getElementById('displayBoxContainer');
+    if (!container) return;
+    
+    // Clear container
+    container.innerHTML = '';
+    
+    // Create and load display box HTML
+    const displayBoxHTML = `
+      <!-- Display Box Container -->
+      <div class="chat-wrapper">
+        <!-- A. Messages Section - Fixed box with scroll -->
+        <div class="messages-section">
+          <!-- Scroll to bottom button -->
+          <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
+            ↓
+          </button>
+          
+          <!-- Scrollable messages box -->
+          <div id="chatMessages">
+            <div class="empty-state">
+              <div>Select a conversation to view messages</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- B. Input Section - Always fixed at bottom -->
+        <div class="input-section">
+          <div class="input-area-container">
+            <div class="upload-progress" id="uploadProgress">
+              <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="file-preview" id="filePreview"></div>
+            
+            <div class="sending-indicator" id="sendingIndicator">Sending...</div>
+            <div class="error-message" id="errorMessage">Please wait before sending another message</div>
+            
+            <div class="input-area">
+              <textarea 
+                id="messageInput" 
+                placeholder="Type your message here..." 
+                rows="1"
+              ></textarea>
+              <div class="action-buttons">
+                <div class="file-upload-container">
+                  <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                    📎
+                  </button>
+                  <span class="file-upload-label">file upload</span>
+                </div>
+                <button class="send-btn" onclick="sendMessage()" id="sendButton">
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    container.innerHTML = displayBoxHTML;
+    
+    // Setup textarea auto-resize
+    const textarea = document.getElementById('messageInput');
+    if (textarea) {
+      textarea.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+      });
+      
+      textarea.addEventListener('keypress', (e) => {
+        updateActivity();
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    }
+    
+    // Setup scroll listener
+    setupScrollListener();
+    
+    // Update UI based on mute status
+    updateMuteStatus();
+  }
+  
+  function setupScrollListener() {
+    const messagesDiv = document.getElementById("chatMessages");
+    const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
+    
+    if (!messagesDiv || !scrollToBottomBtn) return;
+    
+    messagesDiv.addEventListener('scroll', function() {
+      const scrollTop = messagesDiv.scrollTop;
+      const scrollHeight = messagesDiv.scrollHeight;
+      const clientHeight = messagesDiv.clientHeight;
+      
+      isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
+      
+      if (!isScrolledToBottom) {
+        scrollToBottomBtn.classList.add('visible');
+      } else {
+        scrollToBottomBtn.classList.remove('visible');
+      }
+    }, { passive: true });
+    
+    scrollToBottomBtn.addEventListener('click', scrollToBottom);
+    
+    if (messagesDiv.style) {
+      messagesDiv.style.transform = 'translateZ(0)';
+      messagesDiv.style.backfaceVisibility = 'hidden';
+      messagesDiv.style.perspective = '1000px';
+    }
+  }
+  
+  function scrollToBottom() {
+    const messagesDiv = document.getElementById("chatMessages");
+    if (messagesDiv) {
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      isScrolledToBottom = true;
+      const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
+      if (scrollToBottomBtn) {
+        scrollToBottomBtn.classList.remove('visible');
+      }
+    }
+  }
+  
+  function scrollToBottomSmooth() {
+    const messagesDiv = document.getElementById("chatMessages");
+    if (messagesDiv && isScrolledToBottom) {
+      messagesDiv.scrollTo({
+        top: messagesDiv.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }
+  
+  // ================================================
   // EVENT LISTENERS
   // ================================================
-  document.getElementById('agentPass').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') login();
-  });
-  
-  document.getElementById('messageInput').addEventListener('keypress', (e) => {
-    updateActivity();
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-  
-  document.getElementById('messageInput').addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-  });
-  
   window.addEventListener('popstate', function() {
     updateActivity();
     if (selectedUser) {
