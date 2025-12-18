@@ -6,13 +6,36 @@
 .chat-wrapper {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh;
   width: 100%;
   overflow: hidden;
-  min-height: 0;
+  position: relative;
 }
 
-/* ===== A. MESSAGES SECTION ===== */
+/* ===== A. USER INFO HEADER ===== */
+.user-info-header {
+  flex-shrink: 0;
+  background: white;
+  border-bottom: 1px solid #e8e8e8;
+  padding: 16px 20px;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.user-id, .whatsapp-number {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.user-id {
+  font-size: 16px;
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* ===== B. MESSAGES SECTION ===== */
 .messages-section {
   flex: 1;
   display: flex;
@@ -32,7 +55,7 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 
-  /* modified + additions */
+  /* Smooth scrolling */
   scroll-behavior: smooth;
   scrollbar-gutter: stable both-edges;
   contain: strict;
@@ -80,7 +103,7 @@
 /* ===== C. SCROLL TO BOTTOM BUTTON ===== */
 .scroll-to-bottom-btn {
   position: absolute;
-  bottom: 100px;
+  bottom: 120px; /* Increased to account for input section */
   right: 20px;
   width: 40px;
   height: 40px;
@@ -110,7 +133,7 @@
   transform: translateY(-2px);
 }
 
-/* ===== B. INPUT SECTION ===== */
+/* ===== D. INPUT SECTION ===== */
 .input-section {
   flex-shrink: 0;
   background: white;
@@ -119,6 +142,7 @@
   position: sticky;
   bottom: 0;
   padding-bottom: max(16px, env(safe-area-inset-bottom));
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
 }
 
 .input-area-container {
@@ -484,6 +508,10 @@
 
 /* ===== MOBILE OPTIMIZATIONS ===== */
 @media (max-width: 768px) {
+  .user-info-header {
+    padding: 12px 16px;
+  }
+  
   .input-area {
     padding: 12px;
     gap: 8px;
@@ -511,7 +539,7 @@
   }
   
   .scroll-to-bottom-btn {
-    bottom: 90px;
+    bottom: 110px;
     right: 16px;
     width: 36px;
     height: 36px;
@@ -520,6 +548,14 @@
 }
 
 @media (max-width: 480px) {
+  .user-info-header {
+    padding: 10px 12px;
+  }
+  
+  .user-id, .whatsapp-number {
+    font-size: 13px;
+  }
+  
   .input-area {
     padding: 10px;
   }
@@ -539,7 +575,7 @@
   }
   
   .scroll-to-bottom-btn {
-    bottom: 85px;
+    bottom: 105px;
     right: 12px;
     width: 32px;
     height: 32px;

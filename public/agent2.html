@@ -1954,7 +1954,7 @@
   }
   
   // ================================================
-  // FIXED: DISPLAY BOX FUNCTIONS
+  // FIXED: DISPLAY BOX FUNCTIONS - UPDATED FOR THREE-PART LAYOUT
   // ================================================
   function loadDisplayBox() {
     const container = document.getElementById('displayBoxContainer');
@@ -1970,54 +1970,60 @@
     const chatWrapper = document.createElement('div');
     chatWrapper.className = 'chat-wrapper';
     chatWrapper.innerHTML = `
-        <!-- A. Messages Section - Fixed box with scroll -->
-        <div class="messages-section">
-            <!-- Scroll to bottom button -->
-            <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom" style="display: none;">
-                ↓
-            </button>
-            
-            <!-- Scrollable messages box -->
-            <div id="chatMessages">
-                <div class="empty-state">
-                    <div>Loading messages...</div>
-                </div>
-            </div>
-        </div>
+      <!-- A. User Info Header - Static at the top -->
+      <div class="user-info-header">
+        <div class="user-id" id="displayUserId">${selectedUser || 'User'}</div>
+        <div class="whatsapp-number" id="displayWhatsappNumber">WhatsApp: ${selectedUser || 'Click on a user from the left'}</div>
+      </div>
+      
+      <!-- B. Messages Section - Scrollable area -->
+      <div class="messages-section">
+        <!-- Scroll to bottom button -->
+        <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom" style="display: none;">
+          ↓
+        </button>
         
-        <!-- B. Input Section - Always fixed at bottom -->
-        <div class="input-section">
-            <div class="input-area-container">
-                <div class="upload-progress" id="uploadProgress" style="display: none;">
-                    <div class="progress-bar" id="progressBar"></div>
-                </div>
-                
-                <div class="file-preview" id="filePreview" style="display: none;"></div>
-                
-                <div class="sending-indicator" id="sendingIndicator" style="display: none;">Sending...</div>
-                <div class="error-message" id="errorMessage" style="display: none;">Please wait before sending another message</div>
-                
-                <div class="input-area">
-                    <textarea 
-                        id="messageInput" 
-                        placeholder="Type your message here..." 
-                        rows="1"
-                        ${isMuted || !selectedUser ? 'disabled' : ''}
-                    ></textarea>
-                    <div class="action-buttons">
-                        <div class="file-upload-container">
-                            <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-                                📎
-                            </button>
-                            <span class="file-upload-label">file upload</span>
-                        </div>
-                        <button class="send-btn" onclick="sendMessage()" id="sendButton" ${isMuted || !selectedUser ? 'disabled' : ''}>
-                            Send
-                        </button>
-                    </div>
-                </div>
-            </div>
+        <!-- Scrollable messages box -->
+        <div id="chatMessages">
+          <div class="empty-state">
+            <div>Loading messages...</div>
+          </div>
         </div>
+      </div>
+      
+      <!-- C. Input Section - Fixed at bottom -->
+      <div class="input-section">
+        <div class="input-area-container">
+          <div class="upload-progress" id="uploadProgress" style="display: none;">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          
+          <div class="file-preview" id="filePreview" style="display: none;"></div>
+          
+          <div class="sending-indicator" id="sendingIndicator" style="display: none;">Sending...</div>
+          <div class="error-message" id="errorMessage" style="display: none;">Please wait before sending another message</div>
+          
+          <div class="input-area">
+            <textarea 
+              id="messageInput" 
+              placeholder="Type your message here..." 
+              rows="1"
+              ${isMuted || !selectedUser ? 'disabled' : ''}
+            ></textarea>
+            <div class="action-buttons">
+              <div class="file-upload-container">
+                <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                  📎
+                </button>
+                <span class="file-upload-label">file upload</span>
+              </div>
+              <button class="send-btn" onclick="sendMessage()" id="sendButton" ${isMuted || !selectedUser ? 'disabled' : ''}>
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
     
     container.appendChild(chatWrapper);
@@ -2064,8 +2070,10 @@
         
         if (!isScrolledToBottom) {
           scrollBtn.style.display = 'block';
+          scrollBtn.classList.add('visible');
         } else {
           scrollBtn.style.display = 'none';
+          scrollBtn.classList.remove('visible');
         }
       }, { passive: true });
       
@@ -2088,11 +2096,15 @@
   function scrollToBottom() {
     const messagesDiv = document.getElementById("chatMessages");
     if (messagesDiv) {
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      messagesDiv.scrollTo({
+        top: messagesDiv.scrollHeight,
+        behavior: 'smooth'
+      });
       isScrolledToBottom = true;
       const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
       if (scrollToBottomBtn) {
         scrollToBottomBtn.style.display = 'none';
+        scrollToBottomBtn.classList.remove('visible');
       }
     }
   }
