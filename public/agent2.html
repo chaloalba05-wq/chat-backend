@@ -1415,7 +1415,7 @@
   }
   
   // ================================================
-  // CHAT FUNCTIONS - UPDATED FOR DUAL-ROOM
+  // CHAT FUNCTIONS - UPDATED FOR DUAL-ROOM WITH FIXES
   // ================================================
   function selectUser(userId) {
     selectedUser = userId;
@@ -1426,14 +1426,19 @@
     document.getElementById('whatsappNumber').textContent = `WhatsApp: ${userId}`;
     document.getElementById('chatDetailUserAvatar').textContent = userId.charAt(0).toUpperCase();
     
+    // Load the display box FIRST
+    loadDisplayBox();
+    
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendButton');
     
     if (!isMuted) {
-      messageInput.disabled = false;
-      sendBtn.disabled = false;
-      messageInput.placeholder = "Type your message here...";
-      messageInput.focus();
+      if (messageInput) messageInput.disabled = false;
+      if (sendBtn) sendBtn.disabled = false;
+      if (messageInput) {
+        messageInput.placeholder = "Type your message here...";
+        messageInput.focus();
+      }
       
       // Join user room and request history
       if (socket && socket.connected) {
@@ -1453,11 +1458,13 @@
       }
     }
     
+    // Show existing messages
     showMessages();
+    
+    // Activate chat detail view
     document.getElementById('chatDetailView').classList.add('active');
     
-    // Load the display box
-    loadDisplayBox();  // ←←← THIS IS THE FIX (line 1358)
+    updateActivity();
   }
   
   function exitChat() {
@@ -1465,17 +1472,15 @@
     DUAL_ROOM_CONFIG.currentRoom = 'broadcast';
     DUAL_ROOM_CONFIG.currentWhatsapp = null;
     
+    // Clear the display box
+    const container = document.getElementById('displayBoxContainer');
+    if (container) {
+      container.innerHTML = '';
+    }
+    
     document.getElementById('chatDetailView').classList.remove('active');
     
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.getElementById('sendButton');
-    messageInput.disabled = true;
-    sendBtn.disabled = true;
-    messageInput.value = '';
-    messageInput.placeholder = "Select a conversation to start chatting";
-    
     updateUserList();
-    
     updateActivity();
   }
   
@@ -1496,6 +1501,7 @@
           <div>No messages yet. Start the conversation!</div>
         </div>
       `;
+      scrollToBottom();
       return;
     }
     
@@ -1517,7 +1523,7 @@
     
     setTimeout(() => {
       scrollToBottom();
-    }, 50);
+    }, 100);
   }
   
   function createMessageElement(msg) {
@@ -1654,14 +1660,18 @@
     const fileInput = document.getElementById('fileInput');
     const filePreview = document.getElementById('filePreview');
     
-    if (fileInput.files.length > 0) {
+    if (fileInput && fileInput.files.length > 0) {
       selectedFile = fileInput.files[0];
-      filePreview.innerHTML = `📎 ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
-      filePreview.style.display = 'flex';
+      if (filePreview) {
+        filePreview.innerHTML = `📎 ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
+        filePreview.style.display = 'flex';
+      }
     } else {
       selectedFile = null;
-      filePreview.innerHTML = '';
-      filePreview.style.display = 'none';
+      if (filePreview) {
+        filePreview.innerHTML = '';
+        filePreview.style.display = 'none';
+      }
     }
     updateActivity();
   }
@@ -1679,18 +1689,18 @@
     const progressDiv = document.getElementById('uploadProgress');
     const progressBar = document.getElementById('progressBar');
     
-    progressDiv.style.display = 'block';
-    progressBar.style.width = '0%';
+    if (progressDiv) progressDiv.style.display = 'block';
+    if (progressBar) progressBar.style.width = '0%';
     
     xhr.upload.addEventListener('progress', function(e) {
       if (e.lengthComputable) {
         const percentComplete = (e.loaded / e.total) * 100;
-        progressBar.style.width = percentComplete + '%';
+        if (progressBar) progressBar.style.width = percentComplete + '%';
       }
     });
     
     xhr.addEventListener('load', function() {
-      progressDiv.style.display = 'none';
+      if (progressDiv) progressDiv.style.display = 'none';
       
       if (xhr.status === 200) {
         try {
@@ -1710,14 +1720,18 @@
         if (callback) callback(null);
       }
       
-      document.getElementById('fileInput').value = '';
-      document.getElementById('filePreview').innerHTML = '';
-      document.getElementById('filePreview').style.display = 'none';
+      const fileInput = document.getElementById('fileInput');
+      const filePreview = document.getElementById('filePreview');
+      if (fileInput) fileInput.value = '';
+      if (filePreview) {
+        filePreview.innerHTML = '';
+        filePreview.style.display = 'none';
+      }
       selectedFile = null;
     });
     
     xhr.addEventListener('error', function() {
-      progressDiv.style.display = 'none';
+      if (progressDiv) progressDiv.style.display = 'none';
       alert('Upload failed. Please check your connection.');
       if (callback) callback(null);
     });
@@ -1743,17 +1757,17 @@
     }
     
     const input = document.getElementById('messageInput');
-    const text = input.value.trim();
+    const text = input ? input.value.trim() : '';
     const fileInput = document.getElementById('fileInput');
     
-    if (!text && !fileInput.files.length) {
+    if (!text && (!fileInput || fileInput.files.length === 0)) {
       alert("Please enter a message or select a file");
       return;
     }
     
     updateActivity();
     
-    if (fileInput.files.length > 0) {
+    if (fileInput && fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
           sendMessageToServer(text, fileInfo);
@@ -1764,23 +1778,30 @@
         }
         
         finishMessageSend();
-        input.value = "";
-        fileInput.value = "";
-        document.getElementById("filePreview").innerHTML = "";
-        document.getElementById("filePreview").style.display = 'none';
+        if (input) input.value = "";
+        if (fileInput) fileInput.value = "";
+        const filePreview = document.getElementById("filePreview");
+        if (filePreview) {
+          filePreview.innerHTML = "";
+          filePreview.style.display = 'none';
+        }
         
-        input.style.height = 'auto';
-        input.style.height = '50px';
+        if (input) {
+          input.style.height = 'auto';
+          input.style.height = '50px';
+        }
       });
     } else {
       sendMessageToServer(text);
       
       setTimeout(() => {
         finishMessageSend();
-        input.value = "";
+        if (input) input.value = "";
         
-        input.style.height = 'auto';
-        input.style.height = '50px';
+        if (input) {
+          input.style.height = 'auto';
+          input.style.height = '50px';
+        }
       }, 500);
     }
   }
@@ -1864,16 +1885,20 @@
     const messageInput = document.getElementById('messageInput');
     
     if (isMuted) {
-      muteIndicator.textContent = "🔇 Muted";
-      muteIndicator.className = "mute-status muted";
+      if (muteIndicator) {
+        muteIndicator.textContent = "🔇 Muted";
+        muteIndicator.className = "mute-status muted";
+      }
       if (sendBtn) sendBtn.disabled = true;
       if (messageInput) {
         messageInput.disabled = true;
         messageInput.placeholder = "Account is muted by Super Admin";
       }
     } else {
-      muteIndicator.textContent = "⚡ Active";
-      muteIndicator.className = "mute-status unmuted";
+      if (muteIndicator) {
+        muteIndicator.textContent = "⚡ Active";
+        muteIndicator.className = "mute-status unmuted";
+      }
       if (sendBtn && selectedUser) sendBtn.disabled = false;
       if (messageInput && selectedUser) {
         messageInput.disabled = false;
@@ -1929,79 +1954,93 @@
   }
   
   // ================================================
-  // DISPLAY BOX FUNCTIONS
+  // FIXED: DISPLAY BOX FUNCTIONS
   // ================================================
   function loadDisplayBox() {
     const container = document.getElementById('displayBoxContainer');
-    if (!container) return;
+    if (!container) {
+      console.error("❌ Display box container not found!");
+      return;
+    }
     
-    // Clear container
+    // Clear container and create fresh display box
     container.innerHTML = '';
     
-    // Create and load display box HTML
-    const displayBoxHTML = `
-      <!-- Display Box Container -->
-      <div class="chat-wrapper">
+    // Create the full chat wrapper structure
+    const chatWrapper = document.createElement('div');
+    chatWrapper.className = 'chat-wrapper';
+    chatWrapper.innerHTML = `
         <!-- A. Messages Section - Fixed box with scroll -->
         <div class="messages-section">
-          <!-- Scroll to bottom button -->
-          <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
-            ↓
-          </button>
-          
-          <!-- Scrollable messages box -->
-          <div id="chatMessages">
-            <div class="empty-state">
-              <div>Select a conversation to view messages</div>
+            <!-- Scroll to bottom button -->
+            <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom" style="display: none;">
+                ↓
+            </button>
+            
+            <!-- Scrollable messages box -->
+            <div id="chatMessages">
+                <div class="empty-state">
+                    <div>Loading messages...</div>
+                </div>
             </div>
-          </div>
         </div>
         
         <!-- B. Input Section - Always fixed at bottom -->
         <div class="input-section">
-          <div class="input-area-container">
-            <div class="upload-progress" id="uploadProgress">
-              <div class="progress-bar" id="progressBar"></div>
-            </div>
-            
-            <div class="file-preview" id="filePreview"></div>
-            
-            <div class="sending-indicator" id="sendingIndicator">Sending...</div>
-            <div class="error-message" id="errorMessage">Please wait before sending another message</div>
-            
-            <div class="input-area">
-              <textarea 
-                id="messageInput" 
-                placeholder="Type your message here..." 
-                rows="1"
-              ></textarea>
-              <div class="action-buttons">
-                <div class="file-upload-container">
-                  <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-                    📎
-                  </button>
-                  <span class="file-upload-label">file upload</span>
+            <div class="input-area-container">
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar" id="progressBar"></div>
                 </div>
-                <button class="send-btn" onclick="sendMessage()" id="sendButton">
-                  Send
-                </button>
-              </div>
+                
+                <div class="file-preview" id="filePreview" style="display: none;"></div>
+                
+                <div class="sending-indicator" id="sendingIndicator" style="display: none;">Sending...</div>
+                <div class="error-message" id="errorMessage" style="display: none;">Please wait before sending another message</div>
+                
+                <div class="input-area">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Type your message here..." 
+                        rows="1"
+                        ${isMuted || !selectedUser ? 'disabled' : ''}
+                    ></textarea>
+                    <div class="action-buttons">
+                        <div class="file-upload-container">
+                            <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+                                📎
+                            </button>
+                            <span class="file-upload-label">file upload</span>
+                        </div>
+                        <button class="send-btn" onclick="sendMessage()" id="sendButton" ${isMuted || !selectedUser ? 'disabled' : ''}>
+                            Send
+                        </button>
+                    </div>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
     `;
     
-    container.innerHTML = displayBoxHTML;
+    container.appendChild(chatWrapper);
     
-    // Setup textarea auto-resize
+    // Set up event listeners
+    setupChatEventListeners();
+    
+    console.log("✅ Display box loaded for user:", selectedUser);
+  }
+  
+  function setupChatEventListeners() {
     const textarea = document.getElementById('messageInput');
+    const messagesDiv = document.getElementById('chatMessages');
+    const scrollBtn = document.getElementById('scrollToBottomBtn');
+    
     if (textarea) {
+      // Auto-resize textarea
       textarea.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 120) + 'px';
       });
       
+      // Enter key to send
       textarea.addEventListener('keypress', (e) => {
         updateActivity();
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -2009,41 +2048,40 @@
           sendMessage();
         }
       });
+      
+      // Focus on textarea when clicked anywhere in input area
+      textarea.addEventListener('focus', updateActivity);
     }
     
-    // Setup scroll listener
-    setupScrollListener();
-    
-    // Update UI based on mute status
-    updateMuteStatus();
-  }
-  
-  function setupScrollListener() {
-    const messagesDiv = document.getElementById("chatMessages");
-    const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
-    
-    if (!messagesDiv || !scrollToBottomBtn) return;
-    
-    messagesDiv.addEventListener('scroll', function() {
-      const scrollTop = messagesDiv.scrollTop;
-      const scrollHeight = messagesDiv.scrollHeight;
-      const clientHeight = messagesDiv.clientHeight;
+    if (messagesDiv && scrollBtn) {
+      // Scroll listener
+      messagesDiv.addEventListener('scroll', function() {
+        const scrollTop = messagesDiv.scrollTop;
+        const scrollHeight = messagesDiv.scrollHeight;
+        const clientHeight = messagesDiv.clientHeight;
+        
+        isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
+        
+        if (!isScrolledToBottom) {
+          scrollBtn.style.display = 'block';
+        } else {
+          scrollBtn.style.display = 'none';
+        }
+      }, { passive: true });
       
-      isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
+      // Scroll to bottom button click
+      scrollBtn.addEventListener('click', scrollToBottom);
       
-      if (!isScrolledToBottom) {
-        scrollToBottomBtn.classList.add('visible');
-      } else {
-        scrollToBottomBtn.classList.remove('visible');
-      }
-    }, { passive: true });
+      // Scroll to bottom initially
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+    }
     
-    scrollToBottomBtn.addEventListener('click', scrollToBottom);
-    
-    if (messagesDiv.style) {
-      messagesDiv.style.transform = 'translateZ(0)';
-      messagesDiv.style.backfaceVisibility = 'hidden';
-      messagesDiv.style.perspective = '1000px';
+    // File input change handler
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+      fileInput.onchange = handleFileSelect;
     }
   }
   
@@ -2054,7 +2092,7 @@
       isScrolledToBottom = true;
       const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
       if (scrollToBottomBtn) {
-        scrollToBottomBtn.classList.remove('visible');
+        scrollToBottomBtn.style.display = 'none';
       }
     }
   }
