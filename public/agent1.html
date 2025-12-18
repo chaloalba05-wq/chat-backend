@@ -1792,6 +1792,9 @@
       this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     });
     
+    // Register agent on server immediately
+    registerAgentOnServer();
+    
     initPersistentConnection();
     
     window.addEventListener('resize', handleResize);
@@ -1808,6 +1811,84 @@
   function getCurrentFileName() {
     const path = window.location.pathname;
     return path.split('/').pop() || "agent1.html";
+  }
+  
+  // ================================================
+  // AGENT REGISTRATION FUNCTION
+  // ================================================
+  function registerAgentOnServer() {
+    console.log("🔄 Attempting to register agent on server...");
+    
+    // Create a temporary socket connection just for registration
+    const tempSocket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: false,
+      timeout: 10000
+    });
+    
+    const statusElement = document.getElementById('agentStatus');
+    statusElement.textContent = "🔄 Registering...";
+    statusElement.className = "mute-status muted";
+    
+    tempSocket.on('connect', () => {
+      console.log("✅ Connected for registration, Socket ID:", tempSocket.id);
+      
+      tempSocket.emit('register_permanent_agent', {
+        id: AGENT_CONFIG.id,
+        name: AGENT_CONFIG.name,
+        password: AGENT_CONFIG.password,
+        filename: AGENT_CONFIG.filename
+      });
+      
+      // Set a timeout to disconnect after registration attempt
+      setTimeout(() => {
+        if (tempSocket.connected) {
+          tempSocket.disconnect();
+        }
+        console.log("✅ Registration attempt completed");
+      }, 3000);
+    });
+    
+    tempSocket.on('agent_registered', (response) => {
+      console.log("✅ Agent registration successful:", response);
+      statusElement.textContent = "✅ Registered";
+      statusElement.className = "mute-status unmuted";
+      
+      // Disconnect after successful registration
+      setTimeout(() => {
+        if (tempSocket.connected) {
+          tempSocket.disconnect();
+        }
+      }, 1000);
+    });
+    
+    tempSocket.on('agent_already_exists', (response) => {
+      console.log("ℹ️ Agent already exists:", response);
+      statusElement.textContent = "✅ Already Registered";
+      statusElement.className = "mute-status unmuted";
+      
+      setTimeout(() => {
+        if (tempSocket.connected) {
+          tempSocket.disconnect();
+        }
+      }, 1000);
+    });
+    
+    tempSocket.on('connect_error', (error) => {
+      console.error("❌ Registration connection error:", error);
+      statusElement.textContent = "⚠️ Registration Failed";
+      statusElement.className = "mute-status muted";
+      
+      // Try again after 5 seconds
+      setTimeout(() => {
+        console.log("🔄 Retrying registration...");
+        registerAgentOnServer();
+      }, 5000);
+    });
+    
+    tempSocket.on('disconnect', () => {
+      console.log("🔌 Registration socket disconnected");
+    });
   }
   
   // ================================================
@@ -1863,6 +1944,22 @@
         if (loginButton) {
           loginButton.disabled = false;
           loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
+        }
+        
+        // If agent not found, try to register again
+        if (res.message && res.message.includes('not found')) {
+          console.log("🔄 Agent not found, attempting to re-register...");
+          document.getElementById('loginError').textContent = 'Agent not registered. Attempting to register now...';
+          registerAgentOnServer();
+          
+          // Enable login button after 3 seconds
+          setTimeout(() => {
+            if (loginButton) {
+              loginButton.disabled = false;
+              loginButton.innerHTML = '<span>🔓</span><span>Try Login Again</span>';
+              document.getElementById('loginError').textContent = 'Registration attempt completed. Please try logging in again.';
+            }
+          }, 3000);
         }
         
         if (currentAgent) {
