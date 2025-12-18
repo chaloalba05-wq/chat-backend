@@ -1777,6 +1777,7 @@
     const fileName = getCurrentFileName();
     AGENT_CONFIG.filename = fileName;
     
+    // Set agent details immediately
     document.getElementById('agentFileName').textContent = fileName;
     document.getElementById('displayAgentId').textContent = AGENT_CONFIG.id;
     document.getElementById('displayAgentName').textContent = AGENT_CONFIG.name;
@@ -1791,7 +1792,6 @@
       this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     });
     
-    registerAgentOnServer();
     initPersistentConnection();
     
     window.addEventListener('resize', handleResize);
@@ -1808,43 +1808,6 @@
   function getCurrentFileName() {
     const path = window.location.pathname;
     return path.split('/').pop() || "agent1.html";
-  }
-  
-  function registerAgentOnServer() {
-    console.log("Registering agent on server:", AGENT_CONFIG);
-    
-    const tempSocket = io("https://chat-backend-p2b9.onrender.com", {
-      transports: ['websocket', 'polling'],
-      reconnection: false
-    });
-    
-    tempSocket.on('connect', () => {
-      console.log("Connected for registration");
-      
-      tempSocket.emit('register_permanent_agent', {
-        id: AGENT_CONFIG.id,
-        name: AGENT_CONFIG.name,
-        password: AGENT_CONFIG.password,
-        filename: AGENT_CONFIG.filename
-      });
-      
-      setTimeout(() => {
-        tempSocket.disconnect();
-        console.log("Agent registration completed");
-      }, 2000);
-    });
-    
-    tempSocket.on('agent_registered', (response) => {
-      console.log("Agent registration response:", response);
-      document.getElementById('agentStatus').textContent = "✅ Registered";
-      document.getElementById('agentStatus').className = "mute-status unmuted";
-    });
-    
-    tempSocket.on('connect_error', (error) => {
-      console.error("Registration connection error:", error);
-      document.getElementById('agentStatus').textContent = "⚠️ Registration Failed";
-      document.getElementById('agentStatus').className = "mute-status muted";
-    });
   }
   
   // ================================================
@@ -2618,7 +2581,7 @@
     updateConnectionStatus('connecting');
     
     socket = io("https://chat-backend-p2b9.onrender.com", {
-      transports: ['websktop, 'polling'],
+      transports: ['websocket', 'polling'],
       reconnection: false,
       timeout: 30000,
       forceNew: true,
