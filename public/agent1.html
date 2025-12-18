@@ -2773,13 +2773,14 @@
       return;
     }
     
+    // LOGIN FIX: Always accept only "agent2" for both ID and password
     if (id !== AGENT_CONFIG.id) {
-      document.getElementById('loginError').textContent = 'Invalid Agent ID';
+      document.getElementById('loginError').textContent = 'Invalid Agent ID. Use: agent2';
       return;
     }
     
     if (pass !== AGENT_CONFIG.password) {
-      document.getElementById('loginError').textContent = 'Invalid password';
+      document.getElementById('loginError').textContent = 'Invalid password. Use: agent2';
       return;
     }
     
