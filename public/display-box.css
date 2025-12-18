@@ -31,7 +31,12 @@
   padding: 16px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  scroll-behavior: auto;
+
+  /* modified + additions */
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable both-edges;
+  contain: strict;
+
   will-change: transform;
   backface-visibility: hidden;
   transform: translateZ(0);
@@ -344,7 +349,7 @@
 }
 
 /* ===== ATTACHMENTS ===== */
-.attachment {
+.attachment {  
   margin-top: 12px;
   padding: 12px;
   background: rgba(255,255,255,0.1);

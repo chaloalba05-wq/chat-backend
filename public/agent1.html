@@ -261,215 +261,6 @@
       word-break: break-word;
     }
     
-    /* ===== LOGIN SCREEN ===== */
-    .login-screen { 
-      position: fixed; 
-      top: 0; 
-      left: 0; 
-      width: 100%; 
-      height: 100%; 
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      display: flex; 
-      justify-content: center; 
-      align-items: center;
-      z-index: 1000;
-      padding: 20px;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-    }
-    
-    .login-container {
-      width: 100%;
-      max-width: min(420px, 90vw);
-      background: white;
-      border-radius: clamp(12px, 3vw, 16px);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-      overflow: hidden;
-      margin: auto;
-      display: flex;
-      flex-direction: column;
-      max-height: 90vh;
-    }
-    
-    .login-header {
-      padding: clamp(20px, 4vw, 30px);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      text-align: center;
-      color: white;
-      flex-shrink: 0;
-    }
-    
-    .login-title {
-      font-size: clamp(20px, 4vw, 24px);
-      font-weight: 700;
-      margin-bottom: clamp(6px, 1vw, 8px);
-      line-height: 1.2;
-    }
-    
-    .login-subtitle {
-      font-size: clamp(13px, 2vw, 14px);
-      opacity: 0.9;
-    }
-    
-    .login-body {
-      padding: clamp(20px, 4vw, 30px);
-      flex: 1;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .agent-info-section {
-      background: #f8f9fa;
-      padding: clamp(16px, 3vw, 20px);
-      border-radius: clamp(10px, 2vw, 12px);
-      margin-bottom: clamp(20px, 3vw, 25px);
-      border-left: 4px solid #667eea;
-      flex-shrink: 0;
-    }
-    
-    .agent-info-title {
-      font-size: clamp(14px, 2vw, 15px);
-      font-weight: 600;
-      color: #333;
-      margin-bottom: clamp(12px, 2vw, 15px);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .agent-details-grid {
-      display: grid;
-      grid-template-columns: repeat(1, 1fr);
-      gap: clamp(10px, 2vw, 12px);
-      margin-bottom: clamp(12px, 2vw, 15px);
-    }
-    
-    @media (min-width: 480px) {
-      .agent-details-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-    
-    .agent-field {
-      background: white;
-      padding: clamp(10px, 2vw, 12px);
-      border-radius: clamp(6px, 1.5vw, 8px);
-      border: 1px solid #e0e0e0;
-      min-height: 60px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    
-    .field-label {
-      font-size: clamp(11px, 1.5vw, 12px);
-      color: #666;
-      margin-bottom: clamp(3px, 0.5vw, 4px);
-    }
-    
-    .field-value {
-      font-size: clamp(13px, 1.8vw, 14px);
-      font-weight: 600;
-      color: #333;
-      word-break: break-word;
-      line-height: 1.3;
-    }
-    
-    .file-info {
-      background: #e8f5e9;
-      padding: clamp(10px, 2vw, 12px);
-      border-radius: clamp(6px, 1.5vw, 8px);
-      font-size: clamp(12px, 1.8vw, 13px);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-    
-    .form-group {
-      margin-bottom: clamp(16px, 2.5vw, 20px);
-      flex-shrink: 0;
-    }
-    
-    .form-label {
-      display: block;
-      font-size: clamp(13px, 1.8vw, 14px);
-      color: #333;
-      margin-bottom: clamp(6px, 1vw, 8px);
-      font-weight: 500;
-    }
-    
-    .form-input {
-      width: 100%;
-      padding: clamp(10px, 2vw, 12px) clamp(12px, 2.5vw, 16px);
-      border: 2px solid #e0e0e0;
-      border-radius: clamp(6px, 1.5vw, 8px);
-      font-size: clamp(14px, 2vw, 16px);
-      transition: border 0.2s;
-      -webkit-appearance: none;
-      appearance: none;
-      min-height: 48px;
-    }
-    
-    .form-input:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-    
-    .login-error {
-      color: #d32f2f;
-      font-size: clamp(13px, 1.8vw, 14px);
-      margin: clamp(8px, 1.5vw, 10px) 0;
-      min-height: clamp(18px, 2vw, 20px);
-      text-align: center;
-      line-height: 1.3;
-      flex-shrink: 0;
-    }
-    
-    .login-button {
-      width: 100%;
-      padding: clamp(12px, 2.5vw, 14px);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: clamp(6px, 1.5vw, 8px);
-      font-size: clamp(15px, 2.5vw, 16px);
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: clamp(44px, 8vh, 48px);
-      flex-shrink: 0;
-      margin-top: auto;
-    }
-    
-    .login-button:active {
-      transform: scale(0.98);
-    }
-    
-    .login-button:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-      transform: none;
-    }
-    
-    .login-note {
-      font-size: clamp(11px, 1.5vw, 12px);
-      color: #666;
-      text-align: center;
-      margin-top: clamp(16px, 2.5vw, 20px);
-      line-height: 1.5;
-      flex-shrink: 0;
-    }
-    
     /* ===== CHAT DETAIL HEADER ===== */
     .chat-detail-header {
       padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
@@ -592,11 +383,6 @@
         padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
         padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
       }
-      
-      .login-screen {
-        padding-top: max(20px, env(safe-area-inset-top));
-        padding-bottom: max(20px, env(safe-area-inset-bottom));
-      }
     }
     
     /* ===== NOTIFICATION ===== */
@@ -656,76 +442,6 @@
   <link rel="stylesheet" href="display-box.css">
 </head>
 <body>
-
-<!-- Login Screen -->
-<div id="loginScreen" class="login-screen">
-  <div class="login-container">
-    <div class="login-header">
-      <div class="login-title">🔐 Agent Login</div>
-      <div class="login-subtitle">Permanent Agent Account</div>
-    </div>
-    
-    <div class="login-body">
-      <!-- Agent Information Section -->
-      <div class="agent-info-section">
-        <div class="agent-info-title">
-          <span>📋 Agent Configuration</span>
-        </div>
-        
-        <div class="file-info">
-          <span>📁</span>
-          <span><strong>Agent File:</strong> <span id="agentFileName">Loading...</span></span>
-        </div>
-        
-        <div class="agent-details-grid">
-          <div class="agent-field">
-            <div class="field-label">Agent ID</div>
-            <div class="field-value" id="displayAgentId">Loading...</div>
-          </div>
-          <div class="agent-field">
-            <div class="field-label">Agent Name</div>
-            <div class="field-value" id="displayAgentName">Loading...</div>
-          </div>
-          <div class="agent-field">
-            <div class="field-label">Status</div>
-            <div id="agentStatus" class="mute-status unmuted">⚡ Ready</div>
-          </div>
-          <div class="agent-field">
-            <div class="field-label">Server</div>
-            <div class="field-value">chat-backend-p2b9.onrender.com</div>
-          </div>
-        </div>
-        
-        <div class="note" style="font-size: 11px; color: #666; font-style: italic; margin-top: 10px;">
-          This agent account is permanently created on the server.
-        </div>
-      </div>
-      
-      <!-- Login Form -->
-      <div class="form-group">
-        <label class="form-label">Agent ID</label>
-        <input type="text" id="agentId" class="form-input" placeholder="Enter Agent ID">
-      </div>
-      
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" id="agentPass" class="form-input" placeholder="Enter Password">
-      </div>
-      
-      <div id="loginError" class="login-error"></div>
-      
-      <button onclick="login()" id="loginButton" class="login-button">
-        <span>🔓</span>
-        <span>Login as Agent</span>
-      </button>
-      
-      <div class="login-note">
-        <div><strong>Note:</strong> This agent is automatically registered on the server.</div>
-        <div style="margin-top: 5px;">Credentials are hardcoded for permanent access.</div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Main App -->
 <div id="app" class="container" style="display: none;">
@@ -1085,7 +801,7 @@
       showNotification('Connection restored successfully!', '#e8f5e9', '#2e7d32');
       
       socket.emit('agent_login', { 
-        agentId: AGENT_CONFIG.id, 
+        agentId: currentAgent.id, 
         password: AGENT_CONFIG.password,
         reconnect: true
       });
@@ -1139,36 +855,46 @@
   }
   
   // ================================================
-  // INITIALIZATION
+  // INITIALIZATION - MODIFIED FOR LOGIN.HTML
   // ================================================
   window.onload = function() {
-    const fileName = getCurrentFileName();
-    AGENT_CONFIG.filename = fileName;
+    // Check if user is logged in via localStorage
+    const agentData = localStorage.getItem('agentData');
     
-    // Set agent details immediately
-    document.getElementById('agentFileName').textContent = fileName;
-    document.getElementById('displayAgentId').textContent = AGENT_CONFIG.id;
-    document.getElementById('displayAgentName').textContent = AGENT_CONFIG.name;
+    if (!agentData) {
+      // Not logged in, redirect to login page
+      window.location.href = 'login.html';
+      return;
+    }
     
-    document.getElementById('agentId').value = AGENT_CONFIG.id;
-    document.getElementById('agentPass').value = AGENT_CONFIG.password;
-    
-    initPersistentConnection();
+    try {
+      // Parse agent data from localStorage
+      currentAgent = JSON.parse(agentData);
+      
+      // Update UI with agent info
+      document.getElementById('agentNameDisplay').textContent = currentAgent.name;
+      document.getElementById('agentIdDisplay').textContent = currentAgent.id;
+      document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
+      
+      // Show the app
+      document.getElementById('app').style.display = 'flex';
+      
+      // Initialize connection
+      initPersistentConnection();
+      initializeSocketConnection();
+      
+    } catch (error) {
+      console.error('Error loading agent data:', error);
+      // Clear invalid data and redirect to login
+      localStorage.removeItem('agentData');
+      window.location.href = 'login.html';
+    }
     
     window.addEventListener('resize', handleResize);
-    
-    setTimeout(() => {
-      document.getElementById('agentId').focus();
-    }, 300);
   };
   
   function handleResize() {
     isMobile = window.innerWidth < 768;
-  }
-  
-  function getCurrentFileName() {
-    const path = window.location.pathname;
-    return path.split('/').pop() || "agent2.html";
   }
   
   // ================================================
@@ -1185,9 +911,9 @@
       updateActivity();
       
       if (currentAgent) {
-        console.log("🔄 Re-authenticating after reconnection...");
+        console.log("🔄 Authenticating with server...");
         socket.emit('agent_login', { 
-          agentId: AGENT_CONFIG.id, 
+          agentId: currentAgent.id, 
           password: AGENT_CONFIG.password,
           reconnect: true
         });
@@ -1195,21 +921,17 @@
     });
     
     socket.on('agent_login_response', (res) => {
-      const loginButton = document.getElementById('loginButton');
-      
       if (res.success) {
         console.log("✅ Login successful:", res);
-        currentAgent = { 
-          id: AGENT_CONFIG.id, 
-          name: res.name || AGENT_CONFIG.name,
-          muted: res.muted || false
-        };
+        
+        // Update currentAgent with server data
+        currentAgent.name = res.name || currentAgent.name;
+        currentAgent.muted = res.muted || false;
         
         isMuted = res.muted || false;
         updateMuteStatus();
         
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
+        // Update UI with agent info
         document.getElementById('agentNameDisplay').textContent = currentAgent.name;
         document.getElementById('agentIdDisplay').textContent = currentAgent.id;
         document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
@@ -1228,16 +950,14 @@
         
       } else {
         console.error("❌ Login failed:", res.message);
-        document.getElementById('loginError').textContent = res.message || 'Login failed';
         
-        if (loginButton) {
-          loginButton.disabled = false;
-          loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-        }
+        // If login fails, clear localStorage and redirect to login
+        localStorage.removeItem('agentData');
+        showNotification('Session expired. Please login again.', '#ffebee', '#c62828');
         
-        if (currentAgent) {
-          setTimeout(() => reconnect(), 3000);
-        }
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 2000);
       }
       
       updateActivity();
@@ -1246,13 +966,6 @@
     socket.on('connect_error', (error) => {
       console.error("❌ Connection error:", error);
       updateConnectionStatus('error', 'Connection error');
-      document.getElementById('loginError').textContent = `Connection error: ${error.message}`;
-      
-      const loginButton = document.getElementById('loginButton');
-      if (loginButton) {
-        loginButton.disabled = false;
-        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-      }
       
       if (currentAgent && !CONNECTION_CONFIG.isManualDisconnect) {
         scheduleReconnect();
@@ -1533,7 +1246,7 @@
     
     socket.on('mute_status', (data) => {
       updateActivity();
-      if (data.agentId === AGENT_CONFIG.id) {
+      if (data.agentId === currentAgent.id) {
         isMuted = data.muted;
         updateMuteStatus();
         
@@ -1562,6 +1275,33 @@
       updateConnectionStatus('connected', 'Stable connection');
       updateActivity();
     });
+  }
+  
+  // ================================================
+  // SOCKET INITIALIZATION FUNCTION
+  // ================================================
+  function initializeSocketConnection() {
+    console.log("🔄 Initializing socket connection...");
+    
+    updateConnectionStatus('connecting');
+    
+    socket = io("https://chat-backend-p2b9.onrender.com", {
+      transports: ['websocket', 'polling'],
+      reconnection: false,
+      timeout: 30000,
+      forceNew: true,
+      multiplex: false,
+      upgrade: true,
+      rememberUpgrade: true,
+      path: '/socket.io/',
+      query: {
+        agentId: currentAgent.id,
+        persistent: 'true',
+        fromMainApp: 'true'
+      }
+    });
+    
+    setupSocketListeners();
   }
   
   // ================================================
@@ -1707,7 +1447,7 @@
         // Also request specific user messages
         socket.emit('get_messages', { 
           whatsapp: userId, 
-          agentId: AGENT_CONFIG.id,
+          agentId: currentAgent.id,
           markAsRead: true 
         });
       }
@@ -1782,7 +1522,7 @@
   
   function createMessageElement(msg) {
     const messageDiv = document.createElement("div");
-    const isAgent = msg.sender === 'agent' || msg.sender === 'admin' || msg.agentId === AGENT_CONFIG.id;
+    const isAgent = msg.sender === 'agent' || msg.sender === 'admin' || msg.agentId === currentAgent.id;
     
     messageDiv.className = "message-container " + (isAgent ? "agent-message" : "user-message");
     
@@ -2118,202 +1858,6 @@
   // ================================================
   // UTILITY FUNCTIONS
   // ================================================
-  function login() {
-    const id = document.getElementById('agentId').value.trim();
-    const pass = document.getElementById('agentPass').value.trim();
-    
-    if (!id || !pass) {
-      document.getElementById('loginError').textContent = 'Please enter both ID and password';
-      return;
-    }
-    
-    // LOGIN FIX: Always accept only "agent2" for both ID and password
-    if (id !== AGENT_CONFIG.id) {
-      document.getElementById('loginError').textContent = 'Invalid Agent ID. Use: agent2';
-      return;
-    }
-    
-    if (pass !== AGENT_CONFIG.password) {
-      document.getElementById('loginError').textContent = 'Invalid password. Use: agent2';
-      return;
-    }
-    
-    const loginButton = document.getElementById('loginButton');
-    loginButton.disabled = true;
-    loginButton.innerHTML = '<span>🔄</span><span>Connecting...</span>';
-    
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-      reconnectTimeout = null;
-    }
-    
-    autoReconnectAttempts = 0;
-    document.getElementById('loginError').textContent = '';
-    CONNECTION_CONFIG.isManualDisconnect = false;
-    
-    updateConnectionStatus('connecting');
-    
-    socket = io("https://chat-backend-p2b9.onrender.com", {
-      transports: ['websocket', 'polling'],
-      reconnection: false,
-      timeout: 30000,
-      forceNew: true,
-      multiplex: false,
-      upgrade: true,
-      rememberUpgrade: true,
-      path: '/socket.io/',
-      query: {
-        agentId: AGENT_CONFIG.id,
-        persistent: 'true'
-      }
-    });
-    
-    setupSocketListeners();
-    
-    socket.once('connect', () => {
-      console.log("Socket connected, sending login credentials...");
-      
-      // AUTO-REGISTRATION ADDED: First try to register the agent
-      console.log("🔄 Attempting auto-registration for agent...");
-      socket.emit('register_agent', {
-        agentId: AGENT_CONFIG.id,
-        password: AGENT_CONFIG.password,
-        agentName: AGENT_CONFIG.name,
-        filename: AGENT_CONFIG.filename
-      });
-      
-      // Then proceed with login
-      setTimeout(() => {
-        socket.emit('agent_login', { 
-          agentId: AGENT_CONFIG.id, 
-          password: AGENT_CONFIG.password,
-          persistent: true
-        });
-      }, 500);
-    });
-    
-    // ADDED: Handle agent registration response
-    socket.on('agent_registration_response', (res) => {
-      console.log("Agent registration response:", res);
-      if (res.success) {
-        console.log("✅ Agent auto-registered successfully");
-        showNotification('Agent account created successfully!', '#e8f5e9', '#2e7d32');
-      } else {
-        console.log("ℹ️ Agent registration response:", res.message);
-        // Don't show error for already registered agents
-        if (res.message && !res.message.includes('already registered') && 
-            !res.message.includes('already exists') &&
-            !res.message.includes('Agent already')) {
-          console.warn("⚠️ Registration issue:", res.message);
-        }
-      }
-    });
-    
-    // ADDED: If login fails because agent doesn't exist, try to auto-register
-    socket.on('agent_login_response', (res) => {
-      const loginButton = document.getElementById('loginButton');
-      
-      if (res.success) {
-        console.log("✅ Login successful:", res);
-        currentAgent = { 
-          id: AGENT_CONFIG.id, 
-          name: res.name || AGENT_CONFIG.name,
-          muted: res.muted || false
-        };
-        
-        isMuted = res.muted || false;
-        updateMuteStatus();
-        
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
-        document.getElementById('agentNameDisplay').textContent = currentAgent.name;
-        document.getElementById('agentIdDisplay').textContent = currentAgent.id;
-        document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
-        
-        // Request broadcast room messages on login
-        if (socket && socket.connected) {
-          console.log("📡 Requesting broadcast room messages...");
-          socket.emit('get_broadcast_messages', {
-            agentId: currentAgent.id
-          });
-        }
-        
-        // Load user conversations
-        loadAllConversations();
-        showNotification('Connected to server successfully!', '#e8f5e9', '#2e7d32');
-        
-      } else {
-        console.error("❌ Login failed:", res.message);
-        document.getElementById('loginError').textContent = res.message || 'Login failed';
-        
-        // AUTO-REGISTRATION ADDED: If login fails because agent doesn't exist, try to register
-        if (res.message && (res.message.includes('not found') || 
-            res.message.includes('not registered') || 
-            res.message.includes('does not exist') ||
-            res.message.includes('Invalid agent'))) {
-          
-          console.log("🔄 Agent not found, attempting auto-registration...");
-          showNotification('Agent not found. Auto-registering...', '#fff3e0', '#f57c00');
-          
-          socket.emit('register_agent', {
-            agentId: AGENT_CONFIG.id,
-            password: AGENT_CONFIG.password,
-            agentName: AGENT_CONFIG.name,
-            filename: AGENT_CONFIG.filename
-          });
-          
-          // Wait a moment and try login again
-          setTimeout(() => {
-            socket.emit('agent_login', { 
-              agentId: AGENT_CONFIG.id, 
-              password: AGENT_CONFIG.password,
-              persistent: true
-            });
-          }, 1000);
-          
-          return;
-        }
-        
-        if (loginButton) {
-          loginButton.disabled = false;
-          loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-        }
-        
-        if (currentAgent) {
-          setTimeout(() => reconnect(), 3000);
-        }
-      }
-      
-      updateActivity();
-    });
-    
-    const connectionTimeout = setTimeout(() => {
-      if (!currentAgent && loginButton.disabled) {
-        console.log("Connection timeout");
-        document.getElementById('loginError').textContent = 'Connection timeout. Please try again.';
-        loginButton.disabled = false;
-        loginButton.innerHTML = '<span>🔓</span><span>Login as Agent</span>';
-        updateConnectionStatus('error', 'Connection timeout');
-        
-        if (socket) {
-          socket.disconnect();
-        }
-        
-        scheduleReconnect();
-      }
-    }, 15000);
-    
-    socket.once('connect', () => {
-      clearTimeout(connectionTimeout);
-    });
-    
-    socket.once('connect_error', () => {
-      clearTimeout(connectionTimeout);
-    });
-    
-    updateActivity();
-  }
-  
   function updateMuteStatus() {
     const muteIndicator = document.getElementById('muteIndicator');
     const sendBtn = document.getElementById('sendButton');
@@ -2528,10 +2072,6 @@
   // ================================================
   // EVENT LISTENERS
   // ================================================
-  document.getElementById('agentPass').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') login();
-  });
-  
   window.addEventListener('popstate', function() {
     updateActivity();
     if (selectedUser) {
