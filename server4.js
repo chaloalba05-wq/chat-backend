@@ -11,6 +11,10 @@ const { v4: uuidv4 } = require("uuid");
 const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
 // =====================================
 
+// ===== BROADCAST ROOM CONFIGURATION =====
+const BROADCAST_ROOM = "BROADCAST_ROOM_ALL_AGENTS";
+// =========================================
+
 // ===== File Upload Configuration =====
 const UPLOADS_DIR = path.join(__dirname, "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -39,6 +43,8 @@ const agents = new Map();          // agentId -> { name, password, muted, socket
 const conversations = new Map();   // whatsapp -> { messages: [], lastUpdated, createdAt }
 const activeChats = new Map();     // whatsapp -> { lastMessage, lastMessageTime }
 const activityLog = [];            // Activity log
+const broadcastMessages = [];      // All messages in broadcast room
+// =====================================
 
 // ===== SIMPLE HELPER FUNCTIONS =====
 function logActivity(type, details) {
@@ -53,8 +59,33 @@ function logActivity(type, details) {
   return log;
 }
 
-// ===== SAVE MESSAGE TO MEMORY =====
-function saveMessageToMemory(whatsapp, message) {
+// ===== SAVE MESSAGE TO BROADCAST ROOM =====
+function saveMessageToBroadcastRoom(message) {
+  try {
+    const broadcastMessage = {
+      ...message,
+      isBroadcast: true,
+      broadcastTimestamp: new Date().toISOString(),
+      broadcastId: uuidv4()
+    };
+    
+    broadcastMessages.push(broadcastMessage);
+    
+    // Keep only last 1000 broadcast messages to prevent memory issues
+    if (broadcastMessages.length > 1000) {
+      broadcastMessages.shift();
+    }
+    
+    console.log(`📡 Saved to broadcast room: ${broadcastMessage.broadcastId} (Total: ${broadcastMessages.length} broadcast messages)`);
+    return broadcastMessage;
+  } catch (error) {
+    console.error("Error saving to broadcast room:", error);
+    return null;
+  }
+}
+
+// ===== SAVE MESSAGE TO USER'S CHAT HISTORY =====
+function saveMessageToUserHistory(whatsapp, message) {
   try {
     if (!conversations.has(whatsapp)) {
       // Create new conversation
@@ -79,51 +110,99 @@ function saveMessageToMemory(whatsapp, message) {
     console.log(`💾 Saved message for ${whatsapp} (Total: ${conversations.get(whatsapp)?.messages.length} messages)`);
     return true;
   } catch (error) {
-    console.error("Error saving message to memory:", error);
+    console.error("Error saving message to user history:", error);
     return false;
   }
 }
 
-// ===== BROADCAST TO ALL AGENTS =====
-function broadcastToAllAgents(messageData, excludeSocketId = null) {
+// ===== SEND BROADCAST ROOM MESSAGES TO AGENT =====
+function sendBroadcastRoomToAgent(agentSocketId) {
   try {
+    // Send all broadcast messages to the agent
+    broadcastMessages.forEach(message => {
+      io.to(agentSocketId).emit("broadcast_message", {
+        ...message,
+        isHistorical: true
+      });
+    });
+    
+    console.log(`📨 Sent ${broadcastMessages.length} broadcast messages to agent`);
+  } catch (error) {
+    console.error("Error sending broadcast room to agent:", error);
+  }
+}
+
+// ===== SEND USER CHAT HISTORY TO AGENT =====
+function sendUserChatHistoryToAgent(agentSocketId, whatsapp) {
+  try {
+    const conversation = conversations.get(whatsapp);
+    if (conversation && conversation.messages && conversation.messages.length > 0) {
+      // Send each message from this user's history
+      conversation.messages.forEach(message => {
+        io.to(agentSocketId).emit("user_chat_history", {
+          ...message,
+          whatsapp: whatsapp,
+          isHistorical: true
+        });
+      });
+      
+      console.log(`📨 Sent ${conversation.messages.length} messages from ${whatsapp} to agent`);
+    }
+  } catch (error) {
+    console.error(`Error sending ${whatsapp} chat history to agent:`, error);
+  }
+}
+
+// ===== BROADCAST MESSAGE TO ALL AGENTS =====
+function broadcastMessageToAllAgents(messageData, excludeSocketId = null) {
+  try {
+    // Save to broadcast room first
+    const broadcastMessage = saveMessageToBroadcastRoom(messageData);
+    
     // Send to all non-muted agents
     agents.forEach((agent, agentId) => {
       if (!agent.muted && agent.socketId && agent.socketId !== excludeSocketId) {
-        io.to(agent.socketId).emit("new_message", {
-          ...messageData,
-          isBroadcast: true,
-          timestamp: messageData.timestamp || new Date().toISOString()
-        });
+        io.to(agent.socketId).emit("broadcast_message", broadcastMessage);
       }
     });
+    
+    // Also send to the broadcast room for new connections
+    io.to(BROADCAST_ROOM).emit("broadcast_message", broadcastMessage);
+    
     return true;
   } catch (error) {
-    console.error("Error broadcasting to agents:", error);
+    console.error("Error broadcasting message to agents:", error);
     return false;
   }
 }
 
-// ===== SEND ALL CHATS TO AGENT ON LOGIN =====
-function sendAllActiveChatsToAgent(agentSocketId) {
+// ===== SEND MESSAGE TO SPECIFIC USER ROOM =====
+function sendMessageToUserRoom(whatsapp, message) {
   try {
-    // Send all conversations to the agent
-    conversations.forEach((conv, whatsapp) => {
-      if (!conv.archived && conv.messages && conv.messages.length > 0) {
-        // Send each message
-        conv.messages.forEach(message => {
-          io.to(agentSocketId).emit("new_message", {
-            ...message,
-            whatsapp: whatsapp,
-            isHistorical: true
-          });
+    // Save to user's chat history
+    saveMessageToUserHistory(whatsapp, message);
+    
+    // Send to the specific user's room
+    io.to(whatsapp).emit("new_message", {
+      ...message,
+      whatsapp: whatsapp
+    });
+    
+    // Also send to any agents monitoring this user
+    agents.forEach((agent, agentId) => {
+      if (agent.socketId && agent.monitoringUser === whatsapp) {
+        io.to(agent.socketId).emit("user_message_update", {
+          ...message,
+          whatsapp: whatsapp
         });
       }
     });
     
-    console.log(`📨 Sent ${conversations.size} chat histories to agent`);
+    console.log(`📤 Sent message to user room: ${whatsapp}`);
+    return true;
   } catch (error) {
-    console.error("Error sending chat history to agent:", error);
+    console.error(`Error sending message to user room ${whatsapp}:`, error);
+    return false;
   }
 }
 
@@ -315,6 +394,7 @@ app.get("/test", (req, res) => {
     totalConversations: conversations.size,
     totalAgents: agents.size,
     activeChats: activeChats.size,
+    broadcastMessages: broadcastMessages.length,
     storageInfo: "All messages stored in memory only"
   });
 });
@@ -577,7 +657,8 @@ io.on("connection", (socket) => {
             onlineAgents: Array.from(agents.values()).filter(a => a.socketId).length,
             activeChats: activeChatsList.length,
             mutedAgents: Array.from(agents.values()).filter(a => a.muted).length,
-            totalConversations: conversations.size
+            totalConversations: conversations.size,
+            broadcastMessages: broadcastMessages.length
           }
         });
       } catch (error) {
@@ -620,6 +701,9 @@ io.on("connection", (socket) => {
     agent.lastSeen = new Date();
     users.set(socket.id, { type: 'agent', agentId });
     
+    // Join the broadcast room
+    socket.join(BROADCAST_ROOM);
+    
     logActivity('agent_login', { 
       agentId, 
       name: agent.name, 
@@ -627,8 +711,8 @@ io.on("connection", (socket) => {
       filename: agent.filename || 'no file'
     });
     
-    // Send all active chats history to this agent
-    sendAllActiveChatsToAgent(socket.id);
+    // ===== SEND BROADCAST ROOM HISTORY TO AGENT =====
+    sendBroadcastRoomToAgent(socket.id);
     
     socket.emit("agent_login_response", {
       success: true,
@@ -648,6 +732,36 @@ io.on("connection", (socket) => {
     
     io.to("super_admin").emit("agents_list", agentsList);
     io.to("super_admin").emit("agent_updated", { agentId });
+  });
+
+  // ===== AGENT JOINS USER ROOM =====
+  socket.on("join_user_room", ({ whatsapp }) => {
+    const userData = users.get(socket.id);
+    if (userData?.type !== 'agent') return;
+    
+    const agent = agents.get(userData.agentId);
+    if (!agent) return;
+    
+    // Agent joins the user's specific room
+    socket.join(whatsapp);
+    
+    // Update agent's monitoring status
+    agent.monitoringUser = whatsapp;
+    
+    // Send this user's chat history to the agent
+    sendUserChatHistoryToAgent(socket.id, whatsapp);
+    
+    logActivity('agent_joined_user_room', {
+      agentId: userData.agentId,
+      agentName: agent.name,
+      whatsapp: whatsapp
+    });
+    
+    socket.emit("user_room_joined", {
+      success: true,
+      whatsapp: whatsapp,
+      message: `Now monitoring ${whatsapp}`
+    });
   });
 
   // ===== AGENT SENDS MESSAGE =====
@@ -693,26 +807,26 @@ io.on("connection", (socket) => {
     // ===== REMOVED: DEDUPLICATION CHECK =====
     // Server no longer checks for duplicates - client handles this
     
-    // ===== SAVE TO MEMORY =====
-    saveMessageToMemory(whatsapp, message);
-    console.log(`✓ Agent message saved with ID: ${messageId}`);
+    // ===== SAVE TO BOTH PLACES =====
     
-    // ===== BROADCAST TO ALL =====
+    // 1. Save to broadcast room (all agents can see)
+    saveMessageToBroadcastRoom(message);
     
-    // 1. Send to super_admin and admin
+    // 2. Save to user's specific chat history
+    saveMessageToUserHistory(whatsapp, message);
+    
+    console.log(`✓ Agent message saved to both broadcast room and ${whatsapp}'s history`);
+    
+    // ===== SEND TO BOTH ROOMS =====
+    
+    // 1. Send to broadcast room (all agents)
+    broadcastMessageToAllAgents(message, socket.id);
+    
+    // 2. Send to user's specific room
+    sendMessageToUserRoom(whatsapp, message);
+    
+    // 3. Send to super_admin and admin
     io.to("super_admin").to("admin").emit("new_message", message);
-    
-    // 2. Send to the specific user if we have their whatsapp
-    if (whatsapp !== 'unknown') {
-      io.to(whatsapp).emit("new_message", {
-        ...message,
-        agentId: undefined,
-        agentName: undefined
-      });
-    }
-    
-    // 3. Broadcast to all other agents (excluding the sender)
-    broadcastToAllAgents(message, socket.id);
     
     // Update active chats
     activeChats.set(whatsapp, {
@@ -728,7 +842,9 @@ io.on("connection", (socket) => {
       agentName: agent.name,
       messageId: messageId,
       message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
-      to: whatsapp
+      to: whatsapp,
+      savedToBroadcast: true,
+      savedToUserHistory: true
     });
   });
 
@@ -770,31 +886,29 @@ io.on("connection", (socket) => {
     // ===== REMOVED: DEDUPLICATION CHECK =====
     // Server no longer checks for duplicates - client handles this
     
-    // ===== SAVE TO MEMORY =====
-    saveMessageToMemory(whatsapp, message);
-    console.log(`✓ User message saved with ID: ${messageId}`);
+    // ===== SAVE TO BOTH PLACES =====
     
-    // ===== BROADCAST TO EVERYONE =====
+    // 1. Save to broadcast room (all agents can see)
+    saveMessageToBroadcastRoom(message);
     
-    // 1. Send confirmation to the user who sent it
-    socket.emit("new_message", {
-      ...message,
-      sender: "user"
-    });
+    // 2. Save to user's specific chat history
+    saveMessageToUserHistory(whatsapp, message);
     
-    // 2. Send to super_admin and admin
+    console.log(`✓ User message saved to both broadcast room and ${whatsapp}'s history`);
+    
+    // ===== SEND TO BOTH ROOMS =====
+    
+    // 1. Send to broadcast room (all agents)
+    broadcastMessageToAllAgents(message);
+    
+    // 2. Send to user's specific room
+    sendMessageToUserRoom(whatsapp, message);
+    
+    // 3. Send to super_admin and admin
     io.to("super_admin").to("admin").emit("new_message", {
       ...message,
       sender: "user"
     });
-    
-    // 3. Broadcast to all agents
-    broadcastToAllAgents({
-      ...message,
-      sender: "user"
-    });
-    
-    console.log(`📢 Broadcast message ID: ${messageId}`);
     
     // Update active chats
     activeChats.set(whatsapp, {
@@ -809,7 +923,8 @@ io.on("connection", (socket) => {
       messageId: messageId,
       message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
       hasAttachment: !!data.attachment,
-      forwardedToAllAgents: true
+      savedToBroadcast: true,
+      savedToUserHistory: true
     });
   });
 
@@ -885,6 +1000,19 @@ io.on("connection", (socket) => {
     } catch (error) {
       console.error("Error fetching existing users:", error);
       socket.emit("existing_users", []);
+    }
+  });
+
+  // Get broadcast room messages
+  socket.on("get_broadcast_messages", () => {
+    try {
+      const userData = users.get(socket.id);
+      if (userData?.type === 'agent' || userData?.type === 'super_admin' || userData?.type === 'admin') {
+        socket.emit("broadcast_messages_history", broadcastMessages);
+      }
+    } catch (error) {
+      console.error("Error fetching broadcast messages:", error);
+      socket.emit("broadcast_messages_history", []);
     }
   });
 
@@ -981,9 +1109,16 @@ io.on("connection", (socket) => {
         }
         conversation.lastUpdated = new Date();
         
+        // Also remove from broadcast room if it exists there
+        const broadcastIndex = broadcastMessages.findIndex(msg => msg.id === messageId);
+        if (broadcastIndex !== -1) {
+          broadcastMessages.splice(broadcastIndex, 1);
+        }
+        
         // Notify all connected clients about the deletion
         io.to(whatsapp).emit("message_deleted", { whatsapp, messageId });
         io.to("super_admin").to("admin").emit("message_deleted", { whatsapp, messageId });
+        io.to(BROADCAST_ROOM).emit("broadcast_message_deleted", { messageId });
         
         // Notify all agents
         agents.forEach((agent, agentId) => {
@@ -1056,6 +1191,7 @@ io.on("connection", (socket) => {
         totalChats,
         archivedChats,
         totalMessages,
+        broadcastMessages: broadcastMessages.length,
         storageMode: "IN-MEMORY ONLY",
         note: "Data will be lost on server restart"
       });
@@ -1074,6 +1210,7 @@ io.on("connection", (socket) => {
         if (agent) {
           agent.socketId = null;
           agent.lastSeen = new Date();
+          agent.monitoringUser = null; // Clear monitoring status
           console.log(`✗ Agent disconnected: ${agent.name} (${socket.id})`);
           
           // Notify Super Admin
@@ -1099,6 +1236,7 @@ function startServer() {
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
+    console.log(`📡 Broadcast Room: ${BROADCAST_ROOM}`);
     console.log(`📁 Available routes:`);
     console.log(`   /chat - User chat interface`);
     console.log(`   /admin - Original admin panel`);
@@ -1110,11 +1248,12 @@ function startServer() {
     console.log(`   POST /chat/:whatsapp/restore - Restore archived chat`);
     console.log(`   /test - Test endpoint`);
     console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
-    console.log(`\n✅ System is ready with SIMPLE IN-MEMORY STORAGE!`);
-    console.log(`📝 ALL MESSAGES SAVED UNDER WHATSAPP NUMBERS`);
-    console.log(`🔧 Agents can access all saved messages on login`);
+    console.log(`\n✅ System is ready with DUAL STORAGE SYSTEM!`);
+    console.log(`📡 BROADCAST ROOM: All messages saved for all agents`);
+    console.log(`💾 USER ROOMS: Each user's messages saved under their WhatsApp ID`);
+    console.log(`🔧 Agents automatically get broadcast history on login`);
+    console.log(`👤 Agents can join individual user rooms to see their history`);
     console.log(`⚠️  WARNING: Data is ephemeral - will be lost on server restart`);
-    console.log(`🚫 DEDUPLICATION: Server-side deduplication REMOVED - Client handles duplicates`);
   });
 }
 

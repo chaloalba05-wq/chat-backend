@@ -62,6 +62,54 @@
       transform: translateX(0);
     }
     
+    /* ===== BROADCAST VIEW ===== */
+    .broadcast-view {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #f8f9fa;
+    }
+    
+    /* ===== VIEW CONTROLS ===== */
+    .view-controls {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      padding: clamp(12px, 2vw, 15px) clamp(16px, 3vw, 20px);
+      gap: 10px;
+    }
+    
+    .view-tab {
+      flex: 1;
+      padding: clamp(10px, 2vw, 12px);
+      border: none;
+      border-radius: 8px;
+      background: #f5f5f5;
+      color: #666;
+      font-size: clamp(13px, 1.8vw, 14px);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .view-tab.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    
+    .view-tab:active {
+      transform: scale(0.98);
+    }
+    
+    .view-tab-icon {
+      font-size: clamp(14px, 2.5vw, 16px);
+    }
+    
     /* ===== SIDEBAR - EXACTLY 1/4 OF SCREEN ===== */
     .sidebar { 
       width: 100%;
@@ -546,6 +594,63 @@
       text-overflow: ellipsis;
     }
     
+    /* ===== BROADCAST HEADER ===== */
+    .broadcast-header {
+      padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: clamp(12px, 2vw, 15px);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    
+    .broadcast-back-button {
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: background 0.2s;
+      flex-shrink: 0;
+      color: white;
+    }
+    
+    .broadcast-back-button:active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .broadcast-title {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .broadcast-title-main {
+      font-weight: 600;
+      font-size: clamp(16px, 2.5vw, 18px);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .broadcast-title-sub {
+      font-size: clamp(12px, 1.8vw, 13px);
+      opacity: 0.9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
     /* ===== CHAT WRAPPER - FIXED ===== */
     .chat-wrapper {
       display: flex;
@@ -566,7 +671,8 @@
     }
     
     /* Scrollable Messages Container - FIXED */
-    #chatMessages {
+    #chatMessages,
+    #broadcastMessages {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
@@ -579,32 +685,38 @@
     }
     
     /* Bottom padding for messages */
-    #chatMessages::after {
+    #chatMessages::after,
+    #broadcastMessages::after {
       content: '';
       flex: 0 0 16px;
     }
     
     /* Optimized scrollbar */
-    #chatMessages::-webkit-scrollbar {
+    #chatMessages::-webkit-scrollbar,
+    #broadcastMessages::-webkit-scrollbar {
       width: 6px;
     }
     
-    #chatMessages::-webkit-scrollbar-track {
+    #chatMessages::-webkit-scrollbar-track,
+    #broadcastMessages::-webkit-scrollbar-track {
       background: rgba(241, 241, 241, 0.5);
       border-radius: 3px;
     }
     
-    #chatMessages::-webkit-scrollbar-thumb {
+    #chatMessages::-webkit-scrollbar-thumb,
+    #broadcastMessages::-webkit-scrollbar-thumb {
       background: rgba(102, 126, 234, 0.5);
       border-radius: 3px;
     }
     
-    #chatMessages::-webkit-scrollbar-thumb:hover {
+    #chatMessages::-webkit-scrollbar-thumb:hover,
+    #broadcastMessages::-webkit-scrollbar-thumb:hover {
       background: rgba(102, 126, 234, 0.7);
     }
     
     /* Firefox scrollbar */
-    #chatMessages {
+    #chatMessages,
+    #broadcastMessages {
       scrollbar-width: thin;
       scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     }
@@ -830,6 +942,21 @@
       border-bottom-left-radius: 6px;
     }
     
+    /* Broadcast message styling */
+    .broadcast-message {
+      background: white;
+      border: 1px solid #e8e8e8;
+      margin-right: auto;
+      margin-left: auto;
+      max-width: 95%;
+      border-radius: 12px;
+      border-left: 4px solid #667eea;
+    }
+    
+    .broadcast-message.agent-message {
+      border-left-color: #4CAF50;
+    }
+    
     .message-header {
       display: flex;
       justify-content: space-between;
@@ -847,7 +974,8 @@
       color: rgba(255,255,255,0.95);
     }
     
-    .user-message .message-sender {
+    .user-message .message-sender,
+    .broadcast-message .message-sender {
       color: #444;
     }
     
@@ -861,7 +989,8 @@
       color: rgba(255,255,255,0.8);
     }
     
-    .user-message .message-time {
+    .user-message .message-time,
+    .broadcast-message .message-time {
       color: #666;
     }
     
@@ -871,6 +1000,16 @@
       line-height: 1.5;
       overflow-wrap: break-word;
       word-break: break-word;
+    }
+    
+    .broadcast-user-info {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 4px;
+      padding: 4px 8px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      display: inline-block;
     }
     
     /* ===== FILE UPLOAD ===== */
@@ -986,6 +1125,12 @@
         font-size: 16px;
       }
       
+      .broadcast-back-button {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+      
       .input-area {
         padding: 12px;
         gap: 8px;
@@ -1008,6 +1153,10 @@
         margin: 8px 0;
       }
       
+      .broadcast-message {
+        max-width: 92%;
+      }
+      
       .attachment img {
         max-height: 150px;
       }
@@ -1026,7 +1175,17 @@
         padding: 12px 16px;
       }
       
+      .broadcast-header {
+        padding: 12px 16px;
+      }
+      
       .back-button {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+      
+      .broadcast-back-button {
         width: 36px;
         height: 36px;
         font-size: 16px;
@@ -1047,6 +1206,10 @@
         padding: 10px 14px;
       }
       
+      .broadcast-message {
+        max-width: 94%;
+      }
+      
       .send-btn {
         min-width: 70px;
         padding: 12px 20px;
@@ -1062,6 +1225,15 @@
         width: 32px;
         height: 32px;
         font-size: 14px;
+      }
+      
+      .view-controls {
+        padding: 10px 12px;
+      }
+      
+      .view-tab {
+        padding: 8px 10px;
+        font-size: 12px;
       }
     }
     
@@ -1091,7 +1263,7 @@
         padding-right: max(16px, env(safe-area-inset-right));
       }
       
-      .sidebar-header, .chat-detail-header, .input-area {
+      .sidebar-header, .chat-detail-header, .input-area, .broadcast-header {
         padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
         padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
       }
@@ -1271,8 +1443,49 @@
 <!-- Main App -->
 <div id="app" class="container" style="display: none;">
   
+  <!-- View Controls -->
+  <div class="view-controls">
+    <button class="view-tab active" onclick="switchView('broadcast')">
+      <span class="view-tab-icon">📡</span>
+      <span>Broadcast Room</span>
+    </button>
+    <button class="view-tab" onclick="switchView('users')">
+      <span class="view-tab-icon">👥</span>
+      <span>User Conversations</span>
+    </button>
+  </div>
+  
+  <!-- Broadcast View -->
+  <div id="broadcastView" class="broadcast-view">
+    <!-- Broadcast Header -->
+    <div class="broadcast-header">
+      <button class="broadcast-back-button" onclick="exitBroadcast()" style="display: none;">←</button>
+      <div class="broadcast-title">
+        <div class="broadcast-title-main">📡 Broadcast Room</div>
+        <div class="broadcast-title-sub">All messages from all users</div>
+      </div>
+    </div>
+    
+    <!-- Broadcast Messages -->
+    <div class="chat-wrapper">
+      <div class="messages-section">
+        <!-- Scroll to bottom button -->
+        <button class="scroll-to-bottom-btn" id="broadcastScrollToBottomBtn" title="Scroll to bottom">
+          ↓
+        </button>
+        
+        <!-- Scrollable broadcast messages -->
+        <div id="broadcastMessages">
+          <div class="empty-state">
+            <div>Loading broadcast messages...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <!-- Chat List View (Initial View) -->
-  <div id="chatListView" class="chat-list-view">
+  <div id="chatListView" class="chat-list-view" style="display: none;">
     <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <!-- Agent Info -->
@@ -1388,7 +1601,41 @@
   let socket = null;
   let currentAgent = null;
   let selectedUser = null;
+  let currentView = 'broadcast'; // 'broadcast' or 'users'
   let users = new Map();
+  let broadcastMessages = new Map(); // Store broadcast messages with ID as key
+  let broadcastDuplicateManager = {
+    seenMessages: new Set(),
+    
+    isDuplicate(msg) {
+      if (!msg.id) return false;
+      
+      const key = msg.id;
+      const now = Date.now();
+      
+      // Clean old entries
+      if (this.seenMessages.size > 1000) {
+        this.seenMessages.clear();
+      }
+      
+      if (this.seenMessages.has(key)) {
+        console.log('🔴 BROADCAST DUPLICATE DETECTED:', {
+          id: key,
+          timestamp: msg.timestamp,
+          sender: msg.sender
+        });
+        return true;
+      }
+      
+      this.seenMessages.add(key);
+      return false;
+    },
+    
+    clear() {
+      this.seenMessages.clear();
+    }
+  };
+  
   let isMuted = false;
   let autoReconnectAttempts = 0;
   const MAX_RECONNECT_ATTEMPTS = 20;
@@ -1438,6 +1685,45 @@
   };
   
   // ================================================
+  // VIEW MANAGEMENT
+  // ================================================
+  function switchView(view) {
+    currentView = view;
+    
+    // Update tab buttons
+    document.querySelectorAll('.view-tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    
+    if (view === 'broadcast') {
+      document.querySelector('.view-tab:nth-child(1)').classList.add('active');
+      document.getElementById('broadcastView').style.display = 'flex';
+      document.getElementById('chatListView').style.display = 'none';
+      document.getElementById('chatDetailView').classList.remove('active');
+      
+      // Show broadcast messages
+      showBroadcastMessages();
+      
+    } else if (view === 'users') {
+      document.querySelector('.view-tab:nth-child(2)').classList.add('active');
+      document.getElementById('broadcastView').style.display = 'none';
+      document.getElementById('chatListView').style.display = 'flex';
+      
+      // Exit chat if open
+      if (selectedUser) {
+        document.getElementById('chatDetailView').classList.add('active');
+      }
+    }
+    
+    updateActivity();
+  }
+  
+  function exitBroadcast() {
+    // In broadcast view, just switch to users view
+    switchView('users');
+  }
+  
+  // ================================================
   // SCROLL MANAGEMENT FUNCTIONS - FIXED
   // ================================================
   function setupScrollListener() {
@@ -1461,11 +1747,29 @@
     }, { passive: true });
     
     scrollToBottomBtn.addEventListener('click', scrollToBottom);
+  }
+  
+  function setupBroadcastScrollListener() {
+    const broadcastDiv = document.getElementById("broadcastMessages");
+    const scrollToBottomBtn = document.getElementById("broadcastScrollToBottomBtn");
     
-    // REMOVED: The problematic CSS transforms that were breaking scrolling
-    // messagesDiv.style.transform = 'translateZ(0)';
-    // messagesDiv.style.backfaceVisibility = 'hidden';
-    // messagesDiv.style.perspective = '1000px';
+    if (!broadcastDiv || !scrollToBottomBtn) return;
+    
+    broadcastDiv.addEventListener('scroll', function() {
+      const scrollTop = broadcastDiv.scrollTop;
+      const scrollHeight = broadcastDiv.scrollHeight;
+      const clientHeight = broadcastDiv.clientHeight;
+      
+      const isBroadcastScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
+      
+      if (!isBroadcastScrolledToBottom) {
+        scrollToBottomBtn.classList.add('visible');
+      } else {
+        scrollToBottomBtn.classList.remove('visible');
+      }
+    }, { passive: true });
+    
+    scrollToBottomBtn.addEventListener('click', scrollBroadcastToBottom);
   }
   
   function scrollToBottom() {
@@ -1477,13 +1781,11 @@
     }
   }
   
-  function scrollToBottomSmooth() {
-    const messagesDiv = document.getElementById("chatMessages");
-    if (messagesDiv && isScrolledToBottom) {
-      messagesDiv.scrollTo({
-        top: messagesDiv.scrollHeight,
-        behavior: 'smooth'
-      });
+  function scrollBroadcastToBottom() {
+    const broadcastDiv = document.getElementById("broadcastMessages");
+    if (broadcastDiv) {
+      broadcastDiv.scrollTop = broadcastDiv.scrollHeight;
+      document.getElementById("broadcastScrollToBottomBtn").classList.remove('visible');
     }
   }
   
@@ -1933,8 +2235,13 @@
         document.getElementById('agentIdDisplay').textContent = currentAgent.id;
         document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
         
+        // Load broadcast history first
+        loadBroadcastHistory();
         loadAllConversations();
         showNotification('Connected to server successfully!', '#e8f5e9', '#2e7d32');
+        
+        // Setup broadcast scroll listener
+        setTimeout(setupBroadcastScrollListener, 100);
         
       } else {
         console.error("❌ Login failed:", res.message);
@@ -2022,6 +2329,152 @@
     
     socket.on('pong', () => {
       updateActivity();
+    });
+    
+    // ===== BROADCAST MESSAGE HANDLER =====
+    socket.on('broadcast_message', (msg) => {
+      console.log("📡 Received broadcast message:", msg);
+      updateActivity();
+      
+      if (broadcastDuplicateManager.isDuplicate(msg)) {
+        console.log("🛑 Skipping duplicate broadcast message");
+        return;
+      }
+      
+      // Store broadcast message
+      const messageId = msg.id || msg.broadcastId || Date.now().toString();
+      broadcastMessages.set(messageId, msg);
+      
+      // Also handle as user message for user list
+      const whatsapp = msg.whatsapp || 'unknown';
+      
+      if (whatsapp !== 'unknown' && !users.has(whatsapp)) {
+        users.set(whatsapp, {
+          name: whatsapp,
+          lastMsg: msg.text || msg.message || '[Attachment]',
+          time: msg.timestamp || new Date().toISOString(),
+          messages: []
+        });
+      }
+      
+      if (whatsapp !== 'unknown') {
+        const user = users.get(whatsapp);
+        if (user) {
+          user.lastMsg = msg.text || msg.message || '[Attachment]';
+          user.time = msg.timestamp || new Date().toISOString();
+          
+          user.messages.push({
+            text: msg.text || msg.message,
+            time: msg.timestamp || new Date().toISOString(),
+            sender: msg.sender || 'unknown',
+            attachment: msg.attachment,
+            agentId: msg.agentId,
+            agentName: msg.agentName,
+            id: msg.id
+          });
+        }
+      }
+      
+      updateUserList();
+      
+      // Show in broadcast view if active
+      if (currentView === 'broadcast') {
+        addBroadcastMessage(msg);
+      }
+      
+      // If we're in a user chat with this user, update their messages
+      if (selectedUser === whatsapp) {
+        showMessages();
+      }
+    });
+    
+    // ===== USER CHAT HISTORY HANDLER =====
+    socket.on('user_chat_history', (msg) => {
+      console.log("📨 Received user chat history:", msg);
+      updateActivity();
+      
+      const whatsapp = msg.whatsapp || 'unknown';
+      const user = users.get(whatsapp);
+      
+      if (user) {
+        // Add to user's messages if not duplicate
+        if (!duplicateManager.isDuplicate(msg)) {
+          user.messages.push({
+            text: msg.text || msg.message,
+            time: msg.timestamp || new Date().toISOString(),
+            sender: msg.sender || 'unknown',
+            attachment: msg.attachment,
+            agentId: msg.agentId,
+            agentName: msg.agentName,
+            id: msg.id
+          });
+          
+          // Sort messages by time
+          user.messages.sort((a, b) => new Date(a.time) - new Date(b.time));
+          
+          if (selectedUser === whatsapp) {
+            showMessages();
+          }
+        }
+      }
+    });
+    
+    // ===== USER ROOM JOINED CONFIRMATION =====
+    socket.on('user_room_joined', (data) => {
+      console.log("✅ Joined user room:", data);
+      updateActivity();
+      
+      if (data.success) {
+        showNotification(`Now monitoring ${data.whatsapp}`, '#e8f5e9', '#2e7d32');
+      }
+    });
+    
+    // ===== USER MESSAGE UPDATE HANDLER =====
+    socket.on('user_message_update', (msg) => {
+      console.log("🔄 Received user message update:", msg);
+      updateActivity();
+      
+      const whatsapp = msg.whatsapp || 'unknown';
+      const user = users.get(whatsapp);
+      
+      if (user) {
+        // Update user's last message
+        user.lastMsg = msg.text || msg.message || '[Attachment]';
+        user.time = msg.timestamp || new Date().toISOString();
+        
+        // Add to messages if not duplicate
+        if (!duplicateManager.isDuplicate(msg)) {
+          user.messages.push({
+            text: msg.text || msg.message,
+            time: msg.timestamp || new Date().toISOString(),
+            sender: msg.sender || 'unknown',
+            attachment: msg.attachment,
+            agentId: msg.agentId,
+            agentName: msg.agentName,
+            id: msg.id
+          });
+        }
+        
+        updateUserList();
+        
+        if (selectedUser === whatsapp) {
+          showMessages();
+        }
+      }
+    });
+    
+    // ===== BROADCAST MESSAGE DELETED =====
+    socket.on('broadcast_message_deleted', (data) => {
+      console.log("🗑️ Broadcast message deleted:", data);
+      updateActivity();
+      
+      // Remove from broadcast messages
+      broadcastMessages.delete(data.messageId);
+      
+      // Update broadcast view
+      if (currentView === 'broadcast') {
+        showBroadcastMessages();
+      }
     });
     
     socket.on('new_message', (msg) => {
@@ -2135,6 +2588,135 @@
       updateConnectionStatus('connected', 'Stable connection');
       updateActivity();
     });
+    
+    // ===== BROADCAST MESSAGES HISTORY =====
+    socket.on('broadcast_messages_history', (messages) => {
+      console.log("📡 Received broadcast messages history:", messages.length);
+      updateActivity();
+      
+      broadcastDuplicateManager.clear();
+      
+      messages.forEach(msg => {
+        if (!broadcastDuplicateManager.isDuplicate(msg)) {
+          const messageId = msg.id || msg.broadcastId || Date.now().toString();
+          broadcastMessages.set(messageId, msg);
+        }
+      });
+      
+      showBroadcastMessages();
+    });
+  }
+  
+  // ================================================
+  // BROADCAST FUNCTIONS
+  // ================================================
+  function loadBroadcastHistory() {
+    if (!socket) return;
+    
+    console.log("📡 Loading broadcast history...");
+    updateActivity();
+    
+    socket.emit('get_broadcast_messages');
+  }
+  
+  function addBroadcastMessage(msg) {
+    const broadcastDiv = document.getElementById('broadcastMessages');
+    if (!broadcastDiv) return;
+    
+    const messageElement = createBroadcastMessageElement(msg);
+    broadcastDiv.appendChild(messageElement);
+    
+    // Scroll to bottom if we're near the bottom
+    if (currentView === 'broadcast') {
+      setTimeout(() => {
+        const broadcastContainer = document.getElementById('broadcastMessages');
+        const scrollHeight = broadcastContainer.scrollHeight;
+        const scrollTop = broadcastContainer.scrollTop;
+        const clientHeight = broadcastContainer.clientHeight;
+        
+        if (scrollHeight - scrollTop - clientHeight < 100) {
+          scrollBroadcastToBottom();
+        }
+      }, 100);
+    }
+  }
+  
+  function createBroadcastMessageElement(msg) {
+    const messageDiv = document.createElement("div");
+    const isAgent = msg.sender === 'agent' || msg.sender === 'admin' || msg.agentId;
+    
+    messageDiv.className = "message-container broadcast-message " + (isAgent ? "agent-message" : "user-message");
+    
+    let content = "";
+    if (msg.attachment) {
+      content = formatAttachment(msg.attachment);
+    }
+    
+    const senderName = isAgent 
+      ? (msg.agentName || 'Agent') 
+      : 'User';
+    
+    const whatsappInfo = msg.whatsapp && msg.whatsapp !== 'unknown' 
+      ? `<div class="broadcast-user-info">WhatsApp: ${msg.whatsapp}</div>`
+      : '';
+    
+    messageDiv.innerHTML = `
+      <div class="message-header">
+        <span class="message-sender">${senderName}</span>
+        <span class="message-time" title="${formatDateTime(msg.timestamp)}">
+          ${formatTime(msg.timestamp)}
+        </span>
+      </div>
+      <div class="message-content">${msg.text || msg.message || ''}</div>
+      ${whatsappInfo}
+      ${content}
+    `;
+    
+    messageDiv.dataset.messageId = msg.id || msg.broadcastId || 'no-id';
+    
+    return messageDiv;
+  }
+  
+  function showBroadcastMessages() {
+    const broadcastDiv = document.getElementById('broadcastMessages');
+    if (!broadcastDiv) return;
+    
+    broadcastDiv.innerHTML = '';
+    
+    if (broadcastMessages.size === 0) {
+      broadcastDiv.innerHTML = `
+        <div class="empty-state">
+          <div>No broadcast messages yet</div>
+          <div style="font-size: 14px; color: #666; margin-top: 8px;">Messages from all users will appear here</div>
+        </div>
+      `;
+      return;
+    }
+    
+    // Sort messages by time
+    const sortedMessages = Array.from(broadcastMessages.values())
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    // Group by date
+    const groupedMessages = groupMessagesByDate(sortedMessages);
+    
+    Object.keys(groupedMessages).forEach(date => {
+      if (Object.keys(groupedMessages).length > 1) {
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'date-separator';
+        dateDiv.innerHTML = `<span>${formatDate(date)}</span>`;
+        broadcastDiv.appendChild(dateDiv);
+      }
+      
+      groupedMessages[date].forEach(msg => {
+        const messageElement = createBroadcastMessageElement(msg);
+        broadcastDiv.appendChild(messageElement);
+      });
+    });
+    
+    setTimeout(() => {
+      scrollBroadcastToBottom();
+    }, 100);
   }
   
   // ================================================
@@ -2148,7 +2730,7 @@
     
     socket.emit('get_existing_users');
     
-    socket.on('existing_users', (usersList) => {
+    socket.once('existing_users', (usersList) => {
       console.log("📋 Loaded existing users:", usersList.length);
       updateActivity();
       
@@ -2168,12 +2750,16 @@
       
       updateUserList();
       
+      // Join each user's room to get their history
       users.forEach((user, whatsapp) => {
         socket.emit('get_messages', { 
           whatsapp: whatsapp, 
           agentId: AGENT_CONFIG.id,
           markAsRead: true 
         });
+        
+        // Also join the user room to get updates
+        socket.emit('join_user_room', { whatsapp: whatsapp });
       });
     });
   }
@@ -2275,6 +2861,8 @@
       messageInput.focus();
       
       if (socket) {
+        socket.emit('join_user_room', { whatsapp: userId });
+        
         socket.emit('get_messages', { 
           whatsapp: userId, 
           agentId: AGENT_CONFIG.id,
@@ -2604,16 +3192,8 @@
       showMessages();
     }
     
-    // Send to server
+    // Send to server (will be saved to both broadcast room and user room)
     socket.emit('agent_message', messageData);
-    socket.emit('send_message', {
-      whatsapp: selectedUser,
-      sender: 'agent',
-      text: text,
-      agentId: currentAgent.id,
-      agentName: currentAgent.name,
-      attachment: fileInfo
-    });
   }
   
   function finishMessageSend() {
