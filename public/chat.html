@@ -869,29 +869,23 @@
   let whatsapp = "";
   let selectedFile = null;
   let isScrolledToBottom = true;
-  let pendingMessages = new Map(); // Track pending messages by their timestamp ID
+  let pendingMessages = new Map();
   
-  // ===== ENHANCED DEDUPLICATION SYSTEM =====
+  // ===== CLIENT-SIDE DEDUPLICATION SYSTEM =====
   const duplicateManager = {
-    seenMessages: new Map(),
+    seenMessageIds: new Set(), // Track message IDs to prevent duplicates
     
-    // Updated to use server-generated timestamp ID
     isDuplicate(msg) {
-      if (!msg.id) return false;
-      
-      const key = msg.id; // Use the server's timestamp ID
-      const now = Date.now();
-      
-      // Clean old entries (older than 1 minute)
-      for (const [oldKey, timestamp] of this.seenMessages.entries()) {
-        if (now - timestamp > 60000) {
-          this.seenMessages.delete(oldKey);
-        }
+      if (!msg.id) {
+        console.warn('Message has no ID:', msg);
+        return false;
       }
       
-      if (this.seenMessages.has(key)) {
-        console.log('🔴 DUPLICATE DETECTED:', {
-          id: key,
+      const messageId = msg.id;
+      
+      if (this.seenMessageIds.has(messageId)) {
+        console.log('🔴 CLIENT-SIDE DUPLICATE DETECTED:', {
+          id: messageId,
           timestamp: msg.timestamp,
           sender: msg.sender,
           preview: (msg.text || msg.message || '').substring(0, 50)
@@ -899,19 +893,26 @@
         return true;
       }
       
-      this.seenMessages.set(key, now);
+      // Mark this ID as seen
+      this.seenMessageIds.add(messageId);
       
-      // Limit map size
-      if (this.seenMessages.size > 1000) {
-        const keys = Array.from(this.seenMessages.keys()).slice(0, 500);
-        keys.forEach(k => this.seenMessages.delete(k));
+      // Clean up old entries periodically (keep last 500)
+      if (this.seenMessageIds.size > 500) {
+        const ids = Array.from(this.seenMessageIds);
+        this.seenMessageIds = new Set(ids.slice(-300));
       }
       
       return false;
     },
     
     clear() {
-      this.seenMessages.clear();
+      this.seenMessageIds.clear();
+    },
+    
+    removeOldEntries() {
+      // Keep entries from last 10 minutes
+      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+      // We track by ID only, so we just limit size above
     }
   };
   
@@ -1169,7 +1170,6 @@
     const messagesDiv = document.getElementById("messages");
     const scrollToBottomBtn = document.getElementById("scrollToBottomBtn");
     
-    // Optimized scroll listener with passive flag for better performance
     messagesDiv.addEventListener('scroll', function() {
       const scrollTop = messagesDiv.scrollTop;
       const scrollHeight = messagesDiv.scrollHeight;
@@ -1188,24 +1188,17 @@
     
     // Scroll to bottom button click handler
     scrollToBottomBtn.addEventListener('click', scrollToBottom);
-    
-    // Force hardware acceleration for smooth scrolling
-    messagesDiv.style.transform = 'translateZ(0)';
-    messagesDiv.style.backfaceVisibility = 'hidden';
-    messagesDiv.style.perspective = '1000px';
   }
   
   function scrollToBottom() {
     const messagesDiv = document.getElementById("messages");
     if (messagesDiv) {
-      // Use instant scroll for better performance
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
       isScrolledToBottom = true;
       document.getElementById("scrollToBottomBtn").classList.remove('visible');
     }
   }
   
-  // Optimized scrollToBottom for new messages
   function scrollToBottomSmooth() {
     const messagesDiv = document.getElementById("messages");
     if (messagesDiv && isScrolledToBottom) {
@@ -1221,9 +1214,6 @@
     console.log("✅ Connected to server with ID:", socket.id);
     PersistentConnection.showConnectionStatus('connected', 'Connected');
     PersistentConnection.resetReconnection();
-    
-    // CRITICAL CHANGE: Don't clear duplicates on reconnect
-    // duplicateManager.clear(); // REMOVED THIS LINE!
     
     // Re-register if we have a whatsapp number
     if (whatsapp) {
@@ -1277,6 +1267,7 @@
     console.log("✅ Registration successful:", data);
   });
 
+  // ===== CLIENT-SIDE DEDUPLICATION - CRITICAL SECTION =====
   socket.on("new_message", (msg) => {
     console.log("📨 New message received:", {
       id: msg.id,
@@ -1285,15 +1276,15 @@
       preview: (msg.text || msg.message || '').substring(0, 50)
     });
     
-    // Check for duplicates using server's timestamp ID
+    // CLIENT-SIDE DEDUPLICATION CHECK
     if (duplicateManager.isDuplicate(msg)) {
-      console.log("🛑 Skipping duplicate message with ID:", msg.id);
-      return;
+      console.log("🛑 CLIENT-SIDE: Skipping duplicate message with ID:", msg.id);
+      return; // Don't display duplicate
     }
     
-    // If this is our own message that we sent, check if it's already displayed
+    // If this is our own pending message (sent by us), clean it up
     if (msg.sender === "user" && pendingMessages.has(msg.timestamp)) {
-      console.log("🔄 Updating pending message with server ID:", msg.id);
+      console.log("🔄 Confirming our sent message with server ID:", msg.id);
       pendingMessages.delete(msg.timestamp);
     }
     
@@ -1304,7 +1295,7 @@
     console.log("📜 Message history:", messages.length, "messages");
     const messagesDiv = document.getElementById("messages");
     
-    // Clear messages div efficiently
+    // Clear messages div
     messagesDiv.innerHTML = '';
     
     if (messages.length === 0) {
@@ -1323,7 +1314,7 @@
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
     
-    // Filter out duplicates while processing history
+    // Apply client-side deduplication to history too
     sortedMessages.forEach(msg => {
       if (!duplicateManager.isDuplicate(msg)) {
         const messageElement = createMessageElement(msg);
@@ -1337,11 +1328,6 @@
     
     // Scroll to bottom after loading history
     setTimeout(scrollToBottom, 50);
-  });
-
-  socket.on("connect_error", (error) => {
-    console.error("Connection error:", error);
-    showError("Connection error. Please refresh the page.");
   });
 
   // ===== MESSAGE DISPLAY FUNCTIONS =====
@@ -1369,7 +1355,7 @@
       ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
     `;
     
-    // Store the message ID as a data attribute for debugging
+    // Store the message ID as a data attribute
     messageDiv.dataset.messageId = msg.id || 'no-id';
     
     return messageDiv;
@@ -1389,7 +1375,6 @@
     
     // Only auto-scroll if we're at the bottom or this is our own message
     if (scroll && (isScrolledToBottom || msg.sender === "user")) {
-      // Use microtask for smooth scrolling
       Promise.resolve().then(() => {
         scrollToBottomSmooth();
       });
@@ -1453,6 +1438,7 @@
     document.getElementById("chat").style.display = "flex";
     document.getElementById("chatNumber").textContent = whatsapp;
     
+    // Clear client-side duplicate tracker on new registration
     duplicateManager.clear();
     sendController.reset();
     pendingMessages.clear();
@@ -1571,10 +1557,10 @@
     sendingIndicator.style.display = 'block';
     errorMessage.style.display = 'none';
     
-    // Generate a temporary timestamp for the pending message
+    // Generate a temporary timestamp for local display
     const clientTimestamp = new Date().toISOString();
     
-    // Create temporary message object (without server ID yet)
+    // Create temporary message object for immediate display
     const tempMessage = {
       sender: "user",
       whatsapp: whatsapp,
@@ -1583,53 +1569,29 @@
       read: false
     };
     
-    // ===== CLIENT-SIDE DEDUPLICATION CHECK =====
-    // Check if we already have a similar pending message
-    let isDuplicate = false;
-    for (const [timestamp, pendingMsg] of pendingMessages) {
-      if (pendingMsg.text === text && 
-          (!selectedFile || (selectedFile && pendingMsg.attachment))) {
-        const timeDiff = Math.abs(new Date(clientTimestamp).getTime() - new Date(timestamp).getTime());
-        if (timeDiff < 1000) { // Within 1 second
-          console.log("🛑 Client-side duplicate detected, not displaying temporary message");
-          isDuplicate = true;
-          break;
-        }
-      }
-    }
-    
-    // Only display and store if NOT a duplicate
-    if (!isDuplicate) {
-      // Store this as a pending message
-      pendingMessages.set(clientTimestamp, tempMessage);
-      
-      // Display the temporary message immediately
-      displayMessage(tempMessage);
-    } else {
-      console.log("📝 Message not displayed (client-side duplicate)");
-    }
+    // Display temporary message immediately (optimistic update)
+    pendingMessages.set(clientTimestamp, tempMessage);
+    displayMessage(tempMessage);
     
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
           console.log("📤 Sending message with attachment to server");
           
-          // Send to server - server will assign the real timestamp ID
+          // Send to server - server will generate timestamp ID
           socket.emit("user_message", {
             whatsapp: whatsapp,
             userId: whatsapp,
             message: text,
             attachment: fileInfo
-            // NO clientMsgId - let server generate timestamp ID
           });
         } else {
           if (text) {
-            // Send to server - server will assign the real timestamp ID
+            // Send to server - server will generate timestamp ID
             socket.emit("user_message", {
               whatsapp: whatsapp,
               userId: whatsapp,
               message: text
-              // NO clientMsgId - let server generate timestamp ID
             });
           }
         }
@@ -1648,12 +1610,11 @@
     } else {
       console.log("📤 Sending text message to server");
       
-      // Send to server - server will assign the real timestamp ID
+      // Send to server - server will generate timestamp ID
       socket.emit("user_message", {
         whatsapp: whatsapp,
         userId: whatsapp,
         message: text
-        // NO clientMsgId - let server generate timestamp ID
       });
       
       setTimeout(() => {
@@ -1711,7 +1672,7 @@
     }
   });
 
-  // FIXED: Auto-resize message input WITHOUT changing container heights
+  // Auto-resize message input
   document.getElementById("messageInput").addEventListener("input", function() {
     this.style.height = 'auto';
     const newHeight = Math.min(this.scrollHeight, 120);
@@ -1775,20 +1736,20 @@
 
   // Auto-cleanup duplicate manager every 5 minutes
   setInterval(() => {
-    // Only clean old entries, don't clear everything
-    const now = Date.now();
-    for (const [key, timestamp] of duplicateManager.seenMessages.entries()) {
-      if (now - timestamp > 5 * 60 * 1000) { // 5 minutes
-        duplicateManager.seenMessages.delete(key);
-      }
+    // Clean old entries (keep only last 300)
+    if (duplicateManager.seenMessageIds.size > 300) {
+      const ids = Array.from(duplicateManager.seenMessageIds);
+      duplicateManager.seenMessageIds = new Set(ids.slice(-200));
+      console.log('🧹 Cleaned old duplicate entries');
     }
-    console.log('🧹 Cleaned old duplicate entries');
   }, 5 * 60 * 1000);
   
   // Focus on WhatsApp input on page load
   window.addEventListener('DOMContentLoaded', function() {
     document.getElementById("whatsapp").focus();
-    console.log('🚀 Chat application loaded with timestamp-based deduplication');
+    console.log('🚀 Chat application loaded with CLIENT-SIDE deduplication');
+    console.log('🔒 Server-side deduplication is OFF - Client handles duplicates');
+    console.log('📡 Persistent connection manager is ACTIVE');
   });
 </script>
 </body>

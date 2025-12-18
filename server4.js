@@ -668,7 +668,7 @@ io.on("connection", (socket) => {
     
     const whatsapp = data.whatsapp || 'unknown';
     
-    // ===== CRITICAL: Generate timestamp-based ID =====
+    // ===== Generate timestamp-based ID =====
     const timestamp = new Date().toISOString();
     const messageId = timestamp; // Use timestamp as ID
     
@@ -690,15 +690,8 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // ===== DEDUPLICATION CHECK =====
-    const conversation = conversations.get(whatsapp);
-    if (conversation && conversation.messages) {
-      const existingMessage = conversation.messages.find(msg => msg.id === messageId);
-      if (existingMessage) {
-        console.log(`🛑 DUPLICATE AGENT MESSAGE BLOCKED: ${messageId}`);
-        return;
-      }
-    }
+    // ===== REMOVED: DEDUPLICATION CHECK =====
+    // Server no longer checks for duplicates - client handles this
     
     // ===== SAVE TO MEMORY =====
     saveMessageToMemory(whatsapp, message);
@@ -750,7 +743,7 @@ io.on("connection", (socket) => {
       return;
     }
     
-    // ===== CRITICAL: Generate timestamp-based ID =====
+    // ===== Generate timestamp-based ID =====
     const timestamp = new Date().toISOString();
     const messageId = timestamp; // Use timestamp as ID
     
@@ -774,21 +767,8 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // ===== DEDUPLICATION CHECK =====
-    // Check if we already have a message with this ID
-    const conversation = conversations.get(whatsapp);
-    if (conversation && conversation.messages) {
-      const existingMessage = conversation.messages.find(msg => msg.id === messageId);
-      if (existingMessage) {
-        console.log(`🛑 DUPLICATE BLOCKED: Message ${messageId} already exists`);
-        // Send acknowledgment to client but don't process
-        socket.emit("new_message", {
-          ...existingMessage,
-          isDuplicate: true
-        });
-        return;
-      }
-    }
+    // ===== REMOVED: DEDUPLICATION CHECK =====
+    // Server no longer checks for duplicates - client handles this
     
     // ===== SAVE TO MEMORY =====
     saveMessageToMemory(whatsapp, message);
@@ -1134,6 +1114,7 @@ function startServer() {
     console.log(`📝 ALL MESSAGES SAVED UNDER WHATSAPP NUMBERS`);
     console.log(`🔧 Agents can access all saved messages on login`);
     console.log(`⚠️  WARNING: Data is ephemeral - will be lost on server restart`);
+    console.log(`🚫 DEDUPLICATION: Server-side deduplication REMOVED - Client handles duplicates`);
   });
 }
 
