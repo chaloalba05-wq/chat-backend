@@ -46,6 +46,33 @@ const activityLog = [];            // Activity log
 const broadcastMessages = [];      // All messages in broadcast room
 // =====================================
 
+// ===== PRE-REGISTER AGENTS (so they always exist) =====
+// This ensures agents are always available even on server restart
+function preRegisterDefaultAgents() {
+  const defaultAgents = [
+    { id: "agent1", name: "Agent 1", password: "agent1", filename: "agent1.html" },
+    { id: "agent2", name: "Agent 2", password: "agent2", filename: "agent2.html" },
+    { id: "agent3", name: "Agent 3", password: "agent3", filename: "agent3.html" }
+  ];
+  
+  defaultAgents.forEach(agent => {
+    if (!agents.has(agent.id)) {
+      agents.set(agent.id, {
+        name: agent.name,
+        password: agent.password,
+        muted: false,
+        socketId: null,
+        filename: agent.filename,
+        createdAt: new Date(),
+        lastSeen: null,
+        permanent: true
+      });
+      console.log(`✅ Pre-registered agent: ${agent.id} (${agent.name})`);
+    }
+  });
+}
+// =====================================================
+
 // ===== SIMPLE HELPER FUNCTIONS =====
 function logActivity(type, details) {
   const log = {
@@ -399,6 +426,32 @@ app.get("/test", (req, res) => {
   });
 });
 
+// ===== ADD THIS NEW ROUTE =====
+// Get agent info for debugging
+app.get("/agent/:id/info", (req, res) => {
+  const agent = agents.get(req.params.id);
+  if (agent) {
+    res.json({
+      success: true,
+      agent: {
+        id: req.params.id,
+        name: agent.name,
+        muted: agent.muted || false,
+        isOnline: agent.socketId ? true : false,
+        filename: agent.filename || null,
+        createdAt: agent.createdAt,
+        lastSeen: agent.lastSeen
+      }
+    });
+  } else {
+    res.status(404).json({
+      success: false,
+      message: "Agent not found"
+    });
+  }
+});
+// ================================
+
 // ---- Socket.IO events ----
 io.on("connection", (socket) => {
   console.log("New connection:", socket.id);
@@ -435,59 +488,69 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ===== PERMANENT AGENT REGISTRATION =====
+  // ===== REGISTER AGENT (with both event names for compatibility) =====
+  socket.on("register_agent", (data) => {
+    handleAgentRegistration(socket, data);
+  });
+  
   socket.on("register_permanent_agent", (data) => {
-    const { id, name, password, filename } = data;
+    handleAgentRegistration(socket, data);
+  });
+  
+  function handleAgentRegistration(socket, data) {
+    const { id, name, password, filename, agentId } = data;
+    const agentIdToUse = id || agentId;
     
-    if (!id || !name || !password) {
-      socket.emit("agent_registered", { 
+    if (!agentIdToUse || !name || !password) {
+      socket.emit("agent_registration_response", { 
         success: false, 
-        message: "Missing required fields" 
+        message: "Missing required fields: id, name, password" 
       });
       return;
     }
     
     try {
       // Check if agent already exists
-      const existingAgent = agents.get(id);
+      const existingAgent = agents.get(agentIdToUse);
       
       if (existingAgent) {
-        // Update existing agent with new data if needed
-        if (!existingAgent.filename && filename) {
+        // Update existing agent if needed
+        if (filename && !existingAgent.filename) {
           existingAgent.filename = filename;
         }
         
-        socket.emit("agent_registered", { 
+        socket.emit("agent_registration_response", { 
           success: true, 
-          message: "Agent already exists",
-          agentId: id
+          message: "Agent already exists and is ready for login",
+          agentId: agentIdToUse
         });
         
-        logActivity('agent_updated', { 
-          agentId: id, 
+        logActivity('agent_auto_registered', { 
+          agentId: agentIdToUse, 
           name: name,
           filename: filename || existingAgent.filename 
         });
       } else {
-        // Create new permanent agent
-        agents.set(id, {
-          name,
+        // Create new agent
+        agents.set(agentIdToUse, {
+          name: name || `Agent ${agentIdToUse}`,
           password,
           muted: false,
           socketId: null,
           filename: filename || null,
           createdAt: new Date(),
-          lastSeen: null
+          lastSeen: null,
+          permanent: true
         });
         
-        socket.emit("agent_registered", { 
+        socket.emit("agent_registration_response", { 
           success: true, 
           message: "Agent registered successfully",
-          agentId: id
+          agentId: agentIdToUse
         });
         
-        logActivity('permanent_agent_created', { 
-          agentId: id, 
+        logActivity('agent_registered', { 
+          agentId: agentIdToUse, 
           name: name,
           filename: filename || 'no file'
         });
@@ -506,13 +569,13 @@ io.on("connection", (socket) => {
       io.to("super_admin").emit("agents_list", agentsList);
       
     } catch (error) {
-      console.error("Error registering permanent agent:", error);
-      socket.emit("agent_registered", { 
+      console.error("Error registering agent:", error);
+      socket.emit("agent_registration_response", { 
         success: false, 
-        message: "Registration failed" 
+        message: "Registration failed: " + error.message 
       });
     }
-  });
+  }
 
   // Get agents list
   socket.on("get_agents", () => {
@@ -668,7 +731,20 @@ io.on("connection", (socket) => {
   });
 
   // ===== AGENT LOGIN =====
-  socket.on("agent_login", ({ agentId, password }) => {
+  socket.on("agent_login", ({ agentId, password, persistent }) => {
+    console.log(`Agent login attempt: ${agentId} (persistent: ${persistent})`);
+    
+    // Check if agent exists
+    if (!agents.has(agentId)) {
+      console.log(`❌ Agent not found: ${agentId}. Available agents:`, Array.from(agents.keys()));
+      
+      socket.emit("agent_login_response", {
+        success: false,
+        message: `Agent "${agentId}" not found. Available agents: ${Array.from(agents.keys()).join(', ')}`
+      });
+      return;
+    }
+    
     const agent = agents.get(agentId);
     
     if (!agent) {
@@ -717,8 +793,12 @@ io.on("connection", (socket) => {
     socket.emit("agent_login_response", {
       success: true,
       name: agent.name,
-      muted: agent.muted || false
+      muted: agent.muted || false,
+      agentId: agentId,
+      message: "Login successful"
     });
+    
+    console.log(`✅ Agent logged in: ${agentId} (${agent.name})`);
     
     // Notify Super Admin
     const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
@@ -1233,16 +1313,21 @@ io.on("connection", (socket) => {
 function startServer() {
   const PORT = process.env.PORT || 3000;
 
+  // Pre-register default agents on server start
+  preRegisterDefaultAgents();
+  
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
     console.log(`📡 Broadcast Room: ${BROADCAST_ROOM}`);
+    console.log(`✅ Pre-registered agents: agent1, agent2, agent3`);
     console.log(`📁 Available routes:`);
     console.log(`   /chat - User chat interface`);
     console.log(`   /admin - Original admin panel`);
     console.log(`   /superadmin - Super admin panel`);
     console.log(`   /agent - Agent panel`);
     console.log(`   /agent/conversations - Get all conversations`);
+    console.log(`   /agent/:id/info - Get agent info (for debugging)`);
     console.log(`   DELETE /chat/:whatsapp - Delete a chat`);
     console.log(`   GET /chats/archived - Get archived chats`);
     console.log(`   POST /chat/:whatsapp/restore - Restore archived chat`);
