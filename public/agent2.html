@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Agent Admin</title>
   <style>
-    /* ===== RESET & BASE ===== */
+    /* ===== GLOBAL STYLES ===== */
     * { 
       margin: 0; 
       padding: 0; 
@@ -18,50 +18,56 @@
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
       margin: 0; 
-      background: #f5f5f5; 
+      background: #f8f9fa; 
       height: 100vh;
       height: -webkit-fill-available;
       overflow: hidden;
       touch-action: manipulation;
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+    
+    /* ===== RESPONSIVE HEADER ===== */
+    #header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+      padding: 12px 16px;
+      height: auto;
+      min-height: 70px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 100;
+    }
+
+    .logo-text {
+      font-size: clamp(1.8rem, 6vw, 2.5rem);
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    .logo-subtext {
+      font-size: clamp(0.8rem, 3vw, 1rem);
+      opacity: 0.95;
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+      font-weight: 400;
     }
     
     /* ===== MAIN LAYOUT ===== */
     .container { 
       display: flex; 
-      height: 100vh;
-      height: -webkit-fill-available;
+      height: calc(100vh - 70px);
       width: 100%;
     }
     
-    /* ===== CHAT LIST VIEW (INITIAL VIEW) ===== */
-    .chat-list-view {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      background: white;
-    }
-    
-    /* ===== CHAT DETAIL VIEW (FULL SCREEN) ===== */
-    .chat-detail-view {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      background: #f8f9fa;
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 100;
-      transform: translateX(100%);
-      transition: transform 0.3s ease;
-    }
-    
-    .chat-detail-view.active {
-      transform: translateX(0);
-    }
-    
-    /* ===== SIDEBAR - EXACTLY 1/4 OF SCREEN ===== */
+    /* ===== SIDEBAR ===== */
     .sidebar { 
       width: 100%;
       height: 100%;
@@ -98,6 +104,7 @@
       font-weight: 600;
       font-size: clamp(14px, 3vw, 16px);
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     }
     
     .agent-details {
@@ -167,6 +174,7 @@
       overscroll-behavior: contain;
       scrollbar-width: thin;
       scrollbar-color: #c1c1c1 #f1f1f1;
+      background: #f8f9fa;
     }
     
     .user-list-title {
@@ -180,6 +188,7 @@
       position: sticky;
       top: 0;
       z-index: 1;
+      border-bottom: 1px solid #e8e8e8;
     }
     
     .user-item {
@@ -191,32 +200,38 @@
       align-items: flex-start;
       gap: clamp(10px, 2vw, 12px);
       touch-action: manipulation;
+      background: white;
     }
     
     .user-item:active {
       background: #f0f0f0;
+      transform: scale(0.99);
     }
     
     .user-item:hover { background: #f9f9f9; }
-    .user-item.active { background: #e8f0fe; }
+    .user-item.active { 
+      background: #e8f0fe;
+      border-left: 4px solid #667eea;
+    }
     
     .user-avatar {
       width: clamp(32px, 6vw, 36px);
       height: clamp(32px, 6vw, 36px);
-      background: #e0e0e0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #666;
+      color: white;
       font-weight: 600;
       font-size: clamp(12px, 2vw, 14px);
       flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(102, 126, 234, 0.2);
     }
     
     .user-item.active .user-avatar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%);
+      transform: scale(1.05);
     }
     
     .user-content {
@@ -261,6 +276,25 @@
       word-break: break-word;
     }
     
+    /* ===== CHAT DETAIL VIEW ===== */
+    .chat-detail-view {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: #f8f9fa;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1000;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    }
+    
+    .chat-detail-view.active {
+      transform: translateX(0);
+    }
+    
     /* ===== CHAT DETAIL HEADER ===== */
     .chat-detail-header {
       padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
@@ -273,26 +307,30 @@
       position: sticky;
       top: 0;
       z-index: 10;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
     
     .back-button {
-      padding: 8px;
+      padding: 10px;
       background: #f5f5f5;
       border: none;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
+      width: 44px;
+      height: 44px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       font-size: 18px;
-      transition: background 0.2s;
+      transition: all 0.3s ease;
       flex-shrink: 0;
+      color: #667eea;
     }
     
     .back-button:active {
-      background: #e0e0e0;
+      background: #667eea;
+      color: white;
+      transform: scale(0.95);
     }
     
     .chat-detail-user-avatar {
@@ -307,6 +345,7 @@
       font-weight: 600;
       font-size: clamp(14px, 3vw, 16px);
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     }
     
     .chat-detail-user-info {
@@ -341,60 +380,16 @@
     
     .hidden { display: none; }
     
-    /* ===== MOBILE OPTIMIZATIONS ===== */
-    @media (max-width: 768px) {
-      .chat-detail-view {
-        position: fixed;
-      }
-      
-      .back-button {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
-      }
-    }
-    
-    @media (max-width: 480px) {
-      .chat-detail-header {
-        padding: 12px 16px;
-      }
-      
-      .back-button {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
-      }
-      
-      .chat-detail-user-avatar {
-        width: 32px;
-        height: 32px;
-        font-size: 14px;
-      }
-    }
-    
-    /* ===== SAFE AREA SUPPORT ===== */
-    @supports (padding: max(0px)) {
-      body {
-        padding-left: max(16px, env(safe-area-inset-left));
-        padding-right: max(16px, env(safe-area-inset-right));
-      }
-      
-      .sidebar-header, .chat-detail-header {
-        padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
-        padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
-      }
-    }
-    
     /* ===== NOTIFICATION ===== */
     .notification {
       position: fixed;
-      top: 20px;
+      top: 90px;
       right: 20px;
       left: 20px;
       max-width: 400px;
       margin: 0 auto;
       padding: 12px 16px;
-      border-radius: 8px;
+      border-radius: 12px;
       background: white;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15);
       z-index: 1000;
@@ -402,6 +397,7 @@
       align-items: center;
       gap: 10px;
       animation: slideIn 0.3s ease;
+      border-left: 4px solid #4CAF50;
     }
     
     @keyframes slideIn {
@@ -418,14 +414,15 @@
     /* ===== CONNECTION STATUS ===== */
     .connection-status-indicator {
       position: fixed;
-      top: 10px;
+      top: 80px;
       right: 10px;
-      padding: 6px 12px;
+      padding: 8px 12px;
       border-radius: 20px;
       font-size: 12px;
       font-weight: 500;
       z-index: 1000;
       display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     
     .connected {
@@ -437,44 +434,175 @@
       background: #f44336;
       color: white;
     }
+    
+    .reconnecting {
+      background: #FFC107;
+      color: #333;
+    }
+    
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center;
+      color: #999;
+      padding: 40px 20px;
+      font-size: 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 200px;
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+    
+    .empty-state-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #666;
+    }
+    
+    .empty-state-subtitle {
+      font-size: 14px;
+      color: #999;
+      max-width: 300px;
+      line-height: 1.4;
+    }
+    
+    /* ===== LOADING INDICATOR ===== */
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* ===== MOBILE OPTIMIZATIONS ===== */
+    @media (max-width: 768px) {
+      .container {
+        height: calc(100vh - 60px);
+      }
+      
+      #header {
+        min-height: 60px;
+      }
+      
+      .logo-text {
+        font-size: 1.6rem;
+      }
+      
+      .chat-detail-view {
+        position: fixed;
+      }
+      
+      .back-button {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .container {
+        height: calc(100vh - 56px);
+      }
+      
+      #header {
+        min-height: 56px;
+        padding: 8px 12px;
+      }
+      
+      .logo-text {
+        font-size: 1.4rem;
+      }
+      
+      .logo-subtext {
+        font-size: 0.75rem;
+      }
+      
+      .chat-detail-header {
+        padding: 12px 16px;
+      }
+      
+      .back-button {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+      }
+      
+      .chat-detail-user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+      }
+    }
+    
+    /* ===== SAFE AREA SUPPORT ===== */
+    @supports (padding: max(0px)) {
+      body {
+        padding-left: max(0px, env(safe-area-inset-left));
+        padding-right: max(0px, env(safe-area-inset-right));
+      }
+      
+      .sidebar-header, .chat-detail-header {
+        padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
+        padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
+      }
+    }
   </style>
   <!-- Link to external display box CSS -->
   <link rel="stylesheet" href="display-box.css">
 </head>
 <body>
 
+<!-- Header with logo -->
+<div id="header">
+  <div class="logo-text">ALBASTUZ3D</div>
+  <div class="logo-subtext">AGENT ADMIN PANEL</div>
+</div>
+
 <!-- Main App -->
 <div id="app" class="container" style="display: none;">
   
-  <!-- Chat List View (Initial View) -->
-  <div id="chatListView" class="chat-list-view">
-    <div class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <!-- Agent Info -->
-        <div class="agent-info">
-          <div class="agent-avatar" id="agentAvatar">A1</div>
-          <div class="agent-details">
-            <div class="agent-name" id="agentNameDisplay">Agent 1</div>
-            <div class="agent-id">ID: <span id="agentIdDisplay">agent1</span></div>
-          </div>
-        </div>
-        
-        <!-- Connection Status -->
-        <div class="status-container">
-          <span class="connection-dot" id="connectionDot"></span>
-          <span class="connection-status" id="connectionStatus">Connected</span>
-          <span id="muteIndicator" class="mute-status unmuted" style="margin-left: auto;">⚡ Active</span>
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <!-- Agent Info -->
+      <div class="agent-info">
+        <div class="agent-avatar" id="agentAvatar">A2</div>
+        <div class="agent-details">
+          <div class="agent-name" id="agentNameDisplay">Agent 2</div>
+          <div class="agent-id">ID: <span id="agentIdDisplay">agent2</span></div>
         </div>
       </div>
       
-      <!-- User List -->
-      <div class="user-list-title">Active Conversations</div>
-      <div id="userList" class="user-list">
-        <div class="empty-state">
-          <div class="empty-state-icon">💬</div>
-          <div class="empty-state-title">No conversations yet</div>
-          <div class="empty-state-subtitle">Users will appear here when they send messages</div>
-        </div>
+      <!-- Connection Status -->
+      <div class="status-container">
+        <span class="connection-dot" id="connectionDot"></span>
+        <span class="connection-status" id="connectionStatus">Connecting...</span>
+        <span id="muteIndicator" class="mute-status unmuted" style="margin-left: auto;">⚡ Active</span>
+      </div>
+    </div>
+    
+    <!-- User List -->
+    <div class="user-list-title">Active Conversations</div>
+    <div id="userList" class="user-list">
+      <div class="empty-state">
+        <div class="empty-state-icon">💬</div>
+        <div class="empty-state-title">No conversations yet</div>
+        <div class="empty-state-subtitle">Users will appear here when they send messages</div>
       </div>
     </div>
   </div>
@@ -498,6 +626,7 @@
   </div>
 </div>
 
+<!-- JavaScript remains exactly the same as your original -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
   // ================================================
