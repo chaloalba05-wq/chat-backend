@@ -76,14 +76,16 @@ html, body {
     overscroll-behavior: contain;
 }
 
-/* The actual scrollable messages container - SIMPLIFIED */
+/* The actual scrollable messages container - FIXED FOR SCROLLING */
 .messages-container {
     width: 100%;
-    min-height: 100%;
-    padding: 16px;
+    min-height: 100%; /* Ensure it fills the scrollable area */
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding: 16px;
+    box-sizing: border-box;
+    flex-shrink: 0; /* Prevent container from shrinking */
 }
 
 /* Bottom padding for messages */
