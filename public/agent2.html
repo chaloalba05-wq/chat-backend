@@ -573,6 +573,7 @@
         min-height: 0; /* Crucial for flex chain - allows children to scroll */
         display: flex;
         flex-direction: column;
+        overflow: hidden; /* Prevent outer wrapper from scrolling - ADDED */
     }
 
     /* ===== HEADER SECTION (FIXED TOP) ===== */
@@ -601,15 +602,18 @@
     /* ===== MESSAGES SECTION (FIXED HEIGHT WITH SCROLL) ===== */
     .messages-section {
         flex: 1; /* Takes remaining space between header and input */
-        min-height: 0; /* Crucial for flex child scrolling - FIX APPLIED */
+        min-height: 0; /* Crucial for flex child scrolling */
+        display: flex; /* ADDED - FIX FOR SCROLLING */
+        flex-direction: column; /* ADDED - FIX FOR SCROLLING */
         overflow: hidden; /* Contain the scrolling area */
         position: relative;
         background: #f8f9fa;
     }
 
-    /* The actual scrollable messages container - FIXED HEIGHT */
+    /* The actual scrollable messages container - FIXED */
     .messages-container {
-        height: 100%; /* Take full height of parent */
+        flex: 1; /* CHANGED FROM height: 100% to flex: 1 - CRITICAL FIX */
+        min-height: 0; /* ADDED - CRITICAL FOR SCROLLING */
         width: 100%;
         overflow-y: auto;
         overflow-x: hidden;
@@ -621,6 +625,16 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
+        
+        /* Hardware acceleration for smoother scrolling - ADDED */
+        will-change: transform;
+        backface-visibility: hidden;
+        transform: translateZ(0);
+        scroll-behavior: smooth;
+        
+        /* Firefox scrollbar */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     }
 
     /* Bottom padding for messages */
@@ -660,12 +674,6 @@
 
     .messages-container::-webkit-scrollbar-thumb:hover {
         background: rgba(102, 126, 234, 0.7);
-    }
-
-    /* Firefox scrollbar */
-    .messages-container {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     }
 
     /* ===== INPUT SECTION (FIXED BOTTOM) ===== */

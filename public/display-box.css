@@ -38,11 +38,12 @@ html, body {
     min-height: 0; /* Crucial for flex chain - allows children to scroll */
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* Prevent outer wrapper from scrolling */
 }
 
 /* ===== HEADER SECTION (FIXED TOP) ===== */
 .chat-header {
-    flex-shrink: 0;
+    flex-shrink: 0; /* Fixed height, won't shrink */
     background: white;
     padding: 16px 20px;
     border-bottom: 1px solid #e0e0e0;
@@ -66,33 +67,70 @@ html, body {
 /* ===== MESSAGES SECTION (SCROLLABLE AREA - FIXED) ===== */
 .messages-section {
     flex: 1; /* Takes remaining space between header and input */
-    min-height: 0; /* Crucial for flex child scrolling */
-    overflow-y: auto; /* Allow vertical scrolling */
-    overflow-x: hidden;
-    position: relative;
-    background: #f8f9fa;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-}
-
-/* The actual scrollable messages container - FIXED FOR SCROLLING */
-.messages-container {
-    width: 100%;
-    min-height: 100%; /* Ensure it fills the scrollable area */
+    min-height: 0; /* CRITICAL: Allows flex child to shrink below content size */
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    overflow: hidden; /* Contain the scrollable container */
+    position: relative;
+    background: #f8f9fa;
+}
+
+/* The actual scrollable messages container - THIS IS WHAT SCROLLS */
+.messages-container {
+    flex: 1; /* Fill available space in messages-section */
+    min-height: 0; /* CRITICAL: Allows scrolling */
+    overflow-y: auto; /* Vertical scrolling enabled here */
+    overflow-x: hidden;
     padding: 16px;
     box-sizing: border-box;
-    flex-shrink: 0; /* Prevent container from shrinking */
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+    overscroll-behavior: contain; /* Prevent scroll chaining */
+    
+    /* Hardware acceleration for smoother scrolling */
+    will-change: transform;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    
+    /* Firefox scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
 }
 
 /* Bottom padding for messages */
 .messages-container::after {
     content: '';
+    display: block;
     height: 16px;
+    width: 100%;
     flex-shrink: 0;
+}
+
+/* Optimized scrollbar for Webkit browsers */
+.messages-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+    background: rgba(241, 241, 241, 0.5);
+    border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.5);
+    border-radius: 3px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.7);
+}
+
+/* Message wrapper - ensures proper stacking */
+.message-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0; /* Prevent shrinking of individual messages */
 }
 
 /* Message container should NOT grow, only scroll */
@@ -106,31 +144,6 @@ html, body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     line-height: 1.5;
     flex-shrink: 0; /* Prevent messages from shrinking */
-}
-
-/* Optimized scrollbar */
-.messages-section::-webkit-scrollbar {
-    width: 6px;
-}
-
-.messages-section::-webkit-scrollbar-track {
-    background: rgba(241, 241, 241, 0.5);
-    border-radius: 3px;
-}
-
-.messages-section::-webkit-scrollbar-thumb {
-    background: rgba(102, 126, 234, 0.5);
-    border-radius: 3px;
-}
-
-.messages-section::-webkit-scrollbar-thumb:hover {
-    background: rgba(102, 126, 234, 0.7);
-}
-
-/* Firefox scrollbar */
-.messages-section {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
 }
 
 /* ===== INPUT SECTION (FIXED BOTTOM) ===== */
@@ -525,4 +538,15 @@ html, body {
         padding-left: max(16px, env(safe-area-inset-left));
         padding-right: max(16px, env(safe-area-inset-right));
     }
+}
+
+/* ===== FALLBACK FOR OLDER BROWSERS ===== */
+.no-flexbox .chat-wrapper {
+    display: block;
+    height: calc(100vh - 130px); /* Header + Input heights */
+}
+
+.no-flexbox .messages-section {
+    height: 100%;
+    overflow-y: auto;
 }
