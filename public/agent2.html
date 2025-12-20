@@ -1503,7 +1503,7 @@
     });
     
     // ================================================
-    // BROADCAST ROOM EVENTS - NEW FOR DUAL-ROOM SYSTEM
+    // BROADCAST ROOM EVENTS - FIXED TO PREVENT DUPLICATION
     // ================================================
     socket.on('broadcast_message', (msg) => {
       console.log("📢 BROADCAST message received:", msg);
@@ -1539,14 +1539,12 @@
       user.time = msg.timestamp || new Date().toISOString();
       
       // Check if this is a server confirmation of our pending message
-      if (msg.id && pendingMessages.has(msg.id)) {
-        const tempId = pendingMessages.get(msg.id);
-        pendingMessages.delete(msg.id);
-        
-        // Replace the temporary message with the server-confirmed one
-        const messageIndex = user.messages.findIndex(m => m.tempId === tempId);
-        if (messageIndex > -1) {
-          user.messages[messageIndex] = {
+      if (msg.tempId) {
+        // Find and replace the pending message with the confirmed one
+        const pendingIndex = user.messages.findIndex(m => m.tempId === msg.tempId);
+        if (pendingIndex > -1) {
+          // Replace the pending message
+          user.messages[pendingIndex] = {
             text: msg.text || msg.message,
             time: msg.timestamp || new Date().toISOString(),
             sender: msg.sender || 'unknown',
@@ -1556,10 +1554,16 @@
             id: msg.id,
             fromBroadcast: true
           };
+          
+          // Update pending messages map
+          if (msg.id && pendingMessages.has(msg.id)) {
+            pendingMessages.delete(msg.id);
+          }
         }
-      } else {
-        // Only add to messages if not historical or if we're in user room
-        if (!msg.isHistorical || selectedUser === whatsapp) {
+      } else if (!msg.isHistorical || selectedUser === whatsapp) {
+        // Check if this message already exists (prevent duplicates)
+        const existingIndex = user.messages.findIndex(m => m.id === msg.id);
+        if (existingIndex === -1) {
           user.messages.push({
             text: msg.text || msg.message,
             time: msg.timestamp || new Date().toISOString(),
@@ -1598,7 +1602,7 @@
     });
     
     // ================================================
-    // USER ROOM EVENTS - UPDATED FOR DUAL-ROOM SYSTEM
+    // USER ROOM EVENTS - FIXED TO PREVENT DUPLICATION
     // ================================================
     socket.on('new_message', (msg) => {
       console.log("📨 USER ROOM message received:", msg);
@@ -1620,14 +1624,12 @@
       user.time = msg.timestamp || new Date().toISOString();
       
       // Check if this is a server confirmation of our pending message
-      if (msg.id && pendingMessages.has(msg.id)) {
-        const tempId = pendingMessages.get(msg.id);
-        pendingMessages.delete(msg.id);
-        
-        // Replace the temporary message with the server-confirmed one
-        const messageIndex = user.messages.findIndex(m => m.tempId === tempId);
-        if (messageIndex > -1) {
-          user.messages[messageIndex] = {
+      if (msg.tempId) {
+        // Find and replace the pending message with the confirmed one
+        const pendingIndex = user.messages.findIndex(m => m.tempId === msg.tempId);
+        if (pendingIndex > -1) {
+          // Replace the pending message
+          user.messages[pendingIndex] = {
             text: msg.text || msg.message,
             time: msg.timestamp || new Date().toISOString(),
             sender: msg.sender || 'unknown',
@@ -1637,18 +1639,27 @@
             id: msg.id,
             fromUserRoom: true
           };
+          
+          // Update pending messages map
+          if (msg.id && pendingMessages.has(msg.id)) {
+            pendingMessages.delete(msg.id);
+          }
         }
       } else {
-        user.messages.push({
-          text: msg.text || msg.message,
-          time: msg.timestamp || new Date().toISOString(),
-          sender: msg.sender || 'unknown',
-          attachment: msg.attachment,
-          agentId: msg.agentId,
-          agentName: msg.agentName,
-          id: msg.id,
-          fromUserRoom: true
-        });
+        // Check if this message already exists (prevent duplicates)
+        const existingIndex = user.messages.findIndex(m => m.id === msg.id);
+        if (existingIndex === -1) {
+          user.messages.push({
+            text: msg.text || msg.message,
+            time: msg.timestamp || new Date().toISOString(),
+            sender: msg.sender || 'unknown',
+            attachment: msg.attachment,
+            agentId: msg.agentId,
+            agentName: msg.agentName,
+            id: msg.id,
+            fromUserRoom: true
+          });
+        }
       }
       
       updateUserList();
@@ -1796,7 +1807,7 @@
       updateActivity();
     });
     
-    // NEW: Listen for message confirmation from server
+    // Listen for message confirmation from server
     socket.on('message_confirmation', (data) => {
       console.log("✅ Message confirmed by server:", data);
       updateActivity();
