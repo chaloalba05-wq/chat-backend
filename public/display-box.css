@@ -63,27 +63,24 @@ html, body {
     color: #666;
 }
 
-/* ===== MESSAGES SECTION (FIXED HEIGHT WITH SCROLL) ===== */
+/* ===== MESSAGES SECTION (SCROLLABLE AREA - FIXED) ===== */
 .messages-section {
     flex: 1; /* Takes remaining space between header and input */
-    min-height: 0; /* Crucial for flex child scrolling - FIX APPLIED */
-    overflow-y: auto; /* CHANGED: Allow vertical scrolling */
+    min-height: 0; /* Crucial for flex child scrolling */
+    overflow-y: auto; /* Allow vertical scrolling */
     overflow-x: hidden;
     position: relative;
     background: #f8f9fa;
-    scroll-behavior: smooth; /* ADDED: Smooth scrolling */
+    scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
 }
 
-/* The actual scrollable messages container - FIXED HEIGHT */
+/* The actual scrollable messages container - SIMPLIFIED */
 .messages-container {
     width: 100%;
-    overflow-y: visible; /* CHANGED: Let parent handle scrolling */
-    overflow-x: hidden;
+    min-height: 100%;
     padding: 16px;
-    
-    /* Flex container for messages */
     display: flex;
     flex-direction: column;
     gap: 8px;
