@@ -32,45 +32,98 @@ html, body {
 
 /* ===== CHAT WRAPPER ===== */
 .chat-wrapper {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
     min-height: 0;
+}
+
+/* ===== CHAT HEADER - UPDATED (NOW VISIBLE WITH BACK BUTTON) ===== */
+.chat-header {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    background: white;
+    border-bottom: 1px solid #e8e8e8;
+    flex-shrink: 0;
+    z-index: 10;
+    min-height: 70px;
+}
+
+/* ===== BACK TO CHAT BUTTON ===== */
+.back-to-chat-btn {
+    background: #f5f5f5;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    color: #667eea;
+    margin-right: 12px;
+}
+
+.back-to-chat-btn:active {
+    background: #667eea;
+    color: white;
+    transform: scale(0.95);
+}
+
+.header-info {
+    flex: 1;
+}
+
+.header-info h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.header-info p {
+    font-size: 14px;
+    color: #666;
+}
+
+/* ===== MESSAGES SECTION - FIXED FOR SCROLLING ===== */
+.messages-section {
+    flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-}
-
-/* ===== HEADER (HIDDEN) ===== */
-.chat-header {
-    display: none;
-}
-
-/* ===== MESSAGES SECTION - UPDATED ===== */
-.messages-section {
-    flex: 1;
     min-height: 0;
-    display: flex; /* ADDED: Enable flexbox */
-    flex-direction: column; /* ADDED: Stack vertically */
-    overflow: hidden;
+    position: relative;
     background: #f8f9fa;
 }
 
 /* ===== SCROLLABLE MESSAGES CONTAINER - FIXED ===== */
 .messages-container {
-    /* REMOVED: position: absolute; top: 0; left: 0; right: 0; bottom: 0; */
-    
-    flex: 1; /* ADDED: Take all available space */
-    min-height: 0; /* ADDED: Allow shrinking below content size */
+    flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
-    scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    
-    /* For message stacking */
+    background: #f8f9fa;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    min-height: 0;
+}
+
+/* Bottom padding for messages - FIXED */
+.messages-container::after {
+    content: '';
+    display: block;
+    height: 16px;
+    width: 100%;
+    flex-shrink: 0;
 }
 
 /* Scrollbar styling */
@@ -98,15 +151,6 @@ html, body {
     scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
 }
 
-/* Bottom padding for messages */
-.messages-container::after {
-    content: '';
-    display: block;
-    height: 16px;
-    width: 100%;
-    flex-shrink: 0;
-}
-
 /* ===== MESSAGE BUBBLES ===== */
 .message-bubble {
     max-width: 85%;
@@ -117,6 +161,7 @@ html, body {
     animation: fadeIn 0.3s ease;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     line-height: 1.5;
+    margin-bottom: 8px;
     flex-shrink: 0;
 }
 
@@ -352,12 +397,8 @@ html, body {
 
 /* ===== EMPTY STATE - FIXED ===== */
 .empty-state {
-    /* CHANGED: position: relative instead of absolute */
     position: relative;
-    
-    /* REMOVED: top: 0; left: 0; right: 0; bottom: 0; */
-    
-    flex: 1; /* ADDED: Take available space */
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -371,6 +412,26 @@ html, body {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
+    .chat-header {
+        padding: 12px 16px;
+        min-height: 60px;
+    }
+    
+    .back-to-chat-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+        margin-right: 10px;
+    }
+    
+    .header-info h2 {
+        font-size: 16px;
+    }
+    
+    .header-info p {
+        font-size: 13px;
+    }
+    
     .messages-container {
         padding: 12px;
     }
@@ -407,6 +468,26 @@ html, body {
 }
 
 @media (max-width: 480px) {
+    .chat-header {
+        padding: 10px 12px;
+        min-height: 56px;
+    }
+    
+    .back-to-chat-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+        margin-right: 8px;
+    }
+    
+    .header-info h2 {
+        font-size: 15px;
+    }
+    
+    .header-info p {
+        font-size: 12px;
+    }
+    
     .messages-container {
         padding: 10px;
     }
@@ -443,6 +524,11 @@ html, body {
 
 /* ===== SAFE AREA SUPPORT ===== */
 @supports (padding: max(0px)) {
+    .chat-header {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+    }
+    
     .messages-container {
         padding-left: max(16px, env(safe-area-inset-left));
         padding-right: max(16px, env(safe-area-inset-right));
