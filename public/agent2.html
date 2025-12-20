@@ -1007,45 +1007,9 @@
   let selectedFile = null;
   let isMobile = window.innerWidth < 768;
   let isScrolledToBottom = true;
-  let duplicateManager = {
-    seenMessages: new Map(),
-    
-    isDuplicate(msg) {
-      if (!msg.id) return false;
-      
-      const key = msg.id;
-      const now = Date.now();
-      
-      // Clean old entries
-      for (const [oldKey, timestamp] of this.seenMessages.entries()) {
-        if (now - timestamp > 60000) {
-          this.seenMessages.delete(oldKey);
-        }
-      }
-      
-      if (this.seenMessages.has(key)) {
-        console.log('🔴 DUPLICATE DETECTED:', {
-          id: key,
-          timestamp: msg.timestamp,
-          sender: msg.sender
-        });
-        return true;
-      }
-      
-      this.seenMessages.set(key, now);
-      
-      if (this.seenMessages.size > 1000) {
-        const keys = Array.from(this.seenMessages.keys()).slice(0, 500);
-        keys.forEach(k => this.seenMessages.delete(k));
-      }
-      
-      return false;
-    },
-    
-    clear() {
-      this.seenMessages.clear();
-    }
-  };
+  
+  // Track pending messages waiting for server confirmation
+  let pendingMessages = new Map(); // Map of temporary IDs to server IDs
   
   // ================================================
   // PERSISTENT CONNECTION SYSTEM
@@ -1545,11 +1509,6 @@
       console.log("📢 BROADCAST message received:", msg);
       updateActivity();
       
-      if (duplicateManager.isDuplicate(msg)) {
-        console.log("🛑 Skipping duplicate broadcast message");
-        return;
-      }
-      
       const whatsapp = msg.whatsapp || 'unknown';
       
       // Handle historical broadcast messages
@@ -1579,18 +1538,39 @@
       user.lastMsg = msg.text || msg.message || '[Attachment]';
       user.time = msg.timestamp || new Date().toISOString();
       
-      // Only add to messages if not historical or if we're in user room
-      if (!msg.isHistorical || selectedUser === whatsapp) {
-        user.messages.push({
-          text: msg.text || msg.message,
-          time: msg.timestamp || new Date().toISOString(),
-          sender: msg.sender || 'unknown',
-          attachment: msg.attachment,
-          agentId: msg.agentId,
-          agentName: msg.agentName,
-          id: msg.id,
-          fromBroadcast: true
-        });
+      // Check if this is a server confirmation of our pending message
+      if (msg.id && pendingMessages.has(msg.id)) {
+        const tempId = pendingMessages.get(msg.id);
+        pendingMessages.delete(msg.id);
+        
+        // Replace the temporary message with the server-confirmed one
+        const messageIndex = user.messages.findIndex(m => m.tempId === tempId);
+        if (messageIndex > -1) {
+          user.messages[messageIndex] = {
+            text: msg.text || msg.message,
+            time: msg.timestamp || new Date().toISOString(),
+            sender: msg.sender || 'unknown',
+            attachment: msg.attachment,
+            agentId: msg.agentId,
+            agentName: msg.agentName,
+            id: msg.id,
+            fromBroadcast: true
+          };
+        }
+      } else {
+        // Only add to messages if not historical or if we're in user room
+        if (!msg.isHistorical || selectedUser === whatsapp) {
+          user.messages.push({
+            text: msg.text || msg.message,
+            time: msg.timestamp || new Date().toISOString(),
+            sender: msg.sender || 'unknown',
+            attachment: msg.attachment,
+            agentId: msg.agentId,
+            agentName: msg.agentName,
+            id: msg.id,
+            fromBroadcast: true
+          });
+        }
       }
       
       updateUserList();
@@ -1624,11 +1604,6 @@
       console.log("📨 USER ROOM message received:", msg);
       updateActivity();
       
-      if (duplicateManager.isDuplicate(msg)) {
-        console.log("🛑 Skipping duplicate user room message");
-        return;
-      }
-      
       const whatsapp = msg.whatsapp || 'unknown';
       
       if (!users.has(whatsapp)) {
@@ -1644,16 +1619,37 @@
       user.lastMsg = msg.text || msg.message || '[Attachment]';
       user.time = msg.timestamp || new Date().toISOString();
       
-      user.messages.push({
-        text: msg.text || msg.message,
-        time: msg.timestamp || new Date().toISOString(),
-        sender: msg.sender || 'unknown',
-        attachment: msg.attachment,
-        agentId: msg.agentId,
-        agentName: msg.agentName,
-        id: msg.id,
-        fromUserRoom: true
-      });
+      // Check if this is a server confirmation of our pending message
+      if (msg.id && pendingMessages.has(msg.id)) {
+        const tempId = pendingMessages.get(msg.id);
+        pendingMessages.delete(msg.id);
+        
+        // Replace the temporary message with the server-confirmed one
+        const messageIndex = user.messages.findIndex(m => m.tempId === tempId);
+        if (messageIndex > -1) {
+          user.messages[messageIndex] = {
+            text: msg.text || msg.message,
+            time: msg.timestamp || new Date().toISOString(),
+            sender: msg.sender || 'unknown',
+            attachment: msg.attachment,
+            agentId: msg.agentId,
+            agentName: msg.agentName,
+            id: msg.id,
+            fromUserRoom: true
+          };
+        }
+      } else {
+        user.messages.push({
+          text: msg.text || msg.message,
+          time: msg.timestamp || new Date().toISOString(),
+          sender: msg.sender || 'unknown',
+          attachment: msg.attachment,
+          agentId: msg.agentId,
+          agentName: msg.agentName,
+          id: msg.id,
+          fromUserRoom: true
+        });
+      }
       
       updateUserList();
       
@@ -1674,18 +1670,16 @@
           
           // Add historical messages
           data.messages.forEach(msg => {
-            if (!duplicateManager.isDuplicate(msg)) {
-              user.messages.push({
-                text: msg.text || msg.message,
-                time: msg.timestamp || msg.time,
-                sender: msg.sender || 'unknown',
-                attachment: msg.attachment,
-                agentId: msg.agentId,
-                agentName: msg.agentName,
-                id: msg.id,
-                isHistorical: true
-              });
-            }
+            user.messages.push({
+              text: msg.text || msg.message,
+              time: msg.timestamp || msg.time,
+              sender: msg.sender || 'unknown',
+              attachment: msg.attachment,
+              agentId: msg.agentId,
+              agentName: msg.agentName,
+              id: msg.id,
+              isHistorical: true
+            });
           });
           
           // Mark user history as loaded
@@ -1709,7 +1703,7 @@
         console.log("📜 Received user room history");
         const user = users.get(data.whatsapp);
         if (user) {
-          user.messages = data.history.filter(msg => !duplicateManager.isDuplicate(msg));
+          user.messages = data.history;
           
           if (selectedUser === data.whatsapp) {
             showMessages();
@@ -1790,8 +1784,7 @@
       if (selectedUser && messages) {
         const user = users.get(selectedUser);
         if (user) {
-          // Filter duplicates from history
-          user.messages = messages.filter(msg => !duplicateManager.isDuplicate(msg));
+          user.messages = messages;
           showMessages();
         }
       }
@@ -1801,6 +1794,21 @@
       console.log("✅ Connection is stable");
       updateConnectionStatus('connected', 'Stable connection');
       updateActivity();
+    });
+    
+    // NEW: Listen for message confirmation from server
+    socket.on('message_confirmation', (data) => {
+      console.log("✅ Message confirmed by server:", data);
+      updateActivity();
+      
+      if (data.tempId && data.serverId) {
+        pendingMessages.set(data.serverId, data.tempId);
+      }
+      
+      // Remove "sending" indicator and refresh messages
+      if (selectedUser === data.whatsapp) {
+        showMessages();
+      }
     });
   }
   
@@ -1847,7 +1855,7 @@
       updateActivity();
       
       users.clear();
-      duplicateManager.clear();
+      pendingMessages.clear();
       
       usersList.forEach(user => {
         if (user.whatsapp) {
@@ -2058,6 +2066,9 @@
     
     messageDiv.className = "message-bubble " + (isAgent ? "agent-message" : "user-message");
     
+    // Check if this is a pending message (no server ID yet)
+    const isPending = !msg.id && msg.tempId;
+    
     // Add broadcast indicator if from broadcast room
     let broadcastIndicator = '';
     if (msg.fromBroadcast) {
@@ -2073,21 +2084,38 @@
       ? (msg.agentName || currentAgent?.name || 'Agent') 
       : 'User';
     
+    // Show "Sending..." indicator for pending messages
+    const timeText = isPending ? 'Sending...' : formatTime(msg.time);
+    const timeTitle = isPending ? 'Waiting for server confirmation' : formatDateTime(msg.time);
+    
     messageDiv.innerHTML = `
       <div class="message-meta">
         <span class="message-sender">
           ${senderName}
           ${broadcastIndicator}
+          ${isPending ? '<span style="font-size: 10px; opacity: 0.7; margin-left: 5px;">⏳</span>' : ''}
         </span>
-        <span class="message-time" title="${formatDateTime(msg.time)}">
-          ${formatTime(msg.time)}
+        <span class="message-time" title="${timeTitle}">
+          ${timeText}
         </span>
       </div>
       <div class="message-content">${msg.text || msg.message || ''}</div>
       ${content}
     `;
     
-    messageDiv.dataset.messageId = msg.id || 'no-id';
+    // Add data attributes for tracking
+    if (msg.id) {
+      messageDiv.dataset.messageId = msg.id;
+    }
+    if (msg.tempId) {
+      messageDiv.dataset.tempId = msg.tempId;
+    }
+    
+    // Style pending messages differently
+    if (isPending) {
+      messageDiv.style.opacity = '0.7';
+      messageDiv.style.backgroundColor = '#f0f0f0';
+    }
     
     return messageDiv;
   }
@@ -2278,7 +2306,7 @@
   }
   
   // ================================================
-  // MESSAGE SENDING - UPDATED FOR DUAL-ROOM
+  // MESSAGE SENDING - UPDATED TO WAIT FOR SERVER CONFIRMATION
   // ================================================
   function sendMessage() {
     if (isMuted) {
@@ -2307,53 +2335,74 @@
       // File is handled in handleFileSelect
       return;
     } else {
-      sendMessageToServer(text);
+      // Create temporary message with "sending" status
+      createPendingMessage(text);
       
-      setTimeout(() => {
-        if (input) input.value = "";
-        
-        if (input) {
-          input.style.height = 'auto';
-          input.style.height = '50px';
-        }
-      }, 500);
+      // Clear input immediately
+      if (input) {
+        input.value = "";
+        input.style.height = 'auto';
+        input.style.height = '50px';
+      }
+      
+      // Send to server
+      sendMessageToServer(text);
     }
+  }
+  
+  function createPendingMessage(text, fileInfo = null) {
+    if (!selectedUser) return;
+    
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const user = users.get(selectedUser);
+    
+    if (!user) return;
+    
+    const pendingMessage = {
+      text: text,
+      time: new Date().toISOString(),
+      sender: 'agent',
+      agentId: currentAgent.id,
+      agentName: currentAgent.name,
+      attachment: fileInfo,
+      tempId: tempId, // Temporary ID while waiting for server
+      isPending: true
+    };
+    
+    user.messages.push(pendingMessage);
+    user.lastMsg = text || '[Attachment]';
+    user.time = new Date().toISOString();
+    
+    // Update display immediately with "sending" status
+    showMessages();
+    
+    return tempId;
   }
   
   function sendMessageToServer(text, fileInfo = null) {
     if (!selectedUser) return;
+    
+    // Create temporary ID for tracking
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
     const messageData = {
       whatsapp: selectedUser,
       message: text,
       agentId: currentAgent.id,
       agentName: currentAgent.name,
-      sender: 'agent'
+      sender: 'agent',
+      tempId: tempId, // Send tempId to server for correlation
+      timestamp: new Date().toISOString()
     };
     
     if (fileInfo) {
       messageData.attachment = fileInfo;
     }
     
-    // Add to local messages immediately
-    const user = users.get(selectedUser);
-    const tempMessage = {
-      text: text,
-      time: new Date().toISOString(),
-      sender: 'agent',
-      agentId: currentAgent.id,
-      agentName: currentAgent.name,
-      attachment: fileInfo
-    };
+    // Create pending message in UI first
+    createPendingMessage(text, fileInfo);
     
-    if (user) {
-      user.messages.push(tempMessage);
-      user.lastMsg = text || '[Attachment]';
-      user.time = new Date().toISOString();
-      showMessages();
-    }
-    
-    // Send to server - will be broadcast to both rooms
+    // Send to server
     socket.emit('agent_message', messageData);
     
     // Also emit to user room directly
@@ -2363,7 +2412,9 @@
       text: text,
       agentId: currentAgent.id,
       agentName: currentAgent.name,
-      attachment: fileInfo
+      attachment: fileInfo,
+      tempId: tempId,
+      timestamp: new Date().toISOString()
     });
   }
   

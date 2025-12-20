@@ -1479,6 +1479,11 @@
     
     // Save all messages to localStorage for persistence
     saveAllMessagesToStorage();
+    
+    // Clear sending state if this is our own message (FIX: This was missing)
+    if (msg.sender === "user") {
+      finishMessageSend();
+    }
   });
 
   socket.on("message_history", (messages) => {
@@ -1822,6 +1827,13 @@
     sendingIndicator.style.display = 'block';
     errorMessage.style.display = 'none';
     
+    // Add a timeout fallback in case server doesn't respond (FIX: This was missing)
+    const sendTimeout = setTimeout(() => {
+      console.log("⚠️ Send timeout - clearing sending state");
+      finishMessageSend();
+      showError("Message sent but waiting for confirmation. It may appear shortly.");
+    }, 10000); // 10 second timeout
+    
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
@@ -1842,6 +1854,7 @@
             console.log("📴 Offline - saving message for later");
             PersistentConnection.saveOfflineMessage(messageData);
             showError("Offline - Message saved locally. Will send when reconnected.");
+            clearTimeout(sendTimeout);
             finishMessageSend();
           }
         } else {
@@ -1858,8 +1871,12 @@
               console.log("📴 Offline - saving message for later");
               PersistentConnection.saveOfflineMessage(messageData);
               showError("Offline - Message saved locally. Will send when reconnected.");
+              clearTimeout(sendTimeout);
               finishMessageSend();
             }
+          } else {
+            clearTimeout(sendTimeout);
+            finishMessageSend();
           }
         }
         
@@ -1889,6 +1906,7 @@
         console.log("📴 Offline - saving message for later");
         PersistentConnection.saveOfflineMessage(messageData);
         showError("Offline - Message saved locally. Will send when reconnected.");
+        clearTimeout(sendTimeout);
         finishMessageSend();
       }
       
