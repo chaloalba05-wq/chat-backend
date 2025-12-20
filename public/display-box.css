@@ -67,7 +67,7 @@ html, body {
 .messages-section {
     flex: 1; /* Takes remaining space between header and input */
     min-height: 0; /* Crucial for flex child scrolling - FIX APPLIED */
-    overflow: hidden; /* Contain the scrolling area */
+    overflow: visible; /* CHANGED FROM hidden to visible - THIS FIXES SCROLLING */
     position: relative;
     background: #f8f9fa;
 }
