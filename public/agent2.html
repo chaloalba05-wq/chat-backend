@@ -1263,20 +1263,18 @@
   // AGENT CONFIGURATION - FIXED VALUES
   // ================================================
   const AGENT_CONFIG = {
-    id: "agent2", // FIXED: Always use "agent2" for consistent login
-    name: "agent2", // Display name
-    password: "agent2", // Login password
-    filename: window.location.pathname.split('/').pop() || "agent2.html" // Auto-detect filename
+    id: "agent2",
+    name: "agent2",
+    password: "agent2",
+    filename: window.location.pathname.split('/').pop() || "agent2.html"
   };
   
   // ================================================
-  // DUAL-ROOM SYSTEM CONSTANTS
+  // SINGLE ROOM SYSTEM CONSTANTS (NO BROADCAST)
   // ================================================
-  const DUAL_ROOM_CONFIG = {
-    currentRoom: 'broadcast', // 'broadcast' or 'user'
+  const ROOM_CONFIG = {
     currentWhatsapp: null,
-    broadcastHistoryLoaded: false,
-    userHistoryLoaded: new Map() // Track which users have loaded history
+    userHistoryLoaded: new Map()
   };
   
   let socket = null;
@@ -1293,8 +1291,8 @@
   let isScrolledToBottom = true;
   
   // Track pending messages waiting for server confirmation
-  let pendingMessages = new Map(); // Map of temporary IDs to server IDs
-  let socketListenersSetup = false; // Flag to prevent duplicate listeners
+  let pendingMessages = new Map(); // Map of tempId to message data
+  let socketListenersSetup = false;
 
   // ================================================
   // PERSISTENT CONNECTION SYSTEM
@@ -1582,37 +1580,29 @@
   // INITIALIZATION - MODIFIED FOR LOGIN.HTML
   // ================================================
   window.onload = function() {
-    // Check if user is logged in via localStorage
     const agentData = localStorage.getItem('agentData');
     
     if (!agentData) {
-      // Not logged in, redirect to login page
       window.location.href = 'login.html';
       return;
     }
     
     try {
-      // Parse agent data from localStorage
       currentAgent = JSON.parse(agentData);
       
-      // Update UI with agent info
       document.getElementById('agentNameDisplay').textContent = currentAgent.name;
       document.getElementById('agentIdDisplay').textContent = currentAgent.id;
       document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
       
-      // Show the app
       document.getElementById('app').style.display = 'flex';
       
-      // Initialize connection
       initPersistentConnection();
       initializeSocketConnection();
       
-      // Setup chat UI event listeners
       setupChatUI();
       
     } catch (error) {
       console.error('Error loading agent data:', error);
-      // Clear invalid data and redirect to login
       localStorage.removeItem('agentData');
       window.location.href = 'login.html';
     }
@@ -1633,13 +1623,11 @@
     const scrollBtn = document.getElementById('scrollBottomBtn');
     
     if (textarea) {
-      // Auto-resize textarea
       textarea.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 120) + 'px';
       });
       
-      // Enter key to send
       textarea.addEventListener('keypress', (e) => {
         updateActivity();
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1648,12 +1636,10 @@
         }
       });
       
-      // Focus on textarea when clicked anywhere in input area
       textarea.addEventListener('focus', updateActivity);
     }
     
     if (messagesDiv && scrollBtn) {
-      // Scroll listener
       messagesDiv.addEventListener('scroll', function() {
         const scrollTop = messagesDiv.scrollTop;
         const scrollHeight = messagesDiv.scrollHeight;
@@ -1668,16 +1654,14 @@
         }
       }, { passive: true });
       
-      // Scroll to bottom button click
       scrollBtn.addEventListener('click', scrollToBottom);
     }
   }
   
   // ================================================
-  // SOCKET SETUP - UPDATED FOR DUAL-ROOM SYSTEM
+  // SOCKET SETUP - SINGLE ROOM SYSTEM (NO BROADCAST)
   // ================================================
   function setupSocketListeners() {
-    // Clear existing listeners to prevent duplication
     if (socketListenersSetup && socket) {
       socket.removeAllListeners();
       console.log("🔧 Removed existing socket listeners");
@@ -1706,34 +1690,22 @@
       if (res.success) {
         console.log("✅ Login successful:", res);
         
-        // Update currentAgent with server data
         currentAgent.name = res.name || currentAgent.name;
         currentAgent.muted = res.muted || false;
         
         isMuted = res.muted || false;
         updateMuteStatus();
         
-        // Update UI with agent info
         document.getElementById('agentNameDisplay').textContent = currentAgent.name;
         document.getElementById('agentIdDisplay').textContent = currentAgent.id;
         document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
         
-        // Request broadcast room messages on login
-        if (socket && socket.connected) {
-          console.log("📡 Requesting broadcast room messages...");
-          socket.emit('get_broadcast_messages', {
-            agentId: currentAgent.id
-          });
-        }
-        
-        // Load user conversations
         loadAllConversations();
         showNotification('Connected to server successfully!', '#e8f5e9', '#2e7d32');
         
       } else {
         console.error("❌ Login failed:", res.message);
         
-        // If login fails, clear localStorage and redirect to login
         localStorage.removeItem('agentData');
         showNotification('Session expired. Please login again.', '#ffebee', '#c62828');
         
@@ -1794,112 +1766,7 @@
     });
     
     // ================================================
-    // BROADCAST ROOM EVENTS - FIXED TO PREVENT DUPLICATION
-    // ================================================
-    socket.on('broadcast_message', (msg) => {
-      console.log("📢 BROADCAST message received:", msg);
-      updateActivity();
-      
-      const whatsapp = msg.whatsapp || 'unknown';
-      
-      // Handle historical broadcast messages
-      if (msg.isHistorical) {
-        console.log("📜 Loading historical broadcast message");
-        if (!users.has(whatsapp)) {
-          users.set(whatsapp, {
-            name: whatsapp,
-            lastMsg: msg.text || msg.message || '[Attachment]',
-            time: msg.timestamp || new Date().toISOString(),
-            messages: []
-          });
-        }
-      }
-      
-      // Update user data from broadcast message
-      if (!users.has(whatsapp)) {
-        users.set(whatsapp, {
-          name: whatsapp,
-          lastMsg: msg.text || msg.message || '[Attachment]',
-          time: msg.timestamp || new Date().toISOString(),
-          messages: []
-        });
-      }
-      
-      const user = users.get(whatsapp);
-      user.lastMsg = msg.text || msg.message || '[Attachment]';
-      user.time = msg.timestamp || new Date().toISOString();
-      
-      // Check if this is a server confirmation of our pending message
-      if (msg.tempId) {
-        // Find and replace the pending message with the confirmed one
-        const pendingIndex = user.messages.findIndex(m => m.tempId === msg.tempId);
-        if (pendingIndex > -1) {
-          // Replace the pending message
-          user.messages[pendingIndex] = {
-            text: msg.text || msg.message,
-            time: msg.timestamp || new Date().toISOString(),
-            sender: msg.sender || 'unknown',
-            attachment: msg.attachment,
-            agentId: msg.agentId,
-            agentName: msg.agentName,
-            id: msg.id,
-            fromBroadcast: true
-          };
-          
-          // Update pending messages map
-          if (msg.id && pendingMessages.has(msg.id)) {
-            pendingMessages.delete(msg.id);
-          }
-        }
-      } else if (!msg.isHistorical) {
-        // Check if this message already exists (prevent duplicates)
-        const existingIndex = user.messages.findIndex(m => 
-          (m.id && m.id === msg.id) || 
-          (m.text === (msg.text || msg.message) && 
-           m.time === msg.timestamp && 
-           m.sender === (msg.sender || 'unknown'))
-        );
-        
-        if (existingIndex === -1) {
-          user.messages.push({
-            text: msg.text || msg.message,
-            time: msg.timestamp || new Date().toISOString(),
-            sender: msg.sender || 'unknown',
-            attachment: msg.attachment,
-            agentId: msg.agentId,
-            agentName: msg.agentName,
-            id: msg.id,
-            fromBroadcast: true
-          });
-        }
-      }
-      
-      updateUserList();
-      
-      if (selectedUser === whatsapp) {
-        showMessages();
-      }
-    });
-    
-    socket.on('broadcast_message_deleted', (data) => {
-      console.log("🗑️ Broadcast message deleted:", data);
-      updateActivity();
-      
-      if (data.whatsapp && users.has(data.whatsapp)) {
-        const user = users.get(data.whatsapp);
-        const index = user.messages.findIndex(m => m.id === data.messageId);
-        if (index > -1) {
-          user.messages.splice(index, 1);
-        }
-      }
-      
-      if (selectedUser === data.whatsapp) {
-        showMessages();
-      }
-    });
-    
-    // ================================================
-    // USER ROOM EVENTS - FIXED TO PREVENT DUPLICATION
+    // USER ROOM EVENTS ONLY (NO BROADCAST)
     // ================================================
     socket.on('new_message', (msg) => {
       console.log("📨 USER ROOM message received:", msg);
@@ -1907,6 +1774,12 @@
       
       const whatsapp = msg.whatsapp || 'unknown';
       
+      // Only process messages with server ID (confirmed messages)
+      if (!msg.id) {
+        console.log("⚠️ Ignoring message without server ID");
+        return;
+      }
+      
       if (!users.has(whatsapp)) {
         users.set(whatsapp, {
           name: whatsapp,
@@ -1917,58 +1790,55 @@
       }
       
       const user = users.get(whatsapp);
-      user.lastMsg = msg.text || msg.message || '[Attachment]';
-      user.time = msg.timestamp || new Date().toISOString();
       
-      // Check if this is a server confirmation of our pending message
-      if (msg.tempId) {
-        // Find and replace the pending message with the confirmed one
-        const pendingIndex = user.messages.findIndex(m => m.tempId === msg.tempId);
-        if (pendingIndex > -1) {
-          // Replace the pending message
-          user.messages[pendingIndex] = {
-            text: msg.text || msg.message,
-            time: msg.timestamp || new Date().toISOString(),
-            sender: msg.sender || 'unknown',
-            attachment: msg.attachment,
-            agentId: msg.agentId,
-            agentName: msg.agentName,
-            id: msg.id,
-            fromUserRoom: true
-          };
-          
-          // Update pending messages map
-          if (msg.id && pendingMessages.has(msg.id)) {
-            pendingMessages.delete(msg.id);
-          }
-        }
-      } else {
-        // Check if this message already exists (prevent duplicates)
-        const existingIndex = user.messages.findIndex(m => 
-          (m.id && m.id === msg.id) || 
-          (m.text === (msg.text || msg.message) && 
-           m.time === msg.timestamp && 
-           m.sender === (msg.sender || 'unknown'))
-        );
+      // Check if this is a confirmation of our pending message
+      if (msg.tempId && pendingMessages.has(msg.tempId)) {
+        console.log("✅ Server confirmed our message with tempId:", msg.tempId);
+        pendingMessages.delete(msg.tempId);
+      }
+      
+      // Check if message already exists to prevent duplicates
+      const existingIndex = user.messages.findIndex(m => 
+        (m.id && m.id === msg.id) || 
+        (m.text === (msg.text || msg.message) && 
+         m.time === msg.timestamp)
+      );
+      
+      if (existingIndex === -1) {
+        user.messages.push({
+          text: msg.text || msg.message,
+          time: msg.timestamp || new Date().toISOString(),
+          sender: msg.sender || 'unknown',
+          attachment: msg.attachment,
+          agentId: msg.agentId,
+          agentName: msg.agentName,
+          id: msg.id
+        });
         
-        if (existingIndex === -1) {
-          user.messages.push({
-            text: msg.text || msg.message,
-            time: msg.timestamp || new Date().toISOString(),
-            sender: msg.sender || 'unknown',
-            attachment: msg.attachment,
-            agentId: msg.agentId,
-            agentName: msg.agentName,
-            id: msg.id,
-            fromUserRoom: true
-          });
-        }
+        user.lastMsg = msg.text || msg.message || '[Attachment]';
+        user.time = msg.timestamp || new Date().toISOString();
       }
       
       updateUserList();
       
       if (selectedUser === whatsapp) {
         showMessages();
+      }
+    });
+    
+    socket.on('message_confirmation', (data) => {
+      console.log("✅ Message confirmed by server:", data);
+      updateActivity();
+      
+      if (data.tempId && data.serverId) {
+        // Store the mapping for future reference
+        pendingMessages.set(data.tempId, {
+          serverId: data.serverId,
+          timestamp: data.timestamp
+        });
+        
+        // The actual message will come through new_message event
+        // We just need to remove the pending indicator if it exists
       }
     });
     
@@ -1982,22 +1852,22 @@
           // Clear existing messages for this user
           user.messages = [];
           
-          // Add historical messages
+          // Add historical messages (only confirmed ones with IDs)
           data.messages.forEach(msg => {
-            user.messages.push({
-              text: msg.text || msg.message,
-              time: msg.timestamp || msg.time,
-              sender: msg.sender || 'unknown',
-              attachment: msg.attachment,
-              agentId: msg.agentId,
-              agentName: msg.agentName,
-              id: msg.id,
-              isHistorical: true
-            });
+            if (msg.id) { // Only add messages with server IDs
+              user.messages.push({
+                text: msg.text || msg.message,
+                time: msg.timestamp || msg.time,
+                sender: msg.sender || 'unknown',
+                attachment: msg.attachment,
+                agentId: msg.agentId,
+                agentName: msg.agentName,
+                id: msg.id
+              });
+            }
           });
           
-          // Mark user history as loaded
-          DUAL_ROOM_CONFIG.userHistoryLoaded.set(data.whatsapp, true);
+          ROOM_CONFIG.userHistoryLoaded.set(data.whatsapp, true);
           
           if (selectedUser === data.whatsapp) {
             showMessages();
@@ -2010,14 +1880,14 @@
       console.log("✅ Joined user room:", data.whatsapp);
       updateActivity();
       
-      DUAL_ROOM_CONFIG.currentRoom = 'user';
-      DUAL_ROOM_CONFIG.currentWhatsapp = data.whatsapp;
+      ROOM_CONFIG.currentWhatsapp = data.whatsapp;
       
       if (data.history) {
         console.log("📜 Received user room history");
         const user = users.get(data.whatsapp);
         if (user) {
-          user.messages = data.history;
+          // Only add confirmed messages with IDs
+          user.messages = data.history.filter(msg => msg.id);
           
           if (selectedUser === data.whatsapp) {
             showMessages();
@@ -2033,20 +1903,16 @@
       if (data.whatsapp && users.has(data.whatsapp)) {
         const user = users.get(data.whatsapp);
         if (data.type === 'typing' && data.typing) {
-          // Handle typing indicator
           showTypingIndicator(data.whatsapp);
         }
-        // Other update types can be handled here
       }
     });
     
     socket.on('forwarded_message', (data) => {
       updateActivity();
-      if (data.type === 'user_message' && data.data) {
+      if (data.type === 'user_message' && data.data && data.data.id) {
         const whatsapp = data.data.whatsapp || data.data.userId || 'User';
         addUserMessage(whatsapp, data.data.message, data.data);
-      } else if (data.type === 'broadcast' && data.data) {
-        addUserMessage('Super Admin', data.data.message, data);
       }
     });
     
@@ -2098,7 +1964,8 @@
       if (selectedUser && messages) {
         const user = users.get(selectedUser);
         if (user) {
-          user.messages = messages;
+          // Only add confirmed messages with IDs
+          user.messages = messages.filter(msg => msg.id);
           showMessages();
         }
       }
@@ -2108,21 +1975,6 @@
       console.log("✅ Connection is stable");
       updateConnectionStatus('connected', 'Stable connection');
       updateActivity();
-    });
-    
-    // Listen for message confirmation from server
-    socket.on('message_confirmation', (data) => {
-      console.log("✅ Message confirmed by server:", data);
-      updateActivity();
-      
-      if (data.tempId && data.serverId) {
-        pendingMessages.set(data.serverId, data.tempId);
-      }
-      
-      // Remove "sending" indicator and refresh messages
-      if (selectedUser === data.whatsapp) {
-        showMessages();
-      }
     });
     
     socketListenersSetup = true;
@@ -2156,7 +2008,7 @@
   }
   
   // ================================================
-  // USER MANAGEMENT - UPDATED FOR DUAL-ROOM
+  // USER MANAGEMENT
   // ================================================
   function loadAllConversations() {
     if (!socket || !socket.connected) return;
@@ -2191,6 +2043,11 @@
   
   function addUserMessage(userId, message, data) {
     updateActivity();
+    if (!data.id) {
+      console.log("⚠️ Ignoring message without server ID");
+      return;
+    }
+    
     if (!users.has(userId)) {
       users.set(userId, {
         name: userId,
@@ -2203,7 +2060,6 @@
     
     const user = users.get(userId);
     
-    // Check for duplicate before adding
     const isDuplicate = user.messages.some(msg => 
       msg.id === data.id || 
       (msg.text === message && msg.time === (data.timestamp || new Date().toISOString()))
@@ -2275,7 +2131,7 @@
   }
   
   // ================================================
-  // CHAT FUNCTIONS - UPDATED FOR DUAL-ROOM WITH FIXES
+  // CHAT FUNCTIONS - UPDATED FOR CONFIRMED MESSAGES ONLY
   // ================================================
   function selectUser(userId) {
     selectedUser = userId;
@@ -2299,7 +2155,6 @@
         messageInput.focus();
       }
       
-      // Join user room and request history
       if (socket && socket.connected) {
         console.log(`🚪 Joining user room: ${userId}`);
         socket.emit('join_user_room', {
@@ -2308,7 +2163,6 @@
           agentName: currentAgent.name
         });
         
-        // Also request specific user messages
         socket.emit('get_messages', { 
           whatsapp: userId, 
           agentId: currentAgent.id,
@@ -2317,10 +2171,8 @@
       }
     }
     
-    // Show existing messages
     showMessages();
     
-    // Activate chat detail view
     document.getElementById('chatDetailView').classList.add('active');
     
     updateActivity();
@@ -2328,8 +2180,7 @@
   
   function exitChat() {
     selectedUser = null;
-    DUAL_ROOM_CONFIG.currentRoom = 'broadcast';
-    DUAL_ROOM_CONFIG.currentWhatsapp = null;
+    ROOM_CONFIG.currentWhatsapp = null;
     
     document.getElementById('chatDetailView').classList.remove('active');
     
@@ -2347,16 +2198,17 @@
     
     if (!messagesDiv || !user) return;
     
-    // Hide empty state
     if (emptyState) {
       emptyState.style.display = 'none';
     }
     
-    // Clear existing messages
     const existingMessages = messagesDiv.querySelectorAll('.message-bubble, .typing-indicator, .upload-preview, .date-separator');
     existingMessages.forEach(el => el.remove());
     
-    if (!user.messages || user.messages.length === 0) {
+    // Filter to show only confirmed messages (with IDs)
+    const confirmedMessages = user.messages.filter(msg => msg.id);
+    
+    if (confirmedMessages.length === 0) {
       if (emptyState) {
         emptyState.style.display = 'block';
       }
@@ -2364,11 +2216,11 @@
       return;
     }
     
-    // Remove any duplicate messages before displaying
+    // Remove duplicates
     const uniqueMessages = [];
     const seenMessages = new Set();
     
-    user.messages.forEach(msg => {
+    confirmedMessages.forEach(msg => {
       const messageKey = `${msg.id || ''}-${msg.text || ''}-${msg.time}-${msg.sender}`;
       if (!seenMessages.has(messageKey)) {
         seenMessages.add(messageKey);
@@ -2405,14 +2257,8 @@
     
     messageDiv.className = "message-bubble " + (isAgent ? "agent-message" : "user-message");
     
-    // Check if this is a pending message (no server ID yet)
-    const isPending = !msg.id && msg.tempId;
-    
-    // Add broadcast indicator if from broadcast room
-    let broadcastIndicator = '';
-    if (msg.fromBroadcast) {
-      broadcastIndicator = '<span style="font-size: 10px; opacity: 0.7; margin-left: 5px;">📢</span>';
-    }
+    // Messages are only displayed if they have an ID (confirmed by server)
+    const hasServerId = !!msg.id;
     
     let content = "";
     if (msg.attachment) {
@@ -2423,16 +2269,14 @@
       ? (msg.agentName || currentAgent?.name || 'Agent') 
       : 'User';
     
-    // Show "Sending..." indicator for pending messages
-    const timeText = isPending ? 'Sending...' : formatTime(msg.time);
-    const timeTitle = isPending ? 'Waiting for server confirmation' : formatDateTime(msg.time);
+    // Always show actual time for confirmed messages
+    const timeText = formatTime(msg.time);
+    const timeTitle = formatDateTime(msg.time);
     
     messageDiv.innerHTML = `
       <div class="message-meta">
         <span class="message-sender">
           ${senderName}
-          ${broadcastIndicator}
-          ${isPending ? '<span style="font-size: 10px; opacity: 0.7; margin-left: 5px;">⏳</span>' : ''}
         </span>
         <span class="message-time" title="${timeTitle}">
           ${timeText}
@@ -2445,15 +2289,6 @@
     // Add data attributes for tracking
     if (msg.id) {
       messageDiv.dataset.messageId = msg.id;
-    }
-    if (msg.tempId) {
-      messageDiv.dataset.tempId = msg.tempId;
-    }
-    
-    // Style pending messages differently
-    if (isPending) {
-      messageDiv.style.opacity = '0.7';
-      messageDiv.style.backgroundColor = '#f0f0f0';
     }
     
     return messageDiv;
@@ -2537,7 +2372,6 @@
     messagesDiv.appendChild(typingDiv);
     scrollToBottom();
     
-    // Remove typing indicator after 3 seconds
     setTimeout(() => {
       if (typingDiv.parentNode) {
         typingDiv.remove();
@@ -2554,7 +2388,6 @@
     if (fileInput && fileInput.files.length > 0) {
       selectedFile = fileInput.files[0];
       
-      // Show upload preview
       const messagesDiv = document.getElementById('chatMessages');
       if (messagesDiv) {
         const existingPreview = messagesDiv.querySelector('.upload-preview');
@@ -2572,13 +2405,11 @@
         scrollToBottom();
       }
       
-      // Upload file immediately
       uploadFile(function(fileInfo) {
         if (fileInfo) {
           sendMessageToServer('', fileInfo);
         }
         
-        // Remove preview
         const preview = messagesDiv?.querySelector('.upload-preview');
         if (preview) {
           preview.remove();
@@ -2645,7 +2476,7 @@
   }
   
   // ================================================
-  // MESSAGE SENDING - UPDATED TO WAIT FOR SERVER CONFIRMATION
+  // MESSAGE SENDING - WAIT FOR SERVER CONFIRMATION
   // ================================================
   function sendMessage() {
     if (isMuted) {
@@ -2671,51 +2502,18 @@
     updateActivity();
     
     if (selectedFile) {
-      // File is handled in handleFileSelect
       return;
     } else {
-      // Create temporary message with "sending" status
-      createPendingMessage(text);
-      
-      // Clear input immediately
+      // Clear input immediately (message will appear when confirmed)
       if (input) {
         input.value = "";
         input.style.height = 'auto';
         input.style.height = '50px';
       }
       
-      // Send to server
+      // Send to server - message will appear when we get confirmation
       sendMessageToServer(text);
     }
-  }
-  
-  function createPendingMessage(text, fileInfo = null) {
-    if (!selectedUser) return;
-    
-    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    const user = users.get(selectedUser);
-    
-    if (!user) return;
-    
-    const pendingMessage = {
-      text: text,
-      time: new Date().toISOString(),
-      sender: 'agent',
-      agentId: currentAgent.id,
-      agentName: currentAgent.name,
-      attachment: fileInfo,
-      tempId: tempId, // Temporary ID while waiting for server
-      isPending: true
-    };
-    
-    user.messages.push(pendingMessage);
-    user.lastMsg = text || '[Attachment]';
-    user.time = new Date().toISOString();
-    
-    // Update display immediately with "sending" status
-    showMessages();
-    
-    return tempId;
   }
   
   function sendMessageToServer(text, fileInfo = null) {
@@ -2730,7 +2528,7 @@
       agentId: currentAgent.id,
       agentName: currentAgent.name,
       sender: 'agent',
-      tempId: tempId, // Send tempId to server for correlation
+      tempId: tempId,
       timestamp: new Date().toISOString()
     };
     
@@ -2738,8 +2536,12 @@
       messageData.attachment = fileInfo;
     }
     
-    // Create pending message in UI first
-    createPendingMessage(text, fileInfo);
+    // Store as pending - won't be displayed until confirmed
+    pendingMessages.set(tempId, {
+      text: text,
+      fileInfo: fileInfo,
+      timestamp: messageData.timestamp
+    });
     
     // Send to server
     socket.emit('agent_message', messageData);
@@ -2753,7 +2555,7 @@
       agentName: currentAgent.name,
       attachment: fileInfo,
       tempId: tempId,
-      timestamp: new Date().toISOString()
+      timestamp: messageData.timestamp
     });
   }
   
