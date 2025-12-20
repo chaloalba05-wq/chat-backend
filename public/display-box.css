@@ -11,6 +11,7 @@ html, body {
     width: 100%;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #f8f9fa;
+    overflow: hidden; /* Prevent body scrolling - KEEP THIS */
 }
 
 /* ===== MAIN CHAT CONTAINER ===== */
@@ -27,6 +28,7 @@ html, body {
     display: flex;
     flex-direction: column;
     z-index: 1000;
+    /* REMOVED: overflow: hidden - This was preventing scroll */
 }
 
 /* ===== CHAT WRAPPER ===== */
@@ -36,6 +38,8 @@ html, body {
     height: 100%;
     width: 100%;
     min-height: 0;
+    flex: 1;
+    /* REMOVED: overflow: hidden - This was preventing scroll */
 }
 
 /* ===== CHAT HEADER - UPDATED (NOW VISIBLE WITH BACK BUTTON) ===== */
@@ -45,12 +49,12 @@ html, body {
     padding: 16px;
     background: white;
     border-bottom: 1px solid #e8e8e8;
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent header from shrinking */
     z-index: 10;
     min-height: 70px;
 }
 
-/* ===== BACK TO CHAT BUTTON ===== */
+/* ===== BACK TO CHAT BUTTON - IMPROVED ===== */
 .back-to-chat-btn {
     background: #f5f5f5;
     border: none;
@@ -61,13 +65,15 @@ html, body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 20px;
+    font-weight: bold;
     transition: all 0.3s ease;
     flex-shrink: 0;
     color: #667eea;
     margin-right: 12px;
 }
 
+.back-to-chat-btn:hover,
 .back-to-chat-btn:active {
     background: #667eea;
     color: white;
@@ -92,12 +98,16 @@ html, body {
 
 /* ===== MESSAGES SECTION - FIXED FOR SCROLLING ===== */
 .messages-section {
-    flex: 1;
+    flex: 1; /* Takes remaining space */
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: 0; /* CRITICAL: Allows shrinking */
     position: relative;
     background: #f8f9fa;
+    /* REMOVED: overflow: hidden - This was the main issue! */
+    /* ADDED: These ensure proper scroll container */
+    height: 100%;
+    overflow: visible;
 }
 
 /* ===== SCROLLABLE MESSAGES CONTAINER - FIXED ===== */
@@ -112,7 +122,13 @@ html, body {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    /* Force flexbox to allow scrolling */
+    /* ADDED: These properties ensure proper scrolling */
+    position: relative;
+    height: 100%;
+    max-height: 100%;
+    /* Ensure proper flex behavior */
+    flex-grow: 1;
+    flex-shrink: 1;
     flex-basis: 0;
 }
 
@@ -120,9 +136,10 @@ html, body {
 .messages-container::after {
     content: '';
     display: block;
-    height: 16px;
+    height: 8px; /* Reduced from 16px */
     width: 100%;
     flex-shrink: 0;
+    pointer-events: none;
 }
 
 /* Ensure message container can shrink properly */
@@ -130,7 +147,19 @@ html, body {
     flex-shrink: 0;
 }
 
-/* Scrollbar styling - IMPROVED VISIBILITY */
+/* Important: Make sure messages align to top */
+.messages-container {
+    justify-content: flex-start; /* Align to top instead of stretch */
+}
+
+/* Fix for empty container - ensures it can grow */
+.messages-container:empty::before {
+    content: '';
+    flex: 1;
+    min-height: 1px;
+}
+
+/* ===== SCROLLBAR STYLING - IMPROVED VISIBILITY ===== */
 .messages-container::-webkit-scrollbar {
     width: 8px;
 }
@@ -174,6 +203,7 @@ html, body {
     line-height: 1.5;
     margin-bottom: 8px;
     flex-shrink: 0;
+    align-self: flex-start;
 }
 
 @keyframes fadeIn {
@@ -240,7 +270,7 @@ html, body {
 
 /* ===== INPUT SECTION ===== */
 .input-section {
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent input from shrinking */
     background: white;
     border-top: 1px solid #e8e8e8;
     padding: 16px;
@@ -429,7 +459,7 @@ html, body {
     .back-to-chat-btn {
         width: 40px;
         height: 40px;
-        font-size: 16px;
+        font-size: 18px;
         margin-right: 10px;
     }
     
@@ -485,7 +515,7 @@ html, body {
     .back-to-chat-btn {
         width: 36px;
         height: 36px;
-        font-size: 14px;
+        font-size: 16px;
         margin-right: 8px;
     }
     
@@ -556,8 +586,26 @@ html, body {
     }
 }
 
-/* ===== DEBUG HELPERS (Remove if not needed) ===== */
-/* Add this temporarily to verify scrolling works */
-.debug-border {
-    border: 2px solid red !important;
+/* ===== ALTERNATIVE FIX - Use this if scrolling still doesn't work ===== */
+/* Uncomment if needed:
+.chat-container-alt {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
+
+.messages-section-alt {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+.messages-container-alt {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+}
+*/
