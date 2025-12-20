@@ -873,7 +873,6 @@
   let whatsapp = "";
   let selectedFile = null;
   let isScrolledToBottom = true;
-  let pendingMessages = new Map();
   
   // ===== ENHANCED LOCAL STORAGE FOR MESSAGE PERSISTENCE =====
   const MessageStorage = {
@@ -965,51 +964,6 @@
       } catch (error) {
         console.error('Error clearing current messages:', error);
       }
-    }
-  };
-  
-  // ===== CLIENT-SIDE DEDUPLICATION SYSTEM =====
-  const duplicateManager = {
-    seenMessageIds: new Set(), // Track message IDs to prevent duplicates
-    
-    isDuplicate(msg) {
-      if (!msg.id) {
-        console.warn('Message has no ID:', msg);
-        return false;
-      }
-      
-      const messageId = msg.id;
-      
-      if (this.seenMessageIds.has(messageId)) {
-        console.log('🔴 CLIENT-SIDE DUPLICATE DETECTED:', {
-          id: messageId,
-          timestamp: msg.timestamp,
-          sender: msg.sender,
-          preview: (msg.text || msg.message || '').substring(0, 50)
-        });
-        return true;
-      }
-      
-      // Mark this ID as seen
-      this.seenMessageIds.add(messageId);
-      
-      // Clean up old entries periodically (keep last 500)
-      if (this.seenMessageIds.size > 500) {
-        const ids = Array.from(this.seenMessageIds);
-        this.seenMessageIds = new Set(ids.slice(-300));
-      }
-      
-      return false;
-    },
-    
-    clear() {
-      this.seenMessageIds.clear();
-    },
-    
-    removeOldEntries() {
-      // Keep entries from last 10 minutes
-      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-      // We track by ID only, so we just limit size above
     }
   };
   
@@ -1512,26 +1466,14 @@
     }
   });
 
-  // ===== CLIENT-SIDE DEDUPLICATION - CRITICAL SECTION =====
+  // ===== WAIT FOR SERVER CONFIRMATION BEFORE DISPLAYING =====
   socket.on("new_message", (msg) => {
-    console.log("📨 New message received:", {
+    console.log("📨 New message received from server:", {
       id: msg.id,
       sender: msg.sender,
       timestamp: msg.timestamp,
       preview: (msg.text || msg.message || '').substring(0, 50)
     });
-    
-    // CLIENT-SIDE DEDUPLICATION CHECK
-    if (duplicateManager.isDuplicate(msg)) {
-      console.log("🛑 CLIENT-SIDE: Skipping duplicate message with ID:", msg.id);
-      return; // Don't display duplicate
-    }
-    
-    // If this is our own pending message (sent by us), clean it up
-    if (msg.sender === "user" && pendingMessages.has(msg.timestamp)) {
-      console.log("🔄 Confirming our sent message with server ID:", msg.id);
-      pendingMessages.delete(msg.timestamp);
-    }
     
     displayMessage(msg);
     
@@ -1685,14 +1627,10 @@
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
     
-    // Apply client-side deduplication
+    // Display all messages (no deduplication)
     sortedMessages.forEach(msg => {
-      if (!duplicateManager.isDuplicate(msg)) {
-        const messageElement = createMessageElement(msg);
-        fragment.appendChild(messageElement);
-      } else {
-        console.log("🛑 Skipping duplicate in display:", msg.id);
-      }
+      const messageElement = createMessageElement(msg);
+      fragment.appendChild(messageElement);
     });
     
     messagesDiv.appendChild(fragment);
@@ -1760,10 +1698,7 @@
     document.getElementById("chat").style.display = "flex";
     document.getElementById("chatNumber").textContent = whatsapp;
     
-    // Clear client-side duplicate tracker on new registration
-    duplicateManager.clear();
     sendController.reset();
-    pendingMessages.clear();
     
     // Setup scroll listener after chat is visible
     setTimeout(setupScrollListener, 100);
@@ -1860,7 +1795,7 @@
     xhr.send(formData);
   }
 
-  // ===== ENHANCED MESSAGE SENDING WITH OFFLINE SUPPORT =====
+  // ===== WAIT FOR SERVER CONFIRMATION MESSAGE SENDING =====
   function sendMessage() {
     const canSend = sendController.canSend();
     if (!canSend.canSend) {
@@ -1887,28 +1822,6 @@
     sendingIndicator.style.display = 'block';
     errorMessage.style.display = 'none';
     
-    // Generate a temporary timestamp for local display
-    const clientTimestamp = new Date().toISOString();
-    const tempMessageId = 'temp_' + Date.now();
-    
-    // Create temporary message object for immediate display
-    const tempMessage = {
-      id: tempMessageId,
-      sender: "user",
-      whatsapp: whatsapp,
-      text: text,
-      timestamp: clientTimestamp,
-      read: false,
-      isLocal: true
-    };
-    
-    // Display temporary message immediately (optimistic update)
-    pendingMessages.set(clientTimestamp, tempMessage);
-    displayMessage(tempMessage);
-    
-    // Save to localStorage immediately
-    saveAllMessagesToStorage();
-    
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
         if (fileInfo) {
@@ -1918,26 +1831,25 @@
             whatsapp: whatsapp,
             userId: whatsapp,
             message: text,
-            attachment: fileInfo,
-            clientTimestamp: clientTimestamp
+            attachment: fileInfo
           };
           
           if (socket.connected) {
-            // Send to server
+            // Send to server - message will display when server confirms with new_message event
             socket.emit("user_message", messageData);
           } else {
             // Save for offline sending
             console.log("📴 Offline - saving message for later");
             PersistentConnection.saveOfflineMessage(messageData);
             showError("Offline - Message saved locally. Will send when reconnected.");
+            finishMessageSend();
           }
         } else {
           if (text) {
             const messageData = {
               whatsapp: whatsapp,
               userId: whatsapp,
-              message: text,
-              clientTimestamp: clientTimestamp
+              message: text
             };
             
             if (socket.connected) {
@@ -1946,11 +1858,11 @@
               console.log("📴 Offline - saving message for later");
               PersistentConnection.saveOfflineMessage(messageData);
               showError("Offline - Message saved locally. Will send when reconnected.");
+              finishMessageSend();
             }
           }
         }
         
-        finishMessageSend();
         document.getElementById("messageInput").value = "";
         fileInput.value = "";
         document.getElementById("filePreview").innerHTML = "";
@@ -1967,27 +1879,25 @@
       const messageData = {
         whatsapp: whatsapp,
         userId: whatsapp,
-        message: text,
-        clientTimestamp: clientTimestamp
+        message: text
       };
       
       if (socket.connected) {
+        // Send to server - message will display when server confirms with new_message event
         socket.emit("user_message", messageData);
       } else {
         console.log("📴 Offline - saving message for later");
         PersistentConnection.saveOfflineMessage(messageData);
         showError("Offline - Message saved locally. Will send when reconnected.");
+        finishMessageSend();
       }
       
-      setTimeout(() => {
-        finishMessageSend();
-        document.getElementById("messageInput").value = "";
-        
-        // Reset input height
-        const messageInput = document.getElementById("messageInput");
-        messageInput.style.height = 'auto';
-        messageInput.style.height = '50px';
-      }, 500);
+      document.getElementById("messageInput").value = "";
+      
+      // Reset input height
+      const messageInput = document.getElementById("messageInput");
+      messageInput.style.height = 'auto';
+      messageInput.style.height = '50px';
     }
   }
   
@@ -2089,8 +1999,6 @@
       socket.disconnect();
     }
     
-    duplicateManager.clear();
-    pendingMessages.clear();
     console.log('🧹 Cleanup completed');
   });
 
@@ -2109,16 +2017,8 @@
     }
   }, 30000);
 
-  // Auto-cleanup duplicate manager every 5 minutes
+  // Auto-cleanup old localStorage messages
   setInterval(() => {
-    // Clean old entries (keep only last 300)
-    if (duplicateManager.seenMessageIds.size > 300) {
-      const ids = Array.from(duplicateManager.seenMessageIds);
-      duplicateManager.seenMessageIds = new Set(ids.slice(-200));
-      console.log('🧹 Cleaned old duplicate entries');
-    }
-    
-    // Clean old localStorage messages
     MessageStorage.clearOldMessages();
   }, 5 * 60 * 1000);
   

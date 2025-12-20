@@ -1,223 +1,163 @@
-/* ===== DISPLAY BOX - CHAT UI ENGINE ===== */
-/* This CSS provides a fully functional chat interface for agent2.html */
+/* ===== CHAT UI - FIXED LAYOUT WITH SCROLLABLE MESSAGES ===== */
 
-/* ===== CHAT WRAPPER ===== */
-.chat-wrapper {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
+/* ===== GLOBAL RESET ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    height: 100%;
     width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ===== MAIN CHAT CONTAINER (FIXED FULL SCREEN) ===== */
+.chat-container {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height for mobile */
     background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     z-index: 1000;
 }
 
-/* ===== USER INFO HEADER ===== */
-.user-info-header {
+/* ===== HEADER SECTION (FIXED TOP) ===== */
+.chat-header {
+    flex-shrink: 0; /* Prevent shrinking */
     background: white;
     padding: 16px 20px;
     border-bottom: 1px solid #e0e0e0;
-    height: 60px;
-    min-height: 60px;
-    max-height: 60px;
-    flex-shrink: 0;
-    z-index: 10;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    min-height: 70px;
+    z-index: 10;
 }
 
-.user-id {
-    font-weight: 600;
+.header-info h2 {
     font-size: 18px;
+    font-weight: 600;
     color: #333;
     margin-bottom: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.whatsapp-number {
+.header-info p {
     font-size: 14px;
     color: #666;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-/* ===== MESSAGES SECTION - FIXED HEIGHT (3/4 of screen) ===== */
+/* ===== MESSAGES SECTION (FIXED MIDDLE WITH SCROLL) ===== */
 .messages-section {
-    height: calc(75vh - 60px); /* 3/4 of screen minus header */
-    min-height: 0;
-    overflow: hidden;
+    flex: 1 1 auto; /* Takes all available space */
+    min-height: 0; /* Crucial for flex child scrolling */
+    overflow: hidden; /* Hide overflow from this container */
     position: relative;
-    background: #f8f9fa;
-    flex-shrink: 0;
-}
-
-#chatMessages {
-    height: 100%;
-    width: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 16px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
     background: #f8f9fa;
     display: flex;
     flex-direction: column;
-    box-sizing: border-box;
+}
+
+/* The actual scrollable messages container */
+.messages-container {
+    flex: 1; /* Fill parent */
+    overflow-y: auto; /* Vertical scrolling only */
+    overflow-x: hidden;
+    padding: 16px;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    overscroll-behavior: contain; /* Prevent scroll chaining */
+    
+    /* Flex container for messages */
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 /* Bottom padding for messages */
-#chatMessages::after {
+.messages-container::after {
     content: '';
     flex: 0 0 16px;
 }
 
 /* Optimized scrollbar */
-#chatMessages::-webkit-scrollbar {
+.messages-container::-webkit-scrollbar {
     width: 6px;
 }
 
-#chatMessages::-webkit-scrollbar-track {
+.messages-container::-webkit-scrollbar-track {
     background: rgba(241, 241, 241, 0.5);
     border-radius: 3px;
 }
 
-#chatMessages::-webkit-scrollbar-thumb {
+.messages-container::-webkit-scrollbar-thumb {
     background: rgba(102, 126, 234, 0.5);
     border-radius: 3px;
 }
 
-#chatMessages::-webkit-scrollbar-thumb:hover {
+.messages-container::-webkit-scrollbar-thumb:hover {
     background: rgba(102, 126, 234, 0.7);
 }
 
 /* Firefox scrollbar */
-#chatMessages {
+.messages-container {
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
 }
 
-/* ===== INPUT SECTION - FIXED HEIGHT AT BOTTOM (1/6 of screen) ===== */
+/* ===== INPUT SECTION (FIXED BOTTOM) ===== */
 .input-section {
-    height: calc(25vh - 10px); /* 1/4 of screen with some padding */
-    min-height: 120px;
-    max-height: 200px;
+    flex-shrink: 0; /* Fixed height, won't shrink */
     background: white;
     border-top: 1px solid #e8e8e8;
-    z-index: 10;
-    width: 100%;
-    flex-shrink: 0;
-    box-sizing: border-box;
-    position: relative;
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-    overflow-y: auto;
-}
-
-.input-area-container {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.upload-progress {
-    width: 100%;
-    background-color: #f3f3f3;
-    border-radius: 10px;
-    margin: 8px 16px;
-    overflow: hidden;
-    display: none;
-    flex-shrink: 0;
-}
-
-.progress-bar {
-    height: 6px;
-    background: linear-gradient(90deg, #4CAF50, #8BC34A);
-    border-radius: 10px;
-    width: 0%;
-    transition: width 0.3s ease;
-}
-
-.file-preview {
-    padding: 8px 16px;
-    background: #f8f9fa;
-    border-radius: 20px;
-    font-size: 14px;
-    color: #666;
-    margin: 8px 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    display: none;
-}
-
-.sending-indicator,
-.error-message {
-    padding: 8px 16px;
-    font-size: 14px;
-    text-align: center;
-    display: none;
-    flex-shrink: 0;
-}
-
-.sending-indicator {
-    color: #666;
-    background: #fff9c4;
-}
-
-.error-message {
-    color: #d32f2f;
-    background: #ffebee;
-}
-
-.input-area {
     padding: 16px;
-    background: white;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-    box-sizing: border-box;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    /* Handle safe area for notched devices */
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
-#messageInput {
+/* Input area wrapper */
+.input-wrapper {
+    display: flex;
+    align-items: flex-end; /* Align to bottom for textarea resizing */
+    gap: 12px;
+    width: 100%;
+}
+
+/* Message input textarea */
+.message-input {
     flex: 1;
     border: 2px solid #e8e8e8;
-    margin: 0;
-    font-size: clamp(14px, 4vw, 16px);
-    padding: 14px 16px;
-    min-height: 50px;
-    max-height: 80px;
     border-radius: 25px;
+    padding: 14px 16px;
+    font-size: 16px;
+    font-family: inherit;
     background: #f8f9fa;
-    resize: none;
+    resize: none; /* Let JavaScript handle resizing */
+    min-height: 50px;
+    max-height: 120px;
     overflow-y: auto;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     transition: all 0.3s ease;
-    box-sizing: border-box;
+    line-height: 1.4;
 }
 
-#messageInput:focus {
+.message-input:focus {
     outline: none;
     border-color: #667eea;
     background: white;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-#messageInput:disabled {
-    background: #f5f5f5;
-    color: #999;
-    cursor: not-allowed;
-}
-
+/* Action buttons */
 .action-buttons {
     display: flex;
     align-items: center;
@@ -225,40 +165,28 @@
     flex-shrink: 0;
 }
 
-.file-upload-container {
+.file-attach-btn,
+.send-btn {
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
 }
 
-.file-upload-btn {
+.file-attach-btn {
     background: transparent;
     color: #667eea;
-    border: none;
-    padding: 12px;
-    cursor: pointer;
-    font-size: 22px;
+    font-size: 24px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
-    min-height: 50px;
-    min-width: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    user-select: none;
 }
 
-.file-upload-btn:active {
+.file-attach-btn:active {
     background: rgba(102, 126, 234, 0.1);
     transform: scale(0.95);
-}
-
-.file-upload-label {
-    font-size: 11px;
-    color: #666;
-    margin-top: 2px;
-    display: none;
 }
 
 .send-btn {
@@ -267,15 +195,8 @@
     padding: 14px 24px;
     border-radius: 25px;
     font-weight: 600;
-    min-height: 50px;
     min-width: 80px;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s ease;
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    font-size: 16px;
-    user-select: none;
 }
 
 .send-btn:active {
@@ -291,16 +212,15 @@
 }
 
 /* ===== MESSAGE BUBBLES ===== */
-.message-container {
-    margin: 8px 0;
+.message-bubble {
+    max-width: 85%;
     padding: 12px 16px;
     border-radius: 20px;
-    max-width: 85%;
     word-wrap: break-word;
     position: relative;
     animation: fadeIn 0.3s ease;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    line-height: 1.4;
+    line-height: 1.5;
     flex-shrink: 0;
 }
 
@@ -315,71 +235,64 @@
     }
 }
 
-/* AGENT MESSAGES - RIGHT ALIGNED (PURPLE) */
-.agent-message {
+/* User messages (right side) */
+.user-message {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    margin-left: auto;
-    margin-right: 0;
     align-self: flex-end;
+    margin-left: auto;
     border-bottom-right-radius: 6px;
 }
 
-/* USER MESSAGES - LEFT ALIGNED (WHITE) */
-.user-message {
+/* Agent messages (left side) */
+.agent-message {
     background: white;
     border: 1px solid #e8e8e8;
-    margin-right: auto;
-    margin-left: 0;
     align-self: flex-start;
     border-bottom-left-radius: 6px;
 }
 
-.message-header {
+.message-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
-    flex-wrap: wrap;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
 }
 
 .message-sender {
     font-weight: 600;
-    font-size: 0.9rem;
-}
-
-.agent-message .message-sender {
-    color: rgba(255,255,255,0.95);
 }
 
 .user-message .message-sender {
+    color: rgba(255,255,255,0.95);
+}
+
+.agent-message .message-sender {
     color: #444;
 }
 
 .message-time {
-    font-size: 0.75rem;
     opacity: 0.8;
     font-weight: 400;
 }
 
-.agent-message .message-time {
+.user-message .message-time {
     color: rgba(255,255,255,0.8);
 }
 
-.user-message .message-time {
+.agent-message .message-time {
     color: #666;
 }
 
 .message-content {
     word-wrap: break-word;
-    font-size: clamp(14px, 4vw, 16px);
-    line-height: 1.5;
     overflow-wrap: break-word;
     word-break: break-word;
 }
 
 /* ===== SCROLL TO BOTTOM BUTTON ===== */
-.scroll-to-bottom-btn {
+.scroll-bottom-btn {
     position: absolute;
     bottom: 90px;
     right: 20px;
@@ -400,79 +313,142 @@
     opacity: 0;
     visibility: hidden;
     transform: translateY(10px);
-    user-select: none;
 }
 
-.scroll-to-bottom-btn.visible {
+.scroll-bottom-btn.visible {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
 }
 
+.scroll-bottom-btn:hover {
+    background: #5a6fd8;
+    transform: translateY(-2px) scale(1.05);
+}
+
 /* ===== TYPING INDICATOR ===== */
 .typing-indicator {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 4px;
     padding: 8px 16px;
     background: white;
     border-radius: 20px;
-    margin: 8px 0;
-    width: fit-content;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    animation: fadeIn 0.3s ease;
     align-self: flex-start;
+    margin-top: 8px;
+}
+
+.typing-dot {
+    width: 8px;
+    height: 8px;
+    background: #667eea;
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-6px);
+    }
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #999;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.empty-state p {
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.empty-state small {
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+/* ===== UPLOAD PREVIEW ===== */
+.upload-preview {
+    background: #f8f9fa;
+    padding: 12px 16px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
+}
+
+.progress-bar {
+    height: 6px;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    border-radius: 10px;
+    width: 0%;
+    transition: width 0.3s ease;
 }
 
 /* ===== RESPONSIVE ADJUSTMENTS ===== */
 @media (max-width: 768px) {
-    .user-info-header {
+    .chat-header {
         padding: 12px 16px;
-        height: 55px;
-        min-height: 55px;
-        max-height: 55px;
+        min-height: 60px;
     }
     
-    .messages-section {
-        height: calc(75vh - 55px);
-    }
-    
-    .input-section {
-        min-height: 110px;
-    }
-    
-    .user-id {
+    .header-info h2 {
         font-size: 16px;
     }
     
-    .whatsapp-number {
+    .header-info p {
         font-size: 13px;
     }
     
-    .input-area {
+    .messages-container {
         padding: 12px;
-        gap: 8px;
     }
     
-    #messageInput {
+    .input-section {
+        padding: 12px;
+    }
+    
+    .message-input {
         padding: 12px 16px;
         min-height: 46px;
         font-size: 15px;
     }
     
-    .file-upload-btn,
+    .file-attach-btn,
     .send-btn {
-        min-height: 46px;
+        width: 46px;
+        height: 46px;
         min-width: 46px;
     }
     
-    .message-container {
+    .message-bubble {
         max-width: 90%;
         padding: 10px 14px;
-        margin: 6px 0;
     }
     
-    .scroll-to-bottom-btn {
+    .scroll-bottom-btn {
         bottom: 80px;
         right: 16px;
         width: 36px;
@@ -482,37 +458,23 @@
 }
 
 @media (max-width: 480px) {
-    .user-info-header {
+    .chat-header {
         padding: 10px 12px;
-        height: 50px;
-        min-height: 50px;
-        max-height: 50px;
+        min-height: 56px;
     }
     
-    .messages-section {
-        height: calc(75vh - 50px);
-    }
-    
-    .input-section {
-        min-height: 100px;
-    }
-    
-    .user-id {
-        font-size: 15px;
-    }
-    
-    .whatsapp-number {
-        font-size: 12px;
-    }
-    
-    .input-area {
+    .messages-container {
         padding: 10px;
     }
     
-    .message-container {
-        max-width: 92%;
-        padding: 8px 12px;
-        margin: 4px 0;
+    .input-section {
+        padding: 10px;
+    }
+    
+    .message-input {
+        padding: 10px 14px;
+        min-height: 44px;
+        font-size: 14px;
     }
     
     .send-btn {
@@ -521,39 +483,46 @@
         font-size: 14px;
     }
     
-    .file-upload-btn {
-        font-size: 20px;
-        min-width: 42px;
-        min-height: 42px;
+    .message-bubble {
+        max-width: 92%;
+        padding: 8px 12px;
     }
     
-    .scroll-to-bottom-btn {
+    .scroll-bottom-btn {
         bottom: 75px;
         right: 12px;
         width: 32px;
         height: 32px;
         font-size: 14px;
     }
-    
-    #chatMessages {
-        padding: 12px;
-    }
 }
 
-/* ===== SAFE AREA SUPPORT FOR NOTCHED DEVICES ===== */
+/* ===== SAFE AREA SUPPORT (NOTCHED DEVICES) ===== */
 @supports (padding: max(0px)) {
+    .chat-header {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+    }
+    
+    .messages-container {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+    }
+    
     .input-section {
         padding-left: max(16px, env(safe-area-inset-left));
         padding-right: max(16px, env(safe-area-inset-right));
     }
-    
-    .user-info-header {
-        padding-left: max(16px, env(safe-area-inset-left));
-        padding-right: max(16px, env(safe-area-inset-right));
+}
+
+/* ===== KEYBOARD HANDLING FOR MOBILE ===== */
+/* When keyboard is open on mobile, ensure input stays visible */
+@media (max-height: 500px) {
+    .messages-section {
+        flex: 0.7; /* Reduce messages height when keyboard is open */
     }
     
-    #chatMessages {
-        padding-left: max(16px, env(safe-area-inset-left));
-        padding-right: max(16px, env(safe-area-inset-right));
+    .input-section {
+        flex-shrink: 0;
     }
 }
