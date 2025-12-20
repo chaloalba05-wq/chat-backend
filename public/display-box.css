@@ -66,21 +66,20 @@ html, body {
 
 /* ===== MESSAGES SECTION (SCROLLABLE AREA - FIXED) ===== */
 .messages-section {
-    position: relative;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    flex: 1; /* FIXED: Use flex: 1 instead of position: relative */
+    min-height: 0; /* FIXED: Crucial for flex scrolling */
+    overflow: hidden; /* FIXED: Contain the scroll */
     background: #f8f9fa;
+    display: flex; /* FIXED: Add flex container */
+    flex-direction: column; /* FIXED: Stack children vertically */
+    position: relative; /* Keep for scroll button positioning */
 }
 
 /* The actual scrollable messages container - THIS IS WHAT SCROLLS */
 .messages-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow-y: auto;
+    flex: 1; /* FIXED: Take all available space */
+    min-height: 0; /* FIXED: Allow shrinking below content size */
+    overflow-y: auto; /* FIXED: Enable vertical scrolling here */
     overflow-x: hidden;
     padding: 16px;
     box-sizing: border-box;
@@ -91,6 +90,10 @@ html, body {
     /* Firefox scrollbar */
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
+    
+    /* FIXED: Add for proper flexbox scrolling */
+    display: flex;
+    flex-direction: column;
 }
 
 /* Bottom padding for messages */
@@ -394,12 +397,12 @@ html, body {
     text-align: center;
     padding: 40px 20px;
     flex-shrink: 0;
-    position: absolute; /* ADDED: Fixes positioning */
-    top: 0; /* ADDED */
-    left: 0; /* ADDED */
-    right: 0; /* ADDED */
-    bottom: 0; /* ADDED */
-    z-index: 1; /* ADDED */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
 }
 
 .empty-state p {
@@ -554,11 +557,7 @@ html, body {
 }
 
 /* ===== ADDITIONAL FIXES FOR SMOOTH SCROLLING ===== */
-.messages-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
+/* Removed duplicate .messages-container styles - already defined above */
 
 /* Ensure all message-related elements don't shrink */
 .date-separator {
@@ -593,4 +592,49 @@ html, body {
 /* Prevent content from being cut off at the bottom */
 .messages-container:last-child {
     margin-bottom: 0;
+}
+
+/* ===== CRITICAL FIX FOR THE SCROLLING ISSUE ===== */
+/* These styles ensure the flexbox chain works properly for scrolling */
+
+/* Ensure proper flexbox inheritance */
+.chat-container > .chat-wrapper {
+    flex: 1;
+    min-height: 0;
+}
+
+/* When chat-detail-view is active, ensure proper layout */
+#chatDetailView.active .chat-container {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Fix for iOS Safari scrolling */
+@supports (-webkit-overflow-scrolling: touch) {
+    .messages-container {
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Ensure messages container has proper height calculation */
+.messages-container {
+    /* These are already set above, but repeating for emphasis */
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+}
+
+/* Fix for when messages are added dynamically */
+.messages-container .message-bubble:last-child {
+    margin-bottom: 0;
+}
+
+/* Ensure the empty state works correctly with flexbox */
+#emptyState {
+    position: absolute;
+    pointer-events: none;
+}
+
+.messages-container:has(.message-bubble) #emptyState {
+    display: none;
 }
