@@ -44,22 +44,22 @@ html, body {
     display: none;
 }
 
-/* ===== MESSAGES SECTION ===== */
+/* ===== MESSAGES SECTION - UPDATED ===== */
 .messages-section {
     flex: 1;
     min-height: 0;
+    display: flex; /* ADDED: Enable flexbox */
+    flex-direction: column; /* ADDED: Stack vertically */
     overflow: hidden;
-    position: relative;
     background: #f8f9fa;
 }
 
-/* ===== SCROLLABLE MESSAGES CONTAINER ===== */
+/* ===== SCROLLABLE MESSAGES CONTAINER - FIXED ===== */
 .messages-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    /* REMOVED: position: absolute; top: 0; left: 0; right: 0; bottom: 0; */
+    
+    flex: 1; /* ADDED: Take all available space */
+    min-height: 0; /* ADDED: Allow shrinking below content size */
     overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
@@ -350,13 +350,14 @@ html, body {
     }
 }
 
-/* ===== EMPTY STATE ===== */
+/* ===== EMPTY STATE - FIXED ===== */
 .empty-state {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    /* CHANGED: position: relative instead of absolute */
+    position: relative;
+    
+    /* REMOVED: top: 0; left: 0; right: 0; bottom: 0; */
+    
+    flex: 1; /* ADDED: Take available space */
     display: flex;
     flex-direction: column;
     justify-content: center;
