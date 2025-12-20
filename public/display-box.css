@@ -67,23 +67,22 @@ html, body {
 .messages-section {
     flex: 1; /* Takes remaining space between header and input */
     min-height: 0; /* Crucial for flex child scrolling - FIX APPLIED */
-    overflow: hidden; /* FIXED: Changed back to hidden for proper scroll containment */
+    overflow-y: auto; /* CHANGED: Allow vertical scrolling */
+    overflow-x: hidden;
     position: relative;
     background: #f8f9fa;
+    scroll-behavior: smooth; /* ADDED: Smooth scrolling */
 }
 
 /* The actual scrollable messages container - FIXED HEIGHT */
 .messages-container {
-    height: 100%; /* Take full height of parent */
+    min-height: 100%; /* CHANGED: Ensure it can grow beyond viewport */
     width: 100%;
-    overflow-y: auto;
+    overflow-y: visible; /* CHANGED: Let parent handle scrolling */
     overflow-x: hidden;
     padding: 16px;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    
-    /* Enable smooth scrolling */
-    scroll-behavior: smooth;
     
     /* Flex container for messages */
     display: flex;
@@ -112,26 +111,26 @@ html, body {
 }
 
 /* Optimized scrollbar */
-.messages-container::-webkit-scrollbar {
+.messages-section::-webkit-scrollbar {
     width: 6px;
 }
 
-.messages-container::-webkit-scrollbar-track {
+.messages-section::-webkit-scrollbar-track {
     background: rgba(241, 241, 241, 0.5);
     border-radius: 3px;
 }
 
-.messages-container::-webkit-scrollbar-thumb {
+.messages-section::-webkit-scrollbar-thumb {
     background: rgba(102, 126, 234, 0.5);
     border-radius: 3px;
 }
 
-.messages-container::-webkit-scrollbar-thumb:hover {
+.messages-section::-webkit-scrollbar-thumb:hover {
     background: rgba(102, 126, 234, 0.7);
 }
 
 /* Firefox scrollbar */
-.messages-container {
+.messages-section {
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
 }
