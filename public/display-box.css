@@ -72,17 +72,16 @@ html, body {
     position: relative;
     background: #f8f9fa;
     scroll-behavior: smooth; /* ADDED: Smooth scrolling */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 /* The actual scrollable messages container - FIXED HEIGHT */
 .messages-container {
-    min-height: 100%; /* CHANGED: Ensure it can grow beyond viewport */
     width: 100%;
     overflow-y: visible; /* CHANGED: Let parent handle scrolling */
     overflow-x: hidden;
     padding: 16px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
     
     /* Flex container for messages */
     display: flex;
