@@ -39,6 +39,7 @@ html, body {
     display: flex;
     flex-direction: column;
     overflow: hidden; /* Prevent outer wrapper from scrolling */
+    position: relative; /* Added for proper positioning */
 }
 
 /* ===== HEADER SECTION (FIXED TOP) ===== */
@@ -50,6 +51,7 @@ html, body {
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     min-height: 70px;
     z-index: 10;
+    display: none; /* HIDDEN - You have .chat-detail-header instead */
 }
 
 .header-info h2 {
@@ -66,20 +68,21 @@ html, body {
 
 /* ===== MESSAGES SECTION (SCROLLABLE AREA - FIXED) ===== */
 .messages-section {
-    flex: 1; /* FIXED: Use flex: 1 instead of position: relative */
-    min-height: 0; /* FIXED: Crucial for flex scrolling */
-    overflow: hidden; /* FIXED: Contain the scroll */
+    flex: 1 1 0%; /* CHANGED: Use explicit values for better control */
+    min-height: 0; /* Crucial for flex scrolling */
+    overflow: hidden; /* Contain the scroll */
     background: #f8f9fa;
-    display: flex; /* FIXED: Add flex container */
-    flex-direction: column; /* FIXED: Stack children vertically */
+    display: flex; /* Add flex container */
+    flex-direction: column; /* Stack children vertically */
     position: relative; /* Keep for scroll button positioning */
+    width: 100%; /* Ensure full width */
 }
 
 /* The actual scrollable messages container - THIS IS WHAT SCROLLS */
 .messages-container {
-    flex: 1; /* FIXED: Take all available space */
-    min-height: 0; /* FIXED: Allow shrinking below content size */
-    overflow-y: auto; /* FIXED: Enable vertical scrolling here */
+    flex: 1 1 0%; /* CHANGED: Use explicit flex values */
+    min-height: 0; /* Allow shrinking below content size */
+    overflow-y: auto; /* Enable vertical scrolling here */
     overflow-x: hidden;
     padding: 16px;
     box-sizing: border-box;
@@ -91,9 +94,18 @@ html, body {
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     
-    /* FIXED: Add for proper flexbox scrolling */
+    /* Add for proper flexbox scrolling */
     display: flex;
     flex-direction: column;
+    gap: 8px;
+    
+    /* FIX: Ensure proper height calculation */
+    height: 0; /* This forces flexbox to calculate available space */
+    
+    /* FIX: Remove conflicting hardware acceleration */
+    /* will-change: transform; */ /* Remove if causing issues */
+    /* backface-visibility: hidden; */ /* Remove if causing issues */
+    /* transform: translateZ(0); */ /* Remove if causing issues */
 }
 
 /* Bottom padding for messages */
@@ -103,6 +115,7 @@ html, body {
     height: 16px;
     width: 100%;
     flex-shrink: 0;
+    pointer-events: none; /* Prevent interaction */
 }
 
 /* Optimized scrollbar for Webkit browsers */
@@ -156,6 +169,7 @@ html, body {
     z-index: 10;
     /* Handle safe area for notched devices */
     padding-bottom: max(16px, env(safe-area-inset-bottom));
+    width: 100%; /* Ensure full width */
 }
 
 /* Input area wrapper */
@@ -403,6 +417,7 @@ html, body {
     right: 0;
     bottom: 0;
     z-index: 1;
+    pointer-events: none; /* Allow clicking through to messages */
 }
 
 .empty-state p {
@@ -557,7 +572,6 @@ html, body {
 }
 
 /* ===== ADDITIONAL FIXES FOR SMOOTH SCROLLING ===== */
-/* Removed duplicate .messages-container styles - already defined above */
 
 /* Ensure all message-related elements don't shrink */
 .date-separator {
@@ -594,32 +608,19 @@ html, body {
     margin-bottom: 0;
 }
 
-/* ===== CRITICAL FIX FOR THE SCROLLING ISSUE ===== */
-/* These styles ensure the flexbox chain works properly for scrolling */
-
-/* Ensure proper flexbox inheritance */
-.chat-container > .chat-wrapper {
-    flex: 1;
-    min-height: 0;
-}
-
-/* When chat-detail-view is active, ensure proper layout */
-#chatDetailView.active .chat-container {
-    display: flex;
-    flex-direction: column;
-}
+/* ===== CRITICAL FIXES FOR THE SCROLLING ISSUE ===== */
 
 /* Fix for iOS Safari scrolling */
 @supports (-webkit-overflow-scrolling: touch) {
     .messages-container {
-        -webkit-overflow-scrolling: touch;
+        -webkit-overflow-scrolling: touch !important;
     }
 }
 
 /* Ensure messages container has proper height calculation */
 .messages-container {
-    /* These are already set above, but repeating for emphasis */
-    flex: 1 !important;
+    /* Force proper flex behavior */
+    flex: 1 1 0% !important;
     min-height: 0 !important;
     overflow-y: auto !important;
 }
@@ -637,4 +638,74 @@ html, body {
 
 .messages-container:has(.message-bubble) #emptyState {
     display: none;
+}
+
+/* ===== FIX FOR YOUR SPECIFIC HTML STRUCTURE ===== */
+
+/* Hide the duplicate chat-header since you have chat-detail-header */
+.chat-header {
+    display: none !important;
+}
+
+/* Ensure the chat-detail-view takes full height */
+#chatDetailView.active .chat-container {
+    height: 100vh !important;
+    height: 100dvh !important;
+}
+
+/* Fix for iOS height issues */
+@supports (-webkit-touch-callout: none) {
+    #chatDetailView.active .chat-container,
+    #chatDetailView.active .chat-wrapper,
+    #chatDetailView.active .messages-section {
+        height: 100% !important;
+        min-height: 100% !important;
+    }
+    
+    #chatDetailView.active .messages-container {
+        height: auto !important;
+        max-height: 100% !important;
+    }
+}
+
+/* Force proper flexbox chain in your nested structure */
+#chatDetailView.active .chat-container > .chat-wrapper {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Ensure the scroll button stays above messages */
+.scroll-bottom-btn {
+    z-index: 100 !important;
+}
+
+/* Fix for message bubble alignment */
+.message-bubble {
+    max-width: 85%;
+    word-break: break-word;
+}
+
+/* Fix for input section on mobile keyboards */
+.input-section {
+    background: white;
+    backdrop-filter: blur(10px);
+}
+
+/* ===== FIX FOR DYNAMIC CONTENT ===== */
+/* When messages are added, ensure container can scroll */
+.messages-container.has-content {
+    overflow-y: scroll !important;
+}
+
+/* Prevent text selection interference */
+.messages-container {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+/* Fix for Firefox scrollbar appearing/disappearing */
+.messages-container {
+    scrollbar-gutter: stable;
 }
