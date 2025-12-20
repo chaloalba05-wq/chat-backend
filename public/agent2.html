@@ -5,6 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Agent Admin</title>
   <style>
+    /* ===== CHAT UI - FIXED LAYOUT WITH SCROLLABLE MESSAGES ===== */
+
+    /* ===== GLOBAL RESET ===== */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
     /* ===== GLOBAL STYLES ===== */
     * { 
       margin: 0; 
@@ -540,242 +557,509 @@
     }
 
     /* ===== NEW CHAT UI STYLES ===== */
+    /* ===== CHAT CONTAINER (FIXED FULL SCREEN) ===== */
     .chat-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      background: #fff;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        background: #fff;
+        overflow: hidden;
     }
 
+    /* ===== CHAT WRAPPER (FLEX CONTAINER FOR PROPER SCROLLING) ===== */
+    .chat-wrapper {
+        flex: 1;
+        min-height: 0; /* Crucial for flex chain - allows children to scroll */
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* ===== HEADER SECTION (FIXED TOP) ===== */
     .chat-header {
-      padding: 16px 20px;
-      background: #fff;
-      border-bottom: 1px solid #e0e0e0;
-      flex-shrink: 0;
+        flex-shrink: 0;
+        background: white;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e0e0e0;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        min-height: 70px;
+        z-index: 10;
     }
 
     .header-info h2 {
-      margin: 0;
-      font-size: 18px;
-      color: #333;
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 4px;
     }
 
     .header-info p {
-      margin: 4px 0 0;
-      font-size: 14px;
-      color: #666;
+        font-size: 14px;
+        color: #666;
     }
 
+    /* ===== MESSAGES SECTION (FIXED HEIGHT WITH SCROLL) ===== */
     .messages-section {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
+        flex: 1; /* Takes remaining space between header and input */
+        min-height: 0; /* Crucial for flex child scrolling - FIX APPLIED */
+        overflow: hidden; /* Contain the scrolling area */
+        position: relative;
+        background: #f8f9fa;
     }
 
+    /* The actual scrollable messages container - FIXED HEIGHT */
     .messages-container {
-      height: 100%;
-      overflow-y: auto;
-      padding: 16px;
-      padding-bottom: 80px;
+        height: 100%; /* Take full height of parent */
+        width: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 16px;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        
+        /* Flex container for messages */
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
     }
 
+    /* Bottom padding for messages */
+    .messages-container::after {
+        content: '';
+        height: 16px;
+        flex-shrink: 0;
+    }
+
+    /* Message container should NOT grow, only scroll */
     .message-bubble {
-      max-width: 80%;
-      margin-bottom: 16px;
-      padding: 12px 16px;
-      border-radius: 18px;
-      position: relative;
-      word-wrap: break-word;
+        max-width: 85%;
+        padding: 12px 16px;
+        border-radius: 20px;
+        word-wrap: break-word;
+        position: relative;
+        animation: fadeIn 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        line-height: 1.5;
+        flex-shrink: 0; /* Prevent messages from shrinking */
     }
 
-    .agent-message {
-      background: #f0f7ff;
-      border: 1px solid #e3f2fd;
-      margin-right: auto;
-      margin-left: 0;
+    /* Optimized scrollbar */
+    .messages-container::-webkit-scrollbar {
+        width: 6px;
     }
 
-    .user-message {
-      background: #dcf8c6;
-      border: 1px solid #c8e6c9;
-      margin-left: auto;
-      margin-right: 0;
+    .messages-container::-webkit-scrollbar-track {
+        background: rgba(241, 241, 241, 0.5);
+        border-radius: 3px;
     }
 
-    .message-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-      font-size: 12px;
+    .messages-container::-webkit-scrollbar-thumb {
+        background: rgba(102, 126, 234, 0.5);
+        border-radius: 3px;
     }
 
-    .message-sender {
-      font-weight: 600;
-      color: #555;
+    .messages-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(102, 126, 234, 0.7);
     }
 
-    .message-time {
-      color: #888;
-      font-size: 11px;
+    /* Firefox scrollbar */
+    .messages-container {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     }
 
-    .message-content {
-      font-size: 14px;
-      line-height: 1.4;
-    }
-
-    .typing-indicator {
-      display: flex;
-      align-items: center;
-      padding: 16px;
-      background: #f0f7ff;
-      border-radius: 18px;
-      max-width: 80px;
-      margin-bottom: 16px;
-    }
-
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background: #666;
-      border-radius: 50%;
-      margin-right: 4px;
-      animation: typingAnimation 1.4s infinite ease-in-out;
-    }
-
-    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-
-    @keyframes typingAnimation {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
-    }
-
-    .upload-preview {
-      background: #f5f5f5;
-      border: 1px dashed #ccc;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
-      font-size: 14px;
-    }
-
-    .progress-bar {
-      height: 4px;
-      background: #667eea;
-      border-radius: 2px;
-      margin-top: 8px;
-      transition: width 0.3s ease;
-    }
-
-    .scroll-bottom-btn {
-      position: absolute;
-      bottom: 80px;
-      right: 20px;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #667eea;
-      color: white;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.3s ease;
-      z-index: 100;
-    }
-
-    .scroll-bottom-btn.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
+    /* ===== INPUT SECTION (FIXED BOTTOM) ===== */
     .input-section {
-      padding: 16px;
-      background: #fff;
-      border-top: 1px solid #e0e0e0;
-      flex-shrink: 0;
+        flex-shrink: 0; /* Fixed height, won't shrink */
+        background: white;
+        border-top: 1px solid #e8e8e8;
+        padding: 16px;
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+        /* Handle safe area for notched devices */
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
     }
 
+    /* Input area wrapper */
     .input-wrapper {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        width: 100%;
     }
 
+    /* Message input textarea */
     .message-input {
-      flex: 1;
-      padding: 12px 16px;
-      border: 1px solid #e0e0e0;
-      border-radius: 24px;
-      font-size: 14px;
-      resize: none;
-      max-height: 120px;
-      min-height: 50px;
-      font-family: inherit;
-      background: #f8f9fa;
+        flex: 1;
+        border: 2px solid #e8e8e8;
+        border-radius: 25px;
+        padding: 14px 16px;
+        font-size: 16px;
+        font-family: inherit;
+        background: #f8f9fa;
+        resize: none;
+        min-height: 50px;
+        max-height: 120px;
+        overflow-y: auto;
+        transition: all 0.3s ease;
+        line-height: 1.4;
     }
 
     .message-input:focus {
-      outline: none;
-      border-color: #667eea;
-      background: #fff;
+        outline: none;
+        border-color: #667eea;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
 
+    /* Action buttons */
     .action-buttons {
-      display: flex;
-      gap: 8px;
-      align-items: center;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
     }
 
     .file-attach-btn,
     .send-btn {
-      padding: 12px 20px;
-      border: none;
-      border-radius: 24px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .file-attach-btn {
-      background: #f0f0f0;
-      color: #666;
-      width: 44px;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
+        background: transparent;
+        color: #667eea;
+        font-size: 24px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
     }
 
     .file-attach-btn:active {
-      background: #e0e0e0;
-      transform: scale(0.95);
+        background: rgba(102, 126, 234, 0.1);
+        transform: scale(0.95);
     }
 
     .send-btn {
-      background: #667eea;
-      color: white;
-      min-width: 80px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 14px 24px;
+        border-radius: 25px;
+        font-weight: 600;
+        min-width: 80px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .send-btn:active {
+        transform: scale(0.95);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
     }
 
     .send-btn:disabled {
-      background: #ccc;
-      cursor: not-allowed;
+        background: #cccccc;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none;
     }
 
-    .send-btn:active:not(:disabled) {
-      background: #5a6fd8;
-      transform: scale(0.98);
+    /* ===== MESSAGE BUBBLES ===== */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* User messages (right side) */
+    .user-message {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        align-self: flex-end;
+        margin-left: auto;
+        border-bottom-right-radius: 6px;
+    }
+
+    /* Agent messages (left side) */
+    .agent-message {
+        background: white;
+        border: 1px solid #e8e8e8;
+        align-self: flex-start;
+        border-bottom-left-radius: 6px;
+    }
+
+    .message-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        font-size: 0.85rem;
+    }
+
+    .message-sender {
+        font-weight: 600;
+    }
+
+    .user-message .message-sender {
+        color: rgba(255,255,255,0.95);
+    }
+
+    .agent-message .message-sender {
+        color: #444;
+    }
+
+    .message-time {
+        opacity: 0.8;
+        font-weight: 400;
+    }
+
+    .user-message .message-time {
+        color: rgba(255,255,255,0.8);
+    }
+
+    .agent-message .message-time {
+        color: #666;
+    }
+
+    .message-content {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    /* ===== SCROLL TO BOTTOM BUTTON ===== */
+    .scroll-bottom-btn {
+        position: absolute;
+        bottom: 90px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #667eea;
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        z-index: 5;
+        transition: all 0.3s ease;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(10px);
+    }
+
+    .scroll-bottom-btn.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    .scroll-bottom-btn:hover {
+        background: #5a6fd8;
+        transform: translateY(-2px) scale(1.05);
+    }
+
+    /* ===== TYPING INDICATOR ===== */
+    .typing-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 16px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        align-self: flex-start;
+        margin-top: 8px;
+        flex-shrink: 0;
+    }
+
+    .typing-dot {
+        width: 8px;
+        height: 8px;
+        background: #667eea;
+        border-radius: 50%;
+        animation: typingBounce 1.4s infinite;
+    }
+
+    .typing-dot:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-dot:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes typingBounce {
+        0%, 60%, 100% {
+            transform: translateY(0);
+        }
+        30% {
+            transform: translateY(-6px);
+        }
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: #999;
+        text-align: center;
+        padding: 40px 20px;
+        flex-shrink: 0;
+    }
+
+    .empty-state p {
+        font-size: 16px;
+        margin-bottom: 8px;
+    }
+
+    .empty-state small {
+        font-size: 14px;
+        opacity: 0.7;
+    }
+
+    /* ===== UPLOAD PREVIEW ===== */
+    .upload-preview {
+        background: #f8f9fa;
+        padding: 12px 16px;
+        border-radius: 20px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: #666;
+        flex-shrink: 0;
+    }
+
+    .progress-bar {
+        height: 6px;
+        background: linear-gradient(90deg, #4CAF50, #8BC34A);
+        border-radius: 10px;
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+
+    /* ===== RESPONSIVE ADJUSTMENTS ===== */
+    @media (max-width: 768px) {
+        .chat-header {
+            padding: 12px 16px;
+            min-height: 60px;
+        }
+        
+        .header-info h2 {
+            font-size: 16px;
+        }
+        
+        .header-info p {
+            font-size: 13px;
+        }
+        
+        .messages-container {
+            padding: 12px;
+        }
+        
+        .input-section {
+            padding: 12px;
+        }
+        
+        .message-input {
+            padding: 12px 16px;
+            min-height: 46px;
+            font-size: 15px;
+        }
+        
+        .file-attach-btn,
+        .send-btn {
+            width: 46px;
+            height: 46px;
+            min-width: 46px;
+        }
+        
+        .message-bubble {
+            max-width: 90%;
+            padding: 10px 14px;
+        }
+        
+        .scroll-bottom-btn {
+            bottom: 80px;
+            right: 16px;
+            width: 36px;
+            height: 36px;
+            font-size: 16px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .chat-header {
+            padding: 10px 12px;
+            min-height: 56px;
+        }
+        
+        .messages-container {
+            padding: 10px;
+        }
+        
+        .input-section {
+            padding: 10px;
+        }
+        
+        .message-input {
+            padding: 10px 14px;
+            min-height: 44px;
+            font-size: 14px;
+        }
+        
+        .send-btn {
+            min-width: 70px;
+            padding: 12px 20px;
+            font-size: 14px;
+        }
+        
+        .message-bubble {
+            max-width: 92%;
+            padding: 8px 12px;
+        }
+        
+        .scroll-bottom-btn {
+            bottom: 75px;
+            right: 12px;
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+        }
+    }
+
+    /* ===== SAFE AREA SUPPORT (NOTCHED DEVICES) ===== */
+    @supports (padding: max(0px)) {
+        .chat-header {
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+        
+        .messages-container {
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+        
+        .input-section {
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
     }
 
     /* Date separator */
@@ -833,7 +1117,6 @@
 
       .messages-container {
         padding: 12px;
-        padding-bottom: 80px;
       }
 
       .message-bubble {
@@ -862,7 +1145,7 @@
 <!-- Header with logo -->
 <div id="header">
   <div class="logo-text">ALBASTUZ3D</div>
-  <div class="logo-subtitle">AGENT ADMIN PANEL</div>
+  <div class="logo-subtext">AGENT ADMIN PANEL</div>
 </div>
 
 <!-- Main App -->
@@ -913,59 +1196,60 @@
     
     <!-- New Chat UI Structure -->
     <div class="chat-container">
+      <!-- CHAT WRAPPER (Flex container for proper scrolling chain) -->
+      <div class="chat-wrapper">
+        <!-- Fixed header section -->
+        <header class="chat-header">
+          <div class="header-info">
+            <h2 id="chatHeaderUser">User Chat</h2>
+            <p id="chatHeaderStatus">Status or description</p>
+          </div>
+        </header>
         
-      <!-- Fixed header section -->
-      <header class="chat-header">
-        <div class="header-info">
-          <h2 id="chatHeaderUser">User Chat</h2>
-          <p id="chatHeaderStatus">Status or description</p>
-        </div>
-      </header>
-      
-      <!-- Scrollable messages section -->
-      <section class="messages-section">
-        <!-- Messages container (scrollable area) -->
-        <div class="messages-container" id="chatMessages">
-          
-          <!-- Empty state (shown when no messages) -->
-          <div class="empty-state" id="emptyState">
-            <p>No messages yet</p>
-            <small>Start a conversation</small>
+        <!-- Scrollable messages section -->
+        <section class="messages-section">
+          <!-- Messages container (scrollable area) -->
+          <div class="messages-container" id="chatMessages">
+            
+            <!-- Empty state (shown when no messages) -->
+            <div class="empty-state" id="emptyState">
+              <p>No messages yet</p>
+              <small>Start a conversation</small>
+            </div>
+            
+            <!-- Messages will be dynamically inserted here -->
           </div>
           
-          <!-- Messages will be dynamically inserted here -->
-        </div>
+          <!-- Scroll to bottom button -->
+          <button class="scroll-bottom-btn" id="scrollBottomBtn">
+            ↓
+          </button>
+        </section>
         
-        <!-- Scroll to bottom button -->
-        <button class="scroll-bottom-btn" id="scrollBottomBtn">
-          ↓
-        </button>
-      </section>
-      
-      <!-- Fixed input section at bottom -->
-      <section class="input-section">
-        <div class="input-wrapper">
-          <!-- Text input area -->
-          <textarea 
-            class="message-input" 
-            id="messageInput"
-            placeholder="Type your message..." 
-            rows="1"
-            disabled
-          ></textarea>
-          
-          <!-- Action buttons -->
-          <div class="action-buttons">
-            <button class="file-attach-btn" type="button" onclick="document.getElementById('fileInput').click()">
-              📎
-            </button>
-            <button class="send-btn" type="button" id="sendButton" onclick="sendMessage()" disabled>
-              Send
-            </button>
+        <!-- Fixed input section at bottom -->
+        <section class="input-section">
+          <div class="input-wrapper">
+            <!-- Text input area -->
+            <textarea 
+              class="message-input" 
+              id="messageInput"
+              placeholder="Type your message..." 
+              rows="1"
+              disabled
+            ></textarea>
+            
+            <!-- Action buttons -->
+            <div class="action-buttons">
+              <button class="file-attach-btn" type="button" onclick="document.getElementById('fileInput').click()">
+                📎
+              </button>
+              <button class="send-btn" type="button" id="sendButton" onclick="sendMessage()" disabled>
+                Send
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
-      
+        </section>
+      </div>
     </div>
     
     <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect()">
@@ -1010,7 +1294,8 @@
   
   // Track pending messages waiting for server confirmation
   let pendingMessages = new Map(); // Map of temporary IDs to server IDs
-  
+  let socketListenersSetup = false; // Flag to prevent duplicate listeners
+
   // ================================================
   // PERSISTENT CONNECTION SYSTEM
   // ================================================
@@ -1392,6 +1677,12 @@
   // SOCKET SETUP - UPDATED FOR DUAL-ROOM SYSTEM
   // ================================================
   function setupSocketListeners() {
+    // Clear existing listeners to prevent duplication
+    if (socketListenersSetup && socket) {
+      socket.removeAllListeners();
+      console.log("🔧 Removed existing socket listeners");
+    }
+    
     socket.on('connect', () => {
       console.log("✅ Connected to server, Socket ID:", socket.id);
       updateConnectionStatus('connected');
@@ -1560,9 +1851,15 @@
             pendingMessages.delete(msg.id);
           }
         }
-      } else if (!msg.isHistorical || selectedUser === whatsapp) {
+      } else if (!msg.isHistorical) {
         // Check if this message already exists (prevent duplicates)
-        const existingIndex = user.messages.findIndex(m => m.id === msg.id);
+        const existingIndex = user.messages.findIndex(m => 
+          (m.id && m.id === msg.id) || 
+          (m.text === (msg.text || msg.message) && 
+           m.time === msg.timestamp && 
+           m.sender === (msg.sender || 'unknown'))
+        );
+        
         if (existingIndex === -1) {
           user.messages.push({
             text: msg.text || msg.message,
@@ -1647,7 +1944,13 @@
         }
       } else {
         // Check if this message already exists (prevent duplicates)
-        const existingIndex = user.messages.findIndex(m => m.id === msg.id);
+        const existingIndex = user.messages.findIndex(m => 
+          (m.id && m.id === msg.id) || 
+          (m.text === (msg.text || msg.message) && 
+           m.time === msg.timestamp && 
+           m.sender === (msg.sender || 'unknown'))
+        );
+        
         if (existingIndex === -1) {
           user.messages.push({
             text: msg.text || msg.message,
@@ -1821,6 +2124,8 @@
         showMessages();
       }
     });
+    
+    socketListenersSetup = true;
   }
   
   // ================================================
@@ -1861,7 +2166,7 @@
     
     socket.emit('get_existing_users');
     
-    socket.on('existing_users', (usersList) => {
+    socket.once('existing_users', (usersList) => {
       console.log("📋 Loaded existing users:", usersList.length);
       updateActivity();
       
@@ -1897,15 +2202,24 @@
     }
     
     const user = users.get(userId);
-    user.messages.push({
-      text: message,
-      time: data.timestamp || new Date().toISOString(),
-      sender: data.sender || 'user',
-      attachment: data.attachment,
-      id: data.id
-    });
-    user.lastMsg = message || '[Attachment]';
-    user.time = data.timestamp || new Date().toISOString();
+    
+    // Check for duplicate before adding
+    const isDuplicate = user.messages.some(msg => 
+      msg.id === data.id || 
+      (msg.text === message && msg.time === (data.timestamp || new Date().toISOString()))
+    );
+    
+    if (!isDuplicate) {
+      user.messages.push({
+        text: message,
+        time: data.timestamp || new Date().toISOString(),
+        sender: data.sender || 'user',
+        attachment: data.attachment,
+        id: data.id
+      });
+      user.lastMsg = message || '[Attachment]';
+      user.time = data.timestamp || new Date().toISOString();
+    }
     
     updateUserList();
     
@@ -2049,6 +2363,20 @@
       scrollToBottom();
       return;
     }
+    
+    // Remove any duplicate messages before displaying
+    const uniqueMessages = [];
+    const seenMessages = new Set();
+    
+    user.messages.forEach(msg => {
+      const messageKey = `${msg.id || ''}-${msg.text || ''}-${msg.time}-${msg.sender}`;
+      if (!seenMessages.has(messageKey)) {
+        seenMessages.add(messageKey);
+        uniqueMessages.push(msg);
+      }
+    });
+    
+    user.messages = uniqueMessages;
     
     const groupedMessages = groupMessagesByDate(user.messages);
     

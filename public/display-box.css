@@ -32,6 +32,14 @@ html, body {
     z-index: 1000;
 }
 
+/* ===== CHAT WRAPPER (FLEX CONTAINER FOR PROPER SCROLLING) ===== */
+.chat-wrapper {
+    flex: 1;
+    min-height: 0; /* Crucial for flex chain - allows children to scroll */
+    display: flex;
+    flex-direction: column;
+}
+
 /* ===== HEADER SECTION (FIXED TOP) ===== */
 .chat-header {
     flex-shrink: 0;
@@ -58,7 +66,7 @@ html, body {
 /* ===== MESSAGES SECTION (FIXED HEIGHT WITH SCROLL) ===== */
 .messages-section {
     flex: 1; /* Takes remaining space between header and input */
-    min-height: 0; /* Crucial for flex child scrolling */
+    min-height: 0; /* Crucial for flex child scrolling - FIX APPLIED */
     overflow: hidden; /* Contain the scrolling area */
     position: relative;
     background: #f8f9fa;
