@@ -15,16 +15,106 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* ===== MAIN CHAT CONTAINER (FIXED FULL SCREEN) ===== */
-.chat-container {
+/* ===== CHAT DETAIL VIEW ===== */
+.chat-detail-view {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
+    background: #f8f9fa;
+    z-index: 1000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    overflow: hidden;
+}
+
+.chat-detail-view.active {
+    transform: translateX(0);
+}
+
+/* ===== CHAT DETAIL HEADER (YOUR HTML HAS THIS) ===== */
+.chat-detail-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 83px;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1001;
+    flex-shrink: 0;
+}
+
+.back-button {
+    padding: 10px;
+    background: #f5f5f5;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    color: #667eea;
+}
+
+.back-button:active {
+    background: #667eea;
+    color: white;
+    transform: scale(0.95);
+}
+
+.chat-detail-user-avatar {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.chat-detail-user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-detail-user-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 16px;
+    line-height: 1.2;
+}
+
+.chat-detail-user-number {
+    font-size: 14px;
+    color: #666;
+    margin-top: 2px;
+}
+
+/* ===== CHAT CONTAINER (INSIDE .chat-detail-view) ===== */
+.chat-detail-view.active .chat-container {
+    position: absolute;
+    top: 83px; /* Below .chat-detail-header */
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: 100%;
-    height: 100vh;
-    height: 100dvh;
+    height: calc(100% - 83px);
     background: #f8f9fa;
     display: flex;
     flex-direction: column;
@@ -32,18 +122,23 @@ html, body {
     z-index: 1000;
 }
 
-/* ===== CHAT WRAPPER (FLEX CONTAINER FOR PROPER SCROLLING) ===== */
+/* ===== CHAT WRAPPER ===== */
 .chat-wrapper {
     flex: 1;
-    min-height: 0; /* Crucial for flex chain - allows children to scroll */
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Prevent outer wrapper from scrolling */
+    overflow: hidden;
 }
 
-/* ===== HEADER SECTION (FIXED TOP) ===== */
+/* ===== HEADER SECTION - HIDE THIS (DUPLICATE) ===== */
+.chat-detail-view.active .chat-header {
+    display: none !important; /* Hide duplicate header */
+}
+
+/* If you want to keep it but make it work with existing structure: */
 .chat-header {
-    flex-shrink: 0; /* Fixed height, won't shrink */
+    flex-shrink: 0;
     background: white;
     padding: 16px 20px;
     border-bottom: 1px solid #e0e0e0;
@@ -64,22 +159,22 @@ html, body {
     color: #666;
 }
 
-/* ===== MESSAGES SECTION (SCROLLABLE AREA - FIXED) ===== */
+/* ===== MESSAGES SECTION ===== */
 .messages-section {
-    flex: 1; /* FIXED: Use flex: 1 instead of position: relative */
-    min-height: 0; /* FIXED: Crucial for flex scrolling */
-    overflow: hidden; /* FIXED: Contain the scroll */
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
     background: #f8f9fa;
-    display: flex; /* FIXED: Add flex container */
-    flex-direction: column; /* FIXED: Stack children vertically */
-    position: relative; /* Keep for scroll button positioning */
+    display: flex;
+    flex-direction: column;
+    position: relative;
 }
 
-/* The actual scrollable messages container - THIS IS WHAT SCROLLS */
-.messages-container {
-    flex: 1; /* FIXED: Take all available space */
-    min-height: 0; /* FIXED: Allow shrinking below content size */
-    overflow-y: auto; /* FIXED: Enable vertical scrolling here */
+/* ===== MESSAGES CONTAINER - CRITICAL FOR SCROLLING ===== */
+.chat-detail-view.active .messages-container {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important;
     overflow-x: hidden;
     padding: 16px;
     box-sizing: border-box;
@@ -91,7 +186,6 @@ html, body {
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
     
-    /* FIXED: Add for proper flexbox scrolling */
     display: flex;
     flex-direction: column;
 }
@@ -124,15 +218,15 @@ html, body {
     background: rgba(102, 126, 234, 0.7);
 }
 
-/* Message wrapper - ensures proper stacking */
+/* Message wrapper */
 .message-wrapper {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    flex-shrink: 0; /* Prevent shrinking of individual messages */
+    flex-shrink: 0;
 }
 
-/* Message container should NOT grow, only scroll */
+/* Message container */
 .message-bubble {
     max-width: 85%;
     padding: 12px 16px;
@@ -142,23 +236,21 @@ html, body {
     animation: fadeIn 0.3s ease;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     line-height: 1.5;
-    flex-shrink: 0; /* Prevent messages from shrinking */
+    flex-shrink: 0;
 }
 
-/* ===== INPUT SECTION (FIXED BOTTOM) ===== */
+/* ===== INPUT SECTION ===== */
 .input-section {
-    flex-shrink: 0; /* Fixed height, won't shrink */
+    flex-shrink: 0;
     background: white;
     border-top: 1px solid #e8e8e8;
     padding: 16px;
     position: sticky;
     bottom: 0;
     z-index: 10;
-    /* Handle safe area for notched devices */
     padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
-/* Input area wrapper */
 .input-wrapper {
     display: flex;
     align-items: flex-end;
@@ -166,7 +258,6 @@ html, body {
     width: 100%;
 }
 
-/* Message input textarea */
 .message-input {
     flex: 1;
     border: 2px solid #e8e8e8;
@@ -190,7 +281,6 @@ html, body {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* Action buttons */
 .action-buttons {
     display: flex;
     align-items: center;
@@ -256,7 +346,6 @@ html, body {
     }
 }
 
-/* User messages (right side) */
 .user-message {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -265,7 +354,6 @@ html, body {
     border-bottom-right-radius: 6px;
 }
 
-/* Agent messages (left side) */
 .agent-message {
     background: white;
     border: 1px solid #e8e8e8;
@@ -439,16 +527,33 @@ html, body {
 
 /* ===== RESPONSIVE ADJUSTMENTS ===== */
 @media (max-width: 768px) {
-    .chat-header {
+    .chat-detail-header {
+        height: 70px;
         padding: 12px 16px;
-        min-height: 60px;
     }
     
-    .header-info h2 {
+    .chat-detail-view.active .chat-container {
+        top: 70px;
+        height: calc(100% - 70px);
+    }
+    
+    .back-button {
+        width: 40px;
+        height: 40px;
         font-size: 16px;
     }
     
-    .header-info p {
+    .chat-detail-user-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+    }
+    
+    .chat-detail-user-name {
+        font-size: 15px;
+    }
+    
+    .chat-detail-user-number {
         font-size: 13px;
     }
     
@@ -488,9 +593,34 @@ html, body {
 }
 
 @media (max-width: 480px) {
-    .chat-header {
+    .chat-detail-header {
+        height: 65px;
         padding: 10px 12px;
-        min-height: 56px;
+    }
+    
+    .chat-detail-view.active .chat-container {
+        top: 65px;
+        height: calc(100% - 65px);
+    }
+    
+    .back-button {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+    
+    .chat-detail-user-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+    
+    .chat-detail-user-name {
+        font-size: 14px;
+    }
+    
+    .chat-detail-user-number {
+        font-size: 12px;
     }
     
     .messages-container {
@@ -527,9 +657,9 @@ html, body {
     }
 }
 
-/* ===== SAFE AREA SUPPORT (NOTCHED DEVICES) ===== */
+/* ===== SAFE AREA SUPPORT ===== */
 @supports (padding: max(0px)) {
-    .chat-header {
+    .chat-detail-header {
         padding-left: max(16px, env(safe-area-inset-left));
         padding-right: max(16px, env(safe-area-inset-right));
     }
@@ -545,10 +675,49 @@ html, body {
     }
 }
 
+/* ===== NUCLEAR OPTION - GUARANTEED SCROLLING FIX ===== */
+/* Add this class via JavaScript if scrolling doesn't work */
+.chat-detail-view.active .chat-container.scroll-fix-active {
+    position: absolute;
+    top: 83px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.chat-detail-view.active .chat-container.scroll-fix-active .messages-section {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.chat-detail-view.active .chat-container.scroll-fix-active .messages-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 80px; /* Input height */
+    overflow-y: auto !important;
+}
+
+@media (max-width: 768px) {
+    .chat-detail-view.active .chat-container.scroll-fix-active {
+        top: 70px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-detail-view.active .chat-container.scroll-fix-active {
+        top: 65px;
+    }
+}
+
 /* ===== FALLBACK FOR OLDER BROWSERS ===== */
 .no-flexbox .chat-wrapper {
     display: block;
-    height: calc(100vh - 130px); /* Header + Input heights */
+    height: calc(100vh - 130px);
 }
 
 .no-flexbox .messages-section {
@@ -556,10 +725,7 @@ html, body {
     overflow-y: auto;
 }
 
-/* ===== ADDITIONAL FIXES FOR SMOOTH SCROLLING ===== */
-/* Removed duplicate .messages-container styles - already defined above */
-
-/* Ensure all message-related elements don't shrink */
+/* ===== ADDITIONAL UTILITIES ===== */
 .date-separator {
     text-align: center;
     margin: 20px 0;
@@ -594,47 +760,9 @@ html, body {
     margin-bottom: 0;
 }
 
-/* ===== CRITICAL FIX FOR THE SCROLLING ISSUE ===== */
-/* These styles ensure the flexbox chain works properly for scrolling */
-
-/* Ensure proper flexbox inheritance */
-.chat-container > .chat-wrapper {
-    flex: 1;
-    min-height: 0;
-}
-
-/* When chat-detail-view is active, ensure proper layout */
-#chatDetailView.active .chat-container {
-    display: flex;
-    flex-direction: column;
-}
-
 /* Fix for iOS Safari scrolling */
 @supports (-webkit-overflow-scrolling: touch) {
     .messages-container {
         -webkit-overflow-scrolling: touch;
     }
-}
-
-/* Ensure messages container has proper height calculation */
-.messages-container {
-    /* These are already set above, but repeating for emphasis */
-    flex: 1 !important;
-    min-height: 0 !important;
-    overflow-y: auto !important;
-}
-
-/* Fix for when messages are added dynamically */
-.messages-container .message-bubble:last-child {
-    margin-bottom: 0;
-}
-
-/* Ensure the empty state works correctly with flexbox */
-#emptyState {
-    position: absolute;
-    pointer-events: none;
-}
-
-.messages-container:has(.message-bubble) #emptyState {
-    display: none;
 }

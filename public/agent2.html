@@ -1131,6 +1131,66 @@
     .messages-container:last-child {
       margin-bottom: 0;
     }
+
+    /* ===== CRITICAL SCROLLING FIX - ADD THIS SECTION ===== */
+    /* Fix for chat detail view layout */
+    .chat-detail-view.active .chat-container {
+        position: absolute !important;
+        top: 83px !important; /* Height of chat-detail-header */
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        height: calc(100% - 83px) !important;
+        width: 100% !important;
+    }
+
+    /* Hide duplicate header inside chat */
+    .chat-detail-view.active .chat-header {
+        display: none !important;
+    }
+
+    /* Ensure messages container can scroll */
+    .chat-detail-view.active .messages-container {
+        flex: 1 !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        position: relative !important;
+    }
+
+    /* Fix for mobile */
+    @media (max-width: 768px) {
+        .chat-detail-view.active .chat-container {
+            top: 70px !important;
+            height: calc(100% - 70px) !important;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .chat-detail-view.active .chat-container {
+            top: 65px !important;
+            height: calc(100% - 65px) !important;
+        }
+    }
+
+    /* Nuclear option if scrolling still doesn't work */
+    .chat-detail-view.active .chat-container.force-scroll-fix .messages-section {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 80px !important; /* Input height */
+        overflow: hidden !important;
+    }
+
+    .chat-detail-view.active .chat-container.force-scroll-fix .messages-container {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        overflow-y: auto !important;
+    }
   </style>
 </head>
 <body>
@@ -1608,7 +1668,7 @@
   }
   
   // ================================================
-  // CHAT UI SETUP
+  // CHAT UI SETUP WITH SCROLLING FIX
   // ================================================
   function setupChatUI() {
     const textarea = document.getElementById('messageInput');
@@ -1633,6 +1693,7 @@
     }
     
     if (messagesDiv && scrollBtn) {
+      // Set up scroll listener
       messagesDiv.addEventListener('scroll', function() {
         const scrollTop = messagesDiv.scrollTop;
         const scrollHeight = messagesDiv.scrollHeight;
@@ -1648,6 +1709,84 @@
       }, { passive: true });
       
       scrollBtn.addEventListener('click', scrollToBottom);
+      
+      // Apply scrolling fix on chat open
+      setTimeout(applyScrollingFix, 100);
+    }
+  }
+  
+  // ================================================
+  // CRITICAL SCROLLING FIX FUNCTION
+  // ================================================
+  function applyScrollingFix() {
+    const messagesDiv = document.getElementById('chatMessages');
+    const chatContainer = document.querySelector('.chat-detail-view.active .chat-container');
+    
+    if (!messagesDiv || !chatContainer) return;
+    
+    console.log("Applying scrolling fix...");
+    
+    // Test if scrolling works
+    setTimeout(() => {
+      const canScroll = messagesDiv.scrollHeight > messagesDiv.clientHeight;
+      console.log("Scroll test:", {
+        clientHeight: messagesDiv.clientHeight,
+        scrollHeight: messagesDiv.scrollHeight,
+        canScroll: canScroll
+      });
+      
+      if (!canScroll && messagesDiv.children.length > 0) {
+        console.log("⚠️ Scrolling not working, applying force fix");
+        chatContainer.classList.add('force-scroll-fix');
+        
+        // Add test messages to ensure scrolling works
+        addTestMessages();
+      }
+    }, 500);
+  }
+  
+  function addTestMessages() {
+    const messagesDiv = document.getElementById('chatMessages');
+    if (!messagesDiv) return;
+    
+    // Remove empty state
+    const emptyState = document.getElementById('emptyState');
+    if (emptyState) emptyState.style.display = 'none';
+    
+    // Add test messages
+    for (let i = 0; i < 15; i++) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message-bubble ${i % 2 === 0 ? 'user-message' : 'agent-message'}`;
+      messageDiv.innerHTML = `
+        <div class="message-meta">
+          <span class="message-sender">${i % 2 === 0 ? 'User' : 'Agent'}</span>
+          <span class="message-time">${i + 1}:00</span>
+        </div>
+        <div class="message-content">
+          Test message #${i + 1} - This should make the container scrollable when there are enough messages.
+        </div>
+      `;
+      messagesDiv.appendChild(messageDiv);
+    }
+    
+    // Scroll to bottom
+    setTimeout(scrollToBottom, 100);
+  }
+  
+  function scrollToBottom() {
+    const messagesDiv = document.getElementById("chatMessages");
+    if (messagesDiv) {
+      requestAnimationFrame(() => {
+        messagesDiv.scrollTo({
+          top: messagesDiv.scrollHeight,
+          behavior: 'smooth'
+        });
+      });
+      isScrolledToBottom = true;
+      const scrollBtn = document.getElementById("scrollBottomBtn");
+      if (scrollBtn) {
+        scrollBtn.classList.remove('visible');
+      }
     }
   }
   
@@ -2168,6 +2307,9 @@
     
     document.getElementById('chatDetailView').classList.add('active');
     
+    // Apply scrolling fix after chat is visible
+    setTimeout(applyScrollingFix, 300);
+    
     updateActivity();
   }
   
@@ -2630,23 +2772,6 @@
       return 'Yesterday';
     } else {
       return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
-    }
-  }
-  
-  function scrollToBottom() {
-    const messagesDiv = document.getElementById("chatMessages");
-    if (messagesDiv) {
-      requestAnimationFrame(() => {
-        messagesDiv.scrollTo({
-          top: messagesDiv.scrollHeight,
-          behavior: 'smooth'
-        });
-      });
-      isScrolledToBottom = true;
-      const scrollBtn = document.getElementById("scrollBottomBtn");
-      if (scrollBtn) {
-        scrollBtn.classList.remove('visible');
-      }
     }
   }
   
