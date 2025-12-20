@@ -82,6 +82,9 @@ html, body {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     
+    /* Enable smooth scrolling */
+    scroll-behavior: smooth;
+    
     /* Flex container for messages */
     display: flex;
     flex-direction: column;
