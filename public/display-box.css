@@ -398,6 +398,12 @@ html, body {
     text-align: center;
     padding: 40px 20px;
     flex-shrink: 0;
+    position: absolute; /* ADDED: Fixes positioning */
+    top: 0; /* ADDED */
+    left: 0; /* ADDED */
+    right: 0; /* ADDED */
+    bottom: 0; /* ADDED */
+    z-index: 1; /* ADDED */
 }
 
 .empty-state p {
@@ -549,4 +555,46 @@ html, body {
 .no-flexbox .messages-section {
     height: 100%;
     overflow-y: auto;
+}
+
+/* ===== ADDITIONAL FIXES FOR SMOOTH SCROLLING ===== */
+.messages-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Ensure all message-related elements don't shrink */
+.date-separator {
+    text-align: center;
+    margin: 20px 0;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.date-separator span {
+    background: #f0f0f0;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+.attachment {
+    margin-top: 8px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px;
+    border: 1px solid #e0e0e0;
+    flex-shrink: 0;
+}
+
+/* This ensures smooth scrolling on iOS */
+.messages-container > * {
+    transform: translateZ(0);
+}
+
+/* Prevent content from being cut off at the bottom */
+.messages-container:last-child {
+    margin-bottom: 0;
 }

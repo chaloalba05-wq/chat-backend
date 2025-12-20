@@ -573,7 +573,7 @@
         min-height: 0; /* Crucial for flex chain - allows children to scroll */
         display: flex;
         flex-direction: column;
-        overflow: hidden; /* Prevent outer wrapper from scrolling - ADDED */
+        overflow: hidden; /* Prevent outer wrapper from scrolling */
     }
 
     /* ===== HEADER SECTION (FIXED TOP) ===== */
@@ -603,17 +603,17 @@
     .messages-section {
         flex: 1; /* Takes remaining space between header and input */
         min-height: 0; /* Crucial for flex child scrolling */
-        display: flex; /* ADDED - FIX FOR SCROLLING */
-        flex-direction: column; /* ADDED - FIX FOR SCROLLING */
-        overflow: hidden; /* Contain the scrolling area */
+        display: flex; /* CHANGED: Keep as flex */
+        flex-direction: column; /* CHANGED: Keep as column */
         position: relative;
         background: #f8f9fa;
+        overflow: hidden; /* Contain the scrolling area - IMPORTANT */
     }
 
     /* The actual scrollable messages container - FIXED */
     .messages-container {
-        flex: 1; /* CHANGED FROM height: 100% to flex: 1 - CRITICAL FIX */
-        min-height: 0; /* ADDED - CRITICAL FOR SCROLLING */
+        flex: 1; /* CRITICAL FIX: Use flex: 1 instead of height: 100% */
+        min-height: 0; /* CRITICAL FOR SCROLLING */
         width: 100%;
         overflow-y: auto;
         overflow-x: hidden;
@@ -626,7 +626,7 @@
         flex-direction: column;
         gap: 8px;
         
-        /* Hardware acceleration for smoother scrolling - ADDED */
+        /* Hardware acceleration for smoother scrolling */
         will-change: transform;
         backface-visibility: hidden;
         transform: translateZ(0);
@@ -928,6 +928,12 @@
         text-align: center;
         padding: 40px 20px;
         flex-shrink: 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1;
     }
 
     .empty-state p {
@@ -1075,6 +1081,7 @@
       text-align: center;
       margin: 20px 0;
       position: relative;
+      flex-shrink: 0;
     }
 
     .date-separator span {
@@ -1092,6 +1099,7 @@
       border-radius: 8px;
       padding: 8px;
       border: 1px solid #e0e0e0;
+      flex-shrink: 0;
     }
 
     .attachment a {
@@ -2256,7 +2264,7 @@
     
     setTimeout(() => {
       scrollToBottom();
-    }, 100);
+    }, 50);
   }
   
   function createMessageElement(msg) {
@@ -2651,9 +2659,11 @@
   function scrollToBottom() {
     const messagesDiv = document.getElementById("chatMessages");
     if (messagesDiv) {
-      messagesDiv.scrollTo({
-        top: messagesDiv.scrollHeight,
-        behavior: 'smooth'
+      requestAnimationFrame(() => {
+        messagesDiv.scrollTo({
+          top: messagesDiv.scrollHeight,
+          behavior: 'smooth'
+        });
       });
       isScrolledToBottom = true;
       const scrollBtn = document.getElementById("scrollBottomBtn");
