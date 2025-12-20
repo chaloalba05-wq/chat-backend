@@ -66,31 +66,27 @@ html, body {
 
 /* ===== MESSAGES SECTION (SCROLLABLE AREA - FIXED) ===== */
 .messages-section {
-    flex: 1; /* Takes remaining space between header and input */
-    min-height: 0; /* CRITICAL: Allows flex child to shrink below content size */
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* Contain the scrollable container */
     position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
     background: #f8f9fa;
 }
 
 /* The actual scrollable messages container - THIS IS WHAT SCROLLS */
 .messages-container {
-    flex: 1; /* Fill available space in messages-section */
-    min-height: 0; /* CRITICAL: Allows scrolling */
-    overflow-y: auto; /* Vertical scrolling enabled here */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
     box-sizing: border-box;
     scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
-    overscroll-behavior: contain; /* Prevent scroll chaining */
-    
-    /* Hardware acceleration for smoother scrolling */
-    will-change: transform;
-    backface-visibility: hidden;
-    transform: translateZ(0);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     
     /* Firefox scrollbar */
     scrollbar-width: thin;
