@@ -13,10 +13,9 @@
 html, body {
     height: 100%;
     width: 100%;
-    overflow: auto;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    touch-action: pan-y; /* Disable browser gestures */
-    overscroll-behavior: none; /* Prevent pull-to-refresh */
+    overflow: hidden; /* prevent double scroll */
+    touch-action: pan-y;
+    overscroll-behavior: none;
 }
 
 body { 
@@ -74,20 +73,17 @@ body {
   height: 100%; /* Use full height */
   width: 100%;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ===== SIDEBAR ===== */
 .sidebar { 
-  width: 100%;
-  height: 100%;
-  background: white; 
-  border-right: 1px solid #e0e0e0;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  position: relative;
-  overflow: hidden; /* Constrain scrolling children */
+    display: flex;
+    flex-direction: column;
+    height: 100%;       /* allows child flex:1 to work */
+    width: 100%;
+    overflow: hidden; 
 }
 
 .sidebar-header { 
@@ -180,18 +176,16 @@ body {
 
 /* ===== USER LIST - FIXED SCROLLING ===== */
 .user-list {
-  flex: 1;
-  min-height: 0; /* CRITICAL for flex scrolling */
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #667eea #f1f1f1;
-  background: #f8f9fa;
-  position: relative;
+  flex: 1;                  /* fills available space in sidebar */
+  min-height: 0;            /* CRITICAL for flex scrolling on mobile */
+  overflow-y: auto;         /* enables vertical scrolling */
+  overflow-x: hidden;       /* prevent horizontal scroll */
+  -webkit-overflow-scrolling: touch; /* smooth iOS momentum scrolling */
+  overscroll-behavior: contain;     /* prevent scroll chaining */
+  background: #f8f9fa;      /* optional styling */
+  display: flex;
+  flex-direction: column;   /* ensures child items stack vertically */
   width: 100%;
-  height: 100%;
 }
 
 .user-list-title {
@@ -296,19 +290,14 @@ body {
 
 /* ===== CHAT DETAIL VIEW ===== */
 .chat-detail-view {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #f8f9fa;
-  z-index: 1000;
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  touch-action: pan-y; /* Disable browser gestures */
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 1000;
+    background: #f8f9fa;
+    overflow: hidden; /* parent doesn't scroll, child scrolls */
+    touch-action: pan-y;
 }
 
 .chat-detail-view.active {
@@ -373,14 +362,14 @@ body {
 /* ===== CHAT CONTAINER - MOBILE OPTIMIZED ===== */
 .chat-container {
     flex: 1;
-    min-height: 0;
+    min-height: 0; /* critical */
     display: flex;
     flex-direction: column;
-    background: #f8f9fa;
-    position: relative;
-    overflow: hidden; /* Constrain scrolling children */
-    height: 100%;
+    overflow-y: auto; /* scrollable */
+    overflow-x: hidden;
     width: 100%;
+    height: 100%;
+    -webkit-overflow-scrolling: touch; /* iOS momentum */
 }
 
 /* ===== HEADER SECTION ===== */
@@ -409,30 +398,27 @@ body {
 /* ===== MESSAGES SECTION - FIXED FLEX CONTAINER ===== */
 .messages-section {
     flex: 1;
-    min-height: 0; /* CRITICAL for flex scrolling */
-    position: relative;
-    overflow: hidden; /* Constrain messages-container */
-    background: #f8f9fa;
+    min-height: 0; /* critical for flex scrolling */
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* prevent nested scroll conflicts */
+    position: relative;
     width: 100%;
 }
 
 /* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED MOBILE SCROLLING ===== */
 .messages-container {
     flex: 1;
-    min-height: 0; /* CRITICAL for flex scrolling */
+    min-height: 0; /* critical for flex scrolling */
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 16px;
+    -webkit-overflow-scrolling: touch; /* smooth iOS scrolling */
     scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
+    padding: 16px;
     background: #f8f9fa;
     width: 100%;
-    height: 100%;
     
     /* Mobile touch optimization */
     -webkit-transform: translateZ(0);
@@ -495,10 +481,10 @@ body {
     flex-shrink: 0;
     background: white;
     border-top: 1px solid #e8e8e8;
-    padding: 16px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
-    position: relative;
-    z-index: 5;
+    z-index: 10;
+    position: sticky;
+    bottom: 0;
 }
 
 .input-wrapper {
@@ -1122,7 +1108,6 @@ body {
   }
 }
 
-/* ===== MOBILE SCROLLING FIXES ===== */
 /* iOS momentum scrolling */
 @supports (-webkit-touch-callout: none) {
     .messages-container,
@@ -1131,7 +1116,6 @@ body {
         overflow-y: scroll;
     }
     
-    /* Fix for iOS elastic scrolling */
     body {
         overscroll-behavior-y: none;
     }
