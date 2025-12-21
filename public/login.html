@@ -17,24 +17,50 @@ button { padding: 5px 10px; }
 <button id="loginBtn">Login</button>
 <p id="errorMsg" style="color:red"></p>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
+const socket = io("http://localhost:3000"); // Change URL if different
+
 document.getElementById("loginBtn").addEventListener("click", () => {
   const id = document.getElementById("agentId").value.trim();
   const password = document.getElementById("agentPassword").value.trim();
 
-  // Check credentials against hardcoded agents (add more as needed)
-  const agents = {
-    "agent1": "agent1",
-    "agent2": "agent2"
-  };
-
-  if (agents[id] && agents[id] === password) {
-    localStorage.setItem("agentVerified", "true");
-    localStorage.setItem("agentId", id);
-    window.location.href = `${id}.html`; // redirect to specific agent file
-  } else {
-    document.getElementById("errorMsg").textContent = "Invalid ID or password";
+  if (!id || !password) {
+    document.getElementById("errorMsg").textContent = "Please enter both ID and password";
+    return;
   }
+
+  // 1️⃣ First, register the agent (server will skip if already exists)
+  socket.emit("register_agent", { id, name: id, password });
+
+  // Listen for registration response
+  socket.once("agent_registration_response", (res) => {
+    if (!res.success) {
+      document.getElementById("errorMsg").textContent = "Registration failed: " + res.message;
+      return;
+    }
+
+    console.log("Agent registered/verified:", res.agentId);
+
+    // 2️⃣ Then, login as the agent
+    socket.emit("agent_login", { agentId: id, password, persistent: true });
+
+    socket.once("agent_login_response", (loginRes) => {
+      if (!loginRes.success) {
+        document.getElementById("errorMsg").textContent = "Login failed: " + loginRes.message;
+        return;
+      }
+
+      console.log("Agent logged in:", loginRes.agentId);
+
+      // Store login info in localStorage
+      localStorage.setItem("agentVerified", "true");
+      localStorage.setItem("agentId", loginRes.agentId);
+
+      // Redirect to agent file
+      window.location.href = `${id}.html`;
+    });
+  });
 });
 </script>
 </body>
