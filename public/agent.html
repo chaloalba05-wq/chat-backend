@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Dashboard</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+body { font-family: Arial; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+#activeMessages { flex: 1; overflow-y: auto; border-right: 1px solid #ccc; padding: 10px; width: 250px; }
+#dashboard { display: flex; flex: 1; }
+.user-item { padding: 5px; cursor: pointer; border-bottom: 1px solid #eee; }
+.user-item:hover { background: #f0f0f0; }
+</style>
+</head>
+<body>
+<h2>Agent Dashboard</h2>
+<div id="dashboard">
+  <div id="activeMessages"></div>
+</div>
+
+<script>
+// Initialize socket with reconnection options
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000
+});
+
+const agentId = localStorage.getItem("agentId");
+let currentlyJoinedRooms = new Set(); // prevents duplicate joins
+
+if (!agentId) window.location.href = "login.html";
+
+// Function to register agent and fetch users
+function registerAgent() {
+  socket.emit("register_permanent_agent", {
+    id: agentId,
+    name: agentId,
+    password: agentId
+  });
+  fetchActiveUsers();
+}
+
+// Request active users from the server
+function fetchActiveUsers() {
+  socket.emit("get_active_users_for_agent", { agentId });
+}
+
+// Handle active users list
+socket.on("active_users_list", (users) => {
+  const container = document.getElementById("activeMessages");
+  container.innerHTML = "";
+
+  users.forEach(u => {
+    const div = document.createElement("div");
+    div.textContent = u.whatsapp;
+    div.className = "user-item";
+
+    div.addEventListener("click", () => {
+      socket.emit("join_user_room", { whatsapp: u.whatsapp, agentId }, () => {
+        currentlyJoinedRooms.add(u.whatsapp);
+        window.open(`agent-chat.html?whatsapp=${u.whatsapp}`, "_blank");
+      });
+    });
+
+    container.appendChild(div);
+  });
+});
+
+// refresh list every 4 seconds
+fetchActiveUsers();
+setInterval(fetchActiveUsers, 4000);
+
+// ===== USER ROOM EVENTS ===== //
+socket.on("new_message", (msg) => {
+  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
+  highlightUser(msg.whatsapp);
+});
+
+socket.on("message_update", (msg) => {
+  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
+  highlightUser(msg.whatsapp);
+});
+
+socket.on("chat_deleted", (msg) => {
+  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
+  highlightUser(msg.whatsapp);
+});
+
+socket.on("chat_archived", (msg) => {
+  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
+  highlightUser(msg.whatsapp);
+});
+
+// highlight unread messages
+function highlightUser(whatsapp){
+  const items = document.getElementsByClassName("user-item");
+  for(let i of items){
+    if(i.textContent === whatsapp){
+      i.style.background = "#ffd27f";
+    }
+  }
+}
+
+// Handle reconnection
+socket.on("connect", () => {
+  console.log("Connected to server");
+  registerAgent();
+});
+
+socket.on("disconnect", (reason) => {
+  console.log("Disconnected:", reason);
+});
+
+</script>
+</body>
+</html>
