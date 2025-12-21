@@ -1,6 +1,6 @@
-/* ===== CHAT UI - FIXED LAYOUT WITH SCROLLABLE MESSAGES ===== */
+/* ===== CHAT UI - GUARANTEED MOBILE SCROLLING ===== */
 
-/* ===== GLOBAL RESET ===== */
+/* ===== GLOBAL RESET WITH MOBILE FIXES ===== */
 * {
     margin: 0;
     padding: 0;
@@ -8,6 +8,7 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
 }
 
 html, body {
@@ -15,7 +16,9 @@ html, body {
     width: 100%;
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    touch-action: manipulation;
+    /* Changed from 'none' to allow scrolling */
+    touch-action: pan-y pan-x; /* Allow both vertical and horizontal panning */
+    overscroll-behavior: none; /* Prevent pull-to-refresh */
 }
 
 body { 
@@ -24,7 +27,10 @@ body {
     background: #f8f9fa; 
     height: 100vh;
     height: -webkit-fill-available;
+    height: 100dvh; /* Dynamic viewport height for mobile */
     overflow: hidden;
+    position: fixed; /* Prevent body scrolling on mobile */
+    width: 100%;
 }
 
 /* ===== RESPONSIVE HEADER ===== */
@@ -43,6 +49,7 @@ body {
   flex-shrink: 0;
   position: relative;
   z-index: 100;
+  padding-top: max(12px, env(safe-area-inset-top));
 }
 
 .logo-text {
@@ -65,8 +72,10 @@ body {
 /* ===== MAIN LAYOUT ===== */
 .container { 
   display: flex; 
-  height: calc(100vh - 70px);
+  height: calc(100dvh - 70px); /* Use dynamic viewport height */
+  height: calc(var(--vh, 100vh) - 70px); /* Fallback */
   width: 100%;
+  position: relative;
 }
 
 /* ===== SIDEBAR ===== */
@@ -78,6 +87,7 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
 }
 
 .sidebar-header { 
@@ -171,12 +181,18 @@ body {
 /* ===== USER LIST ===== */
 .user-list {
   flex: 1;
+  position: absolute; /* Absolute positioning for guaranteed scrolling */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: #667eea #f1f1f1;
   background: #f8f9fa;
+  touch-action: pan-y; /* Allow vertical panning only */
 }
 
 .user-list-title {
@@ -203,6 +219,8 @@ body {
   gap: clamp(10px, 2vw, 12px);
   touch-action: manipulation;
   background: white;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .user-item:active {
@@ -292,6 +310,8 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* Changed from 'none' to allow scrolling */
+  touch-action: pan-y; /* Allow vertical scrolling */
 }
 
 .chat-detail-view.active {
@@ -311,6 +331,7 @@ body {
   top: 0;
   z-index: 10;
   box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  padding-top: max(clamp(16px, 3vw, 20px), env(safe-area-inset-top));
 }
 
 .back-button {
@@ -328,6 +349,7 @@ body {
   transition: all 0.3s ease;
   flex-shrink: 0;
   color: #667eea;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .back-button:active {
@@ -351,7 +373,7 @@ body {
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
-/* ===== CHAT CONTAINER ===== */
+/* ===== CHAT CONTAINER - MOBILE OPTIMIZED ===== */
 .chat-container {
     flex: 1;
     min-height: 0;
@@ -359,6 +381,10 @@ body {
     flex-direction: column;
     background: #f8f9fa;
     position: relative;
+    /* Changed from 'hidden' to allow scrolling */
+    overflow: visible; /* Allow scrolling to work properly */
+    height: 100%;
+    width: 100%;
 }
 
 /* ===== HEADER SECTION ===== */
@@ -384,21 +410,27 @@ body {
     color: #666;
 }
 
-/* ===== MESSAGES SECTION ===== */
+/* ===== MESSAGES SECTION - MOBILE FIXED SCROLLING ===== */
 .messages-section {
     flex: 1;
     min-height: 0;
-    display: flex;
-    height: 100%;
-    flex-direction: column;
-    position: relative;
+    /* Changed from relative to static for better flex behavior */
+    position: static;
+    /* Changed from hidden to allow scrolling */
+    overflow: visible;
     background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
 }
 
-/* ===== SCROLLABLE MESSAGES CONTAINER ===== */
+/* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED MOBILE SCROLLING ===== */
 .messages-container {
+    /* REMOVED position: absolute - this was breaking mobile scrolling */
     flex: 1;
-    overflow-y: scroll; /* Forces scrollbar display */
+    min-height: 0;
+    overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
     scroll-behavior: smooth;
@@ -406,14 +438,19 @@ body {
     overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
-    min-height: 0;
     background: #f8f9fa;
-    position: relative;
+    width: 100%;
+    height: 100%;
     
-    /* Artificial overflow trick to keep scrollbar always active */
-    padding-bottom: 0.1px;
+    /* Mobile touch optimization - KEEP THESE */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+    touch-action: pan-y; /* Allow vertical panning for scrolling */
+    -webkit-user-select: none;
+    user-select: none;
     
-    /* Firefox scrollbar styling */
+    /* Always show scrollbar */
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
 }
@@ -429,26 +466,25 @@ body {
 
 /* PERMANENT SCROLLBAR STYLING */
 .messages-container::-webkit-scrollbar {
-    width: 10px; /* Wider for better visibility */
-    height: 10px;
+    width: 6px; /* Thinner for mobile */
+    height: 6px;
 }
 
 .messages-container::-webkit-scrollbar-track {
     background: #f1f1f1;
-    border-radius: 5px;
+    border-radius: 3px;
     margin: 8px 0;
-    border: 2px solid transparent;
+    border: 1px solid transparent;
     background-clip: padding-box;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
     background: rgba(102, 126, 234, 0.7);
-    border-radius: 5px;
-    border: 2px solid transparent;
+    border-radius: 3px;
+    border: 1px solid transparent;
     background-clip: padding-box;
-    min-height: 50px; /* Ensures thumb is always visible */
+    min-height: 40px;
     
-    /* Consistent colors - always visible gradient */
     background-image: linear-gradient(
         to bottom,
         rgba(102, 126, 234, 0.7),
@@ -458,25 +494,10 @@ body {
 
 .messages-container::-webkit-scrollbar-thumb:hover {
     background: rgba(102, 126, 234, 0.9);
-    background-image: linear-gradient(
-        to bottom,
-        rgba(102, 126, 234, 0.8),
-        rgba(102, 126, 234, 1)
-    );
 }
 
 .messages-container::-webkit-scrollbar-thumb:active {
     background: #667eea;
-    background-image: linear-gradient(
-        to bottom,
-        #667eea,
-        #764ba2
-    );
-}
-
-/* Make scrollbar corner visible */
-.messages-container::-webkit-scrollbar-corner {
-    background: #f1f1f1;
 }
 
 /* ===== INPUT SECTION ===== */
@@ -486,6 +507,8 @@ body {
     border-top: 1px solid #e8e8e8;
     padding: 16px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
+    position: relative;
+    z-index: 5;
 }
 
 .input-wrapper {
@@ -509,6 +532,9 @@ body {
     overflow-y: auto;
     transition: all 0.3s ease;
     line-height: 1.4;
+    -webkit-user-select: text;
+    user-select: text;
+    touch-action: manipulation;
 }
 
 .message-input:focus {
@@ -533,6 +559,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .file-attach-btn {
@@ -588,6 +615,7 @@ body {
     flex-direction: column;
     margin-bottom: 8px;
     flex-shrink: 0;
+    min-height: min-content;
 }
 
 .message-bubble {
@@ -600,6 +628,7 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     line-height: 1.5;
     flex-shrink: 0;
+    min-height: min-content;
 }
 
 .user-message {
@@ -658,7 +687,7 @@ body {
 
 /* ===== SCROLL TO BOTTOM BUTTON ===== */
 .scroll-bottom-btn {
-    position: absolute;
+    position: fixed; /* Fixed to viewport for mobile */
     bottom: 90px;
     right: 20px;
     width: 40px;
@@ -673,11 +702,12 @@ body {
     justify-content: center;
     font-size: 18px;
     box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-    z-index: 5;
+    z-index: 100;
     transition: all 0.3s ease;
     opacity: 0;
     visibility: hidden;
     transform: translateY(10px);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .scroll-bottom-btn.visible {
@@ -686,9 +716,9 @@ body {
     transform: translateY(0);
 }
 
-.scroll-bottom-btn:hover {
+.scroll-bottom-btn:active {
     background: #5a6fd8;
-    transform: translateY(-2px) scale(1.05);
+    transform: scale(0.95);
 }
 
 /* ===== TYPING INDICATOR ===== */
@@ -742,6 +772,11 @@ body {
     flex-shrink: 0;
     width: 100%;
     height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .empty-state p {
@@ -926,10 +961,16 @@ body {
   margin-top: 8px;
 }
 
-/* ===== RESPONSIVE ADJUSTMENTS ===== */
+/* ===== RESPONSIVE ADJUSTMENTS FOR MOBILE ===== */
 @media (max-width: 768px) {
+  /* Set dynamic viewport height for mobile */
+  :root {
+    --vh: 100dvh;
+  }
+  
   .container {
-    height: calc(100vh - 60px);
+    height: calc(100dvh - 60px);
+    height: calc(var(--vh, 100vh) - 60px);
   }
   
   #header {
@@ -996,7 +1037,8 @@ body {
 
 @media (max-width: 480px) {
   .container {
-    height: calc(100vh - 56px);
+    height: calc(100dvh - 56px);
+    height: calc(var(--vh, 100vh) - 56px);
   }
   
   #header {
@@ -1065,6 +1107,11 @@ body {
     height: 32px;
     font-size: 14px;
   }
+  
+  /* Mobile-specific scrollbar */
+  .messages-container::-webkit-scrollbar {
+    width: 4px;
+  }
 }
 
 /* ===== SAFE AREA SUPPORT ===== */
@@ -1072,6 +1119,7 @@ body {
   body {
     padding-left: max(0px, env(safe-area-inset-left));
     padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
   }
   
   .sidebar-header, .chat-detail-header {
@@ -1093,4 +1141,41 @@ body {
     padding-left: max(16px, env(safe-area-inset-left));
     padding-right: max(16px, env(safe-area-inset-right));
   }
+}
+
+/* ===== MOBILE SCROLLING FIXES ===== */
+/* iOS momentum scrolling */
+@supports (-webkit-touch-callout: none) {
+    .messages-container {
+        -webkit-overflow-scrolling: touch;
+        overflow-y: scroll;
+    }
+    
+    /* Fix for iOS elastic scrolling */
+    body {
+        overscroll-behavior-y: none;
+    }
+}
+
+/* Android Chrome fix */
+@supports (-webkit-appearance:none) and (not (-webkit-overflow-scrolling:touch)) {
+    .messages-container {
+        overflow-y: auto;
+    }
+}
+
+/* Edge/IE fix */
+@supports (-ms-ime-align:auto) {
+    .messages-container {
+        overflow-y: auto;
+        -ms-overflow-style: -ms-autohiding-scrollbar;
+    }
+}
+
+/* Firefox fix */
+@-moz-document url-prefix() {
+    .messages-container {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
+    }
 }
