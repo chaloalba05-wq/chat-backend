@@ -44,6 +44,7 @@ socket.on("connect", () => {
   connectionStatus.textContent = "Connected"; 
   connectionStatus.style.color = "green"; 
   registerAgent(); 
+  joinBroadcastRoom();
   fetchActiveUsers(); 
 });
 
@@ -62,6 +63,11 @@ function registerAgent() {
   socket.emit("register_permanent_agent", { id: agentId, name: agentId, password: agentPassword });
 }
 
+// ===== JOIN BROADCAST ROOM =====
+function joinBroadcastRoom() {
+  socket.emit("join_broadcast_room", { agentId }); // server should handle this room
+}
+
 // ===== FETCH ACTIVE USERS =====
 let allUsers = [];
 function fetchActiveUsers() {
@@ -69,8 +75,8 @@ function fetchActiveUsers() {
 }
 
 // ===== UPDATE USER LIST =====
-socket.on("active_users_list", (users) => {
-  allUsers = users; // store all users
+function updateUserList(users){
+  allUsers = users;
   const container = document.getElementById("activeMessages");
   container.innerHTML = "";
   if(users.length === 0){
@@ -88,22 +94,26 @@ socket.on("active_users_list", (users) => {
 
     div.addEventListener("click", () => {
       window.open(`agent-chat.html?whatsapp=${u.whatsapp}`, "_blank");
-      div.classList.remove("highlight"); // remove highlight on click
+      div.classList.remove("highlight");
     });
 
     container.appendChild(div);
   });
-});
+}
 
-// refresh list every 4 seconds
-fetchActiveUsers();
-setInterval(fetchActiveUsers, 4000);
+// ===== REAL-TIME EVENTS =====
+socket.on("active_users_list", updateUserList); // immediate user list updates
 
-// ===== USER ROOM EVENTS =====
 socket.on("new_message", handleMessageEvent);
 socket.on("message_update", handleMessageEvent);
 socket.on("chat_deleted", handleMessageEvent);
 socket.on("chat_archived", handleMessageEvent);
+
+// broadcast messages from all agents
+socket.on("broadcast_message", (msg) => {
+  handleMessageEvent(msg);
+  console.log("Broadcast received:", msg);
+});
 
 function handleMessageEvent(msg){
   highlightUser(msg.whatsapp);
@@ -117,6 +127,9 @@ function highlightUser(whatsapp){
     }
   }
 }
+
+// ===== INITIAL FETCH =====
+fetchActiveUsers();
 </script>
 </body>
 </html>
