@@ -413,7 +413,7 @@ body {
     flex: 1;
     min-height: 0; /* CRITICAL for flex scrolling */
     position: relative;
-    overflow: visible;
+    overflow: hidden;
     overflow-x: hidden; /* Constrain messages-container */
     background: #f8f9fa;
     display: flex;
@@ -431,8 +431,6 @@ body {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    scroll-behavior: smooth;
-    will-change: transform;
     backface-visibility: hidden;
     display: flex;
     border: 2px solid red;
@@ -450,6 +448,21 @@ body {
     /* Always show scrollbar */
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
+
+
+/* Webkit browsers */
+.messages-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.7);
+    border-radius: 4px;
 }
 
 .messages-container::after {
@@ -961,7 +974,9 @@ body {
   }
   
   .container {
+    display: flex;
     height: 100%; /* Use full height */
+    overflow-y: auto;
   }
   
   #header {
