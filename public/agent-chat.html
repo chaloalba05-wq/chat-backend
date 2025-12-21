@@ -41,10 +41,7 @@ const socket = io({
   reconnectionDelayMax: 5000 
 });
 
-// Join user room
-socket.emit("join_user_room", { whatsapp });
-
-// Fetch chat history
+// Fetch chat history automatically for this user
 socket.emit("get_messages", { whatsapp, agentId });
 
 socket.on("message_history", (messages) => {
@@ -59,7 +56,7 @@ socket.on("message_history", (messages) => {
   container.scrollTop = container.scrollHeight;
 });
 
-// Listen for new messages
+// Listen for new messages from this user
 socket.on("new_message", (msg) => {
   if (msg.whatsapp !== whatsapp) return;
   const container = document.getElementById("messages");
