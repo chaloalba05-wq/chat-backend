@@ -24,7 +24,8 @@ body {
     background: #f8f9fa; 
     height: 100vh;
     height: -webkit-fill-available;
-    overflow: hidden;
+    /* Change from: overflow: hidden; */
+    overflow: auto; /* or just remove it */
 }
 
 /* ===== RESPONSIVE HEADER ===== */
@@ -367,6 +368,8 @@ body {
     min-height: 0;
     display: flex;
     flex-direction: column;
+    /* Add: */
+    position: relative;
 }
 
 /* ===== HEADER SECTION ===== */
@@ -400,29 +403,26 @@ body {
     flex-direction: column;
     position: relative;
     background: #f8f9fa;
-    height: 100%;
-    overflow: hidden;
 }
 
 /* ===== SCROLLABLE MESSAGES CONTAINER ===== */
 .messages-container {
     flex: 1;
-    min-height: 0;
-    overflow-y: scroll;
+    overflow-y: auto; /* Use 'auto' instead of 'scroll' */
     overflow-x: hidden;
     padding: 16px;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: #667eea #f1f1f1;
+    will-change: transform;
+    backface-visibility: hidden;
+    transform: translateZ(0);
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    background: #f8f9fa;
     position: relative;
-    height: 100%;
-    max-height: 100%;
-    -ms-overflow-style: scrollbar;
-    touch-action: pan-y;
+    -webkit-transform: translateZ(0); 
 }
 
 /* Bottom padding for messages */
