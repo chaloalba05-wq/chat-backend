@@ -389,6 +389,7 @@ body {
     flex: 1;
     min-height: 0;
     display: flex;
+    height: 100%;
     flex-direction: column;
     position: relative;
     background: #f8f9fa;
@@ -397,7 +398,7 @@ body {
 /* ===== SCROLLABLE MESSAGES CONTAINER ===== */
 .messages-container {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll; /* Forces scrollbar display */
     overflow-x: hidden;
     padding: 16px;
     scroll-behavior: smooth;
@@ -408,6 +409,13 @@ body {
     min-height: 0;
     background: #f8f9fa;
     position: relative;
+    
+    /* Artificial overflow trick to keep scrollbar always active */
+    padding-bottom: 0.1px;
+    
+    /* Firefox scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
 }
 
 .messages-container::after {
@@ -419,22 +427,56 @@ body {
     pointer-events: none;
 }
 
+/* PERMANENT SCROLLBAR STYLING */
 .messages-container::-webkit-scrollbar {
-    width: 6px;
+    width: 10px; /* Wider for better visibility */
+    height: 10px;
 }
 
 .messages-container::-webkit-scrollbar-track {
     background: #f1f1f1;
-    border-radius: 3px;
+    border-radius: 5px;
+    margin: 8px 0;
+    border: 2px solid transparent;
+    background-clip: padding-box;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-    background: rgba(102, 126, 234, 0.5);
-    border-radius: 3px;
+    background: rgba(102, 126, 234, 0.7);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    min-height: 50px; /* Ensures thumb is always visible */
+    
+    /* Consistent colors - always visible gradient */
+    background-image: linear-gradient(
+        to bottom,
+        rgba(102, 126, 234, 0.7),
+        rgba(102, 126, 234, 0.9)
+    );
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(102, 126, 234, 0.7);
+    background: rgba(102, 126, 234, 0.9);
+    background-image: linear-gradient(
+        to bottom,
+        rgba(102, 126, 234, 0.8),
+        rgba(102, 126, 234, 1)
+    );
+}
+
+.messages-container::-webkit-scrollbar-thumb:active {
+    background: #667eea;
+    background-image: linear-gradient(
+        to bottom,
+        #667eea,
+        #764ba2
+    );
+}
+
+/* Make scrollbar corner visible */
+.messages-container::-webkit-scrollbar-corner {
+    background: #f1f1f1;
 }
 
 /* ===== INPUT SECTION ===== */
