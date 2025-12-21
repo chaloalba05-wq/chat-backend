@@ -13,9 +13,9 @@
 html, body {
     height: 100%;
     width: 100%;
-    overflow: hidden;
+    overflow: auto;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    touch-action: none; /* Disable browser gestures */
+    touch-action: pan-y; /* Disable browser gestures */
     overscroll-behavior: none; /* Prevent pull-to-refresh */
 }
 
@@ -26,7 +26,8 @@ body {
     height: 100vh;
     height: -webkit-fill-available;
     height: 100dvh; /* Dynamic viewport height for mobile */
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     position: relative; /* Changed from fixed */
     width: 100%;
 }
@@ -307,7 +308,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  touch-action: none; /* Disable browser gestures */
+  touch-action: pan-y; /* Disable browser gestures */
 }
 
 .chat-detail-view.active {
