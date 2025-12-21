@@ -101,17 +101,25 @@ html, body {
     flex-direction: column;
 }
 
-/* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED WORKING ===== */
+/* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED ALWAYS SCROLLABLE ===== */
 .messages-container {
     flex: 1;
-    overflow-y: scroll; /* Use scroll, not auto */
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
+    overflow-y: scroll !important; /* FORCE scroll, not auto */
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
     padding: 16px;
     padding-bottom: 32px;
     background: #f8f9fa;
     display: flex;
     flex-direction: column;
+    position: relative;
+    
+    /* CRITICAL: Force scrollbar to always be rendered */
+    scrollbar-width: auto !important; /* Firefox: 'auto' makes it always visible */
+    scrollbar-color: #667eea #f1f1f1 !important;
+    
+    /* Prevent any hiding */
+    -ms-overflow-style: scrollbar !important; /* IE/Edge */
 }
 
 /* Keep messages aligned to top */
@@ -124,36 +132,49 @@ html, body {
     flex-shrink: 0;
 }
 
-/* ===== SCROLLBAR STYLING ===== */
+/* ===== SCROLLBAR STYLING - ALWAYS VISIBLE, ALWAYS MOVABLE ===== */
+/* WebKit browsers (Chrome, Safari, Edge) */
 .messages-container::-webkit-scrollbar {
-    width: 8px;
+    width: 12px !important; /* Thicker for better grabbing */
+    display: block !important; /* Force display */
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .messages-container::-webkit-scrollbar-track {
-    background: rgba(241, 241, 241, 0.8);
-    border-radius: 4px;
+    background: #f1f1f1 !important;
+    border-radius: 6px !important;
+    border: 1px solid #e0e0e0 !important;
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.1) !important;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-    background: rgba(102, 126, 234, 0.6);
-    border-radius: 4px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
+    background: #667eea !important;
+    border-radius: 6px !important;
+    border: 2px solid #f1f1f1 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+    min-height: 40px; /* Ensures it's always tall enough to grab */
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(102, 126, 234, 0.8);
-    border: 1px solid rgba(102, 126, 234, 0.9);
+    background: #5a6fd8 !important;
+    border: 2px solid #e8e8e8 !important;
 }
 
 .messages-container::-webkit-scrollbar-thumb:active {
-    background: rgba(102, 126, 234, 1);
+    background: #4a56b0 !important;
+    border: 2px solid #667eea !important;
 }
 
-/* Firefox scrollbar */
+/* Firefox scrollbar - ALWAYS VISIBLE */
 .messages-container {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(102, 126, 234, 0.6) rgba(241, 241, 241, 0.8);
+    scrollbar-width: auto !important; /* Always shows scrollbar */
+    scrollbar-color: #667eea #f1f1f1 !important;
+}
+
+/* Internet Explorer/Edge Legacy */
+.messages-container {
+    -ms-overflow-style: scrollbar !important; /* Always shows scrollbar */
 }
 
 /* ===== MESSAGE BUBBLES ===== */
@@ -561,20 +582,90 @@ html, body {
     }
 }
 
-/* ===== CRITICAL MOBILE SCROLLING FIX ===== */
-/* Add this at the very end of your CSS */
+/* ===== CRITICAL: ALWAYS-VISIBLE SCROLLBAR FIXES ===== */
+/* Force scrollbars to always be visible and movable on ALL devices */
+.messages-container {
+    /* Force scrollbar rendering */
+    overflow-y: scroll !important;
+    -ms-overflow-style: scrollbar !important;
+    scrollbar-width: auto !important;
+    
+    /* Ensure it's always movable */
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    
+    /* Prevent any browser from hiding it */
+    scrollbar-color: #667eea #f1f1f1 !important;
+}
+
+/* WebKit: Force scrollbar display */
+.messages-container::-webkit-scrollbar {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 12px !important;
+}
+
+.messages-container::-webkit-scrollbar-track {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    cursor: grab !important;
+}
+
+.messages-container::-webkit-scrollbar-thumb:active {
+    cursor: grabbing !important;
+}
+
+/* Mobile-specific: Ensure scrollbar is always visible */
 @media (max-width: 768px) {
     .messages-container {
-        height: 100% !important;
-        max-height: none !important;
-        -webkit-overflow-scrolling: touch !important;
+        /* Force permanent scrollbar on mobile */
         overflow-y: scroll !important;
-        touch-action: pan-y;
-        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: auto !important;
+        
+        /* Prevent hiding behaviors */
+        -ms-overflow-style: scrollbar !important;
     }
     
-    /* Force scrollbar to always be visible on mobile */
     .messages-container::-webkit-scrollbar {
         display: block !important;
+        width: 10px !important;
     }
+    
+    /* Make scrollbar thumb more touch-friendly */
+    .messages-container::-webkit-scrollbar-thumb {
+        min-height: 50px !important; /* Larger for touch */
+        background: #667eea !important;
+        border-radius: 5px !important;
+        border: 2px solid #f1f1f1 !important;
+    }
+}
+
+/* ===== GUARANTEED DRAGGABLE SCROLLBAR ===== */
+/* Add cursor styling to indicate it's draggable */
+.messages-container {
+    cursor: default;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+    cursor: grab !important;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+    cursor: grab !important;
+    background: #5a6fd8 !important;
+}
+
+.messages-container::-webkit-scrollbar-thumb:active {
+    cursor: grabbing !important;
+    background: #4a56b0 !important;
 }
