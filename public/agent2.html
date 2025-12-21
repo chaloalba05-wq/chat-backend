@@ -358,7 +358,28 @@
       box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     }
     
+    /* ===== CHAT CONTAINER (REMOVE THIS DUPLICATE - IT'S BLOCKING SCROLL) ===== */
+    /* DELETE OR COMMENT OUT THIS BLOCK - Lines 216-220 */
+    /*
+    .chat-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        background: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;  THIS WAS BLOCKING SCROLL!
+        z-index: 1000;
+    }
+    */
+    
     /* ===== CHAT CONTAINER - SIMPLIFIED VERSION ===== */
+    /* Replace lines 216-220 with this: */
     .chat-container {
         flex: 1;
         min-height: 0;
@@ -374,6 +395,7 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
+        /* REMOVE overflow: hidden - This blocks scrolling! */
     }
 
     /* ===== HEADER SECTION (FIXED TOP) ===== */
@@ -405,74 +427,35 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
+        /* REMOVE overflow: hidden - This was blocking scrolling! */
         position: relative;
         background: #f8f9fa;
+        /* ADD height property to ensure it takes space */
         height: 100%;
     }
 
-    /* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED ALWAYS SCROLLABLE ===== */
+    /* The actual scrollable messages container - THIS IS WHAT SCROLLS */
     .messages-container {
         flex: 1;
         min-height: 0;
-        overflow-y: scroll !important;
-        overflow-x: hidden !important;
+        overflow-y: auto;
+        overflow-x: hidden;
         padding: 16px;
         scroll-behavior: smooth;
-        -webkit-overflow-scrolling: touch !important;
+        -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
         
-        /* CRITICAL: Force permanent scrollbar */
-        scrollbar-width: thin !important;
-        scrollbar-color: #667eea #f1f1f1 !important;
+        /* Firefox scrollbar */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
         
         /* Flex container for messages */
         display: flex;
         flex-direction: column;
+        /* ADD these to ensure proper scrolling */
         position: relative;
         height: 100%;
         max-height: 100%;
-        
-        /* Reserve space for scrollbar */
-        scrollbar-gutter: stable !important;
-    }
-
-    /* WebKit scrollbar styling - ALWAYS VISIBLE */
-    .messages-container::-webkit-scrollbar {
-        width: 12px !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        background-color: #f1f1f1 !important;
-    }
-
-    .messages-container::-webkit-scrollbar-track {
-        background-color: #f1f1f1 !important;
-        border-radius: 6px !important;
-        border: 1px solid #e0e0e0 !important;
-        display: block !important;
-        visibility: visible !important;
-    }
-
-    .messages-container::-webkit-scrollbar-thumb {
-        background-color: #667eea !important;
-        border-radius: 6px !important;
-        border: 2px solid #f1f1f1 !important;
-        min-height: 40px !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 0.8 !important;
-        transition: opacity 0.3s ease !important;
-        cursor: grab !important;
-    }
-
-    .messages-container::-webkit-scrollbar-thumb:hover {
-        opacity: 1 !important;
-        background-color: #5a6fd8 !important;
-    }
-
-    .messages-container::-webkit-scrollbar-thumb:active {
-        background-color: #4a56b0 !important;
-        cursor: grabbing !important;
     }
 
     /* Bottom padding for messages */
@@ -485,22 +468,23 @@
         pointer-events: none;
     }
 
-    /* Mobile scrollbar adjustments */
-    @media (max-width: 768px) {
-        .messages-container {
-            scrollbar-width: thin !important;
-            -webkit-overflow-scrolling: touch !important;
-        }
-        
-        .messages-container::-webkit-scrollbar {
-            width: 8px !important;
-        }
-        
-        .messages-container::-webkit-scrollbar-thumb {
-            opacity: 0.6 !important;
-            background-color: rgba(102, 126, 234, 0.8) !important;
-            min-height: 30px !important;
-        }
+    /* Optimized scrollbar for Webkit browsers */
+    .messages-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .messages-container::-webkit-scrollbar-track {
+        background: rgba(241, 241, 241, 0.5);
+        border-radius: 3px;
+    }
+
+    .messages-container::-webkit-scrollbar-thumb {
+        background: rgba(102, 126, 234, 0.5);
+        border-radius: 3px;
+    }
+
+    .messages-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(102, 126, 234, 0.7);
     }
 
     /* Message wrapper - ensures proper stacking */
@@ -1144,16 +1128,6 @@
       height: 100%;
       overflow-y: auto;
     }
-    
-    /* ===== SCROLLBAR SPACER STYLES ===== */
-    .scrollbar-spacer {
-        height: calc(100% + 1px) !important;
-        width: 1px !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        position: absolute !important;
-        z-index: -1 !important;
-    }
   </style>
 </head>
 <body>
@@ -1209,6 +1183,10 @@
         <div class="chat-detail-user-number" id="whatsappNumber">Click on a user from the left</div>
       </div>
     </div>
+    
+    <!-- Chat UI Structure - SIMPLIFIED -->
+    <!-- REMOVE the nested chat-container that was here -->
+    <!-- Instead, use this direct structure: -->
     
     <!-- Fixed header section -->
     <header class="chat-header">
@@ -1303,41 +1281,6 @@
   // Track pending messages waiting for server confirmation
   let pendingMessages = new Map(); // Map of tempId to message data
   let socketListenersSetup = false;
-
-  // ================================================
-  // SCROLLBAR FORCING FUNCTION
-  // ================================================
-  function forceScrollbarVisibility() {
-    const messagesContainer = document.querySelector('.messages-container');
-    if (!messagesContainer) return;
-    
-    // Force scrollbar by ensuring content overflows
-    const containerStyle = window.getComputedStyle(messagesContainer);
-    const isScrollable = messagesContainer.scrollHeight > messagesContainer.clientHeight;
-    
-    // Always add spacer to force scrollbar visibility
-    const existingSpacer = messagesContainer.querySelector('.scrollbar-spacer');
-    if (existingSpacer) existingSpacer.remove();
-    
-    // Add a spacer to force scrollbar
-    const spacer = document.createElement('div');
-    spacer.className = 'scrollbar-spacer';
-    spacer.style.height = 'calc(100% + 1px)';
-    spacer.style.width = '1px';
-    spacer.style.opacity = '0';
-    spacer.style.pointerEvents = 'none';
-    spacer.style.position = 'absolute';
-    messagesContainer.appendChild(spacer);
-    
-    // Also ensure scrollbar is forced via style
-    messagesContainer.style.setProperty('overflow-y', 'scroll', 'important');
-    messagesContainer.style.setProperty('scrollbar-width', 'thin', 'important');
-    
-    // Force WebKit to show scrollbar
-    if ('webkitScrollbar' in messagesContainer.style) {
-      messagesContainer.style.setProperty('--webkit-scrollbar-display', 'block', 'important');
-    }
-  }
 
   // ================================================
   // PERSISTENT CONNECTION SYSTEM
@@ -1667,9 +1610,6 @@
     const messagesDiv = document.getElementById('chatMessages');
     const scrollBtn = document.getElementById('scrollBottomBtn');
     
-    // Force scrollbar visibility immediately
-    forceScrollbarVisibility();
-    
     if (textarea) {
       textarea.addEventListener('input', function() {
         this.style.height = 'auto';
@@ -1704,22 +1644,6 @@
       
       scrollBtn.addEventListener('click', scrollToBottom);
     }
-    
-    // Monitor for messages container changes
-    const observer = new MutationObserver(function() {
-      forceScrollbarVisibility();
-    });
-    
-    const messagesContainer = document.querySelector('.messages-container');
-    if (messagesContainer) {
-      observer.observe(messagesContainer, { childList: true, subtree: true });
-    }
-    
-    // Run on resize as well
-    window.addEventListener('resize', forceScrollbarVisibility);
-    
-    // Initial call
-    setTimeout(forceScrollbarVisibility, 100);
   }
   
   // ================================================
@@ -1888,9 +1812,6 @@
       if (selectedUser === whatsapp) {
         showMessages();
       }
-      
-      // Force scrollbar visibility after new message
-      setTimeout(forceScrollbarVisibility, 50);
     });
     
     socket.on('message_confirmation', (data) => {
@@ -1941,9 +1862,6 @@
           }
         }
       }
-      
-      // Force scrollbar visibility after loading history
-      setTimeout(forceScrollbarVisibility, 100);
     });
     
     socket.on('user_room_joined', (data) => {
@@ -2245,9 +2163,6 @@
     
     document.getElementById('chatDetailView').classList.add('active');
     
-    // Force scrollbar visibility when entering chat
-    setTimeout(forceScrollbarVisibility, 100);
-    
     updateActivity();
   }
   
@@ -2286,8 +2201,6 @@
         emptyState.style.display = 'flex';
       }
       scrollToBottom();
-      // Force scrollbar even when empty
-      setTimeout(forceScrollbarVisibility, 50);
       return;
     }
     
@@ -2323,8 +2236,6 @@
     
     setTimeout(() => {
       scrollToBottom();
-      // Force scrollbar visibility after showing messages
-      forceScrollbarVisibility();
     }, 50);
   }
   
