@@ -1,4 +1,4 @@
-/* ===== ENHANCED CHAT SCRIPT WITH GUARANTEED MOBILE SCROLLING ===== */
+/* ===== CHAT SCRIPT WITH MOBILE SCROLLING FIXES ===== */
 
 // ===== GLOBAL VARIABLES =====
 const socket = io("https://chat-backend-p2b9.onrender.com", {
@@ -21,74 +21,35 @@ let messages = {};
 let activeChatUser = null;
 let userTypingTimeout = null;
 
-// ===== MOBILE SCROLLING FIXES =====
-let viewportHeight = window.innerHeight;
-let keyboardVisible = false;
-
-// Initialize mobile scrolling
-function initMobileScrolling() {
-  console.log('📱 Initializing mobile scrolling...');
-  
-  // Set dynamic viewport height
-  function updateViewportHeight() {
-    const vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-  }
-  
-  window.addEventListener('resize', updateViewportHeight);
-  updateViewportHeight();
-  
-  // Setup scroll listener for messages container
+// ===== MOBILE SCROLLING FIXES (MINIMAL ADDITIONS) =====
+function initScrolling() {
   const messagesContainer = document.querySelector('.messages-container');
-  if (messagesContainer) {
-    // Add passive scroll listener
-    messagesContainer.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Initialize iOS smooth scrolling
-    if ('-webkit-overflow-scrolling' in document.createElement('div').style) {
-      messagesContainer.style.webkitOverflowScrolling = 'touch';
-    }
-  }
+  if (!messagesContainer) return;
   
-  // Setup scroll to bottom button
+  // Add scroll listener
+  messagesContainer.addEventListener('scroll', function() {
+    const scrollTop = this.scrollTop;
+    const scrollHeight = this.scrollHeight;
+    const clientHeight = this.clientHeight;
+    const scrollBottom = scrollHeight - scrollTop - clientHeight;
+    
+    isScrolledToBottom = scrollBottom < 50;
+    
+    // Show/hide scroll button
+    const scrollBtn = document.querySelector('.scroll-bottom-btn');
+    if (scrollBtn) {
+      if (scrollBottom > 100) {
+        scrollBtn.classList.add('visible');
+      } else {
+        scrollBtn.classList.remove('visible');
+      }
+    }
+  }, { passive: true });
+  
+  // Scroll to bottom button
   const scrollBtn = document.querySelector('.scroll-bottom-btn');
   if (scrollBtn) {
     scrollBtn.addEventListener('click', scrollToBottom);
-  }
-  
-  // Handle keyboard show/hide
-  window.addEventListener('resize', handleKeyboard);
-  
-  // Prevent pull-to-refresh on iOS
-  document.body.addEventListener('touchmove', function(e) {
-    if (document.querySelector('.chat-detail-view.active')) {
-      e.preventDefault();
-    }
-  }, { passive: false });
-  
-  console.log('✅ Mobile scrolling initialized');
-}
-
-function handleScroll() {
-  const container = document.querySelector('.messages-container');
-  if (!container) return;
-  
-  const scrollTop = container.scrollTop;
-  const scrollHeight = container.scrollHeight;
-  const clientHeight = container.clientHeight;
-  const scrollBottom = scrollHeight - scrollTop - clientHeight;
-  
-  // Check if we're near bottom (within 50px)
-  isScrolledToBottom = scrollBottom < 50;
-  
-  // Show/hide scroll button
-  const scrollBtn = document.querySelector('.scroll-bottom-btn');
-  if (scrollBtn) {
-    if (scrollBottom > 100) {
-      scrollBtn.classList.add('visible');
-    } else {
-      scrollBtn.classList.remove('visible');
-    }
   }
 }
 
@@ -96,16 +57,7 @@ function scrollToBottom() {
   const container = document.querySelector('.messages-container');
   if (!container) return;
   
-  // Use smooth scrolling if available
-  if ('scrollBehavior' in document.documentElement.style) {
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: 'smooth'
-    });
-  } else {
-    container.scrollTop = container.scrollHeight;
-  }
-  
+  container.scrollTop = container.scrollHeight;
   isScrolledToBottom = true;
   
   const scrollBtn = document.querySelector('.scroll-bottom-btn');
@@ -115,25 +67,14 @@ function scrollToBottom() {
 }
 
 function scrollToBottomSmooth() {
-  if (isScrolledToBottom) {
-    scrollToBottom();
-  }
-}
-
-function handleKeyboard() {
-  const newHeight = window.innerHeight;
-  const heightDiff = Math.abs(viewportHeight - newHeight);
+  const container = document.querySelector('.messages-container');
+  if (!container) return;
   
-  // Check if keyboard appeared/disappeared (viewport height changed significantly)
-  if (heightDiff > 100) {
-    keyboardVisible = newHeight < viewportHeight;
-    
-    if (keyboardVisible && isScrolledToBottom) {
-      // Keyboard appeared - scroll to bottom after a delay
-      setTimeout(scrollToBottom, 300);
-    }
-    
-    viewportHeight = newHeight;
+  if (isScrolledToBottom) {
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'smooth'
+    });
   }
 }
 
@@ -343,14 +284,9 @@ function showChatDetail(user) {
     if (input) input.focus();
   }, 200);
   
-  // Initialize scrolling for this chat
-  setTimeout(() => {
-    const messagesContainer = document.querySelector('.messages-container');
-    if (messagesContainer) {
-      messagesContainer.scrollTop = 0;
-      setTimeout(scrollToBottom, 100);
-    }
-  }, 50);
+  // Initialize scrolling
+  setTimeout(initScrolling, 100);
+  setTimeout(scrollToBottom, 150);
 }
 
 function hideChatDetail() {
@@ -998,11 +934,11 @@ function init() {
   // Initialize managers
   ConnectionManager.init();
   
-  // Setup mobile scrolling FIRST
-  initMobileScrolling();
-  
   // Setup event listeners
   setupEventListeners();
+  
+  // Initialize scrolling (MINIMAL ADDITION)
+  initScrolling();
   
   // Load any saved state
   const savedState = Storage.load('state');
