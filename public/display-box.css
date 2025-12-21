@@ -298,19 +298,17 @@ body {
 
 /* ===== CHAT DETAIL VIEW ===== */
 .chat-detail-view {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #f8f9fa;
-  z-index: 1000;
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* keep header/input visible, scroll only messages */
-  touch-action: pan-y;
+    position: fixed; /* keep on top of everything */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #f8f9fa;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column; /* column layout */
+    height: 100%; /* ensure child flex works */
+    overflow: hidden; /* header/input stay visible */
 }
 
 .chat-detail-view.active {
@@ -419,8 +417,9 @@ body {
 /* ===== SCROLLABLE MESSAGES CONTAINER ===== */
 .messages-container {
     flex: 1; /* take up remaining space */
+    flex-shrink: 0;
     min-height: 0; /* required for proper flex scrolling */
-    overflow-y: auto; /* vertical scroll */
+    overflow-y: scroll; /* always scrollable */
     overflow-x: hidden;
     padding: 16px;
     scroll-behavior: smooth;
@@ -439,21 +438,27 @@ body {
     touch-action: pan-y;
     -webkit-user-select: none;
     user-select: none;
-    
+
+    /* Always-visible scrollbar styling */
     scrollbar-width: thin;
-    scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
+    scrollbar-color: rgba(102, 126, 234, 0.7) #f1f1f1;
+    position: relative;
 }
 
-.messages-container::after {
+/* Fake permanent track for mobile */
+.messages-container::before {
     content: '';
-    display: block;
-    height: 16px;
-    width: 100%;
-    flex-shrink: 0;
+    position: absolute;
+    top: 0;
+    right: 2px; /* scrollbar offset */
+    width: 6px;
+    height: 100%;
+    background: #f1f1f1;
+    border-radius: 3px;
     pointer-events: none;
 }
 
-/* ===== SCROLLBAR STYLING ===== */
+/* ===== SCROLLBAR STYLING FOR DESKTOP ===== */
 .messages-container::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -462,7 +467,6 @@ body {
 .messages-container::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 3px;
-    margin: 8px 0;
     border: 1px solid transparent;
     background-clip: padding-box;
 }
@@ -483,6 +487,7 @@ body {
 .messages-container::-webkit-scrollbar-thumb:active {
     background: #667eea;
 }
+
 
 
 /* ===== INPUT SECTION ===== */
