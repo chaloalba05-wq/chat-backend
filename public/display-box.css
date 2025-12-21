@@ -413,7 +413,7 @@ body {
     flex: 1;
     min-height: 0; /* CRITICAL for flex scrolling */
     position: relative;
-    overflow-y: auto;
+    overflow: visible;
     overflow-x: hidden; /* Constrain messages-container */
     background: #f8f9fa;
     display: flex;
@@ -431,6 +431,9 @@ body {
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    scroll-behavior: smooth;
+    will-change: transform;
+    backface-visibility: hidden;
     display: flex;
     border: 2px solid red;
     flex-direction: column;
