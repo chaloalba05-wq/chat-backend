@@ -25,7 +25,6 @@ body { font-family: Arial; display: flex; flex-direction: column; height: 100vh;
 </div>
 
 <script>
-const socket = io();
 const params = new URLSearchParams(window.location.search);
 const whatsapp = params.get("whatsapp");
 const agentId = localStorage.getItem("agentId");
@@ -33,6 +32,14 @@ const agentId = localStorage.getItem("agentId");
 document.getElementById("header").textContent = `Chat with ${whatsapp}`;
 
 if (!agentId || !whatsapp) window.location.href = "agent.html";
+
+// Connect socket with reconnection enabled
+const socket = io({ 
+  reconnection: true, 
+  reconnectionAttempts: Infinity, 
+  reconnectionDelay: 1000, 
+  reconnectionDelayMax: 5000 
+});
 
 // Join user room
 socket.emit("join_user_room", { whatsapp });
@@ -63,20 +70,10 @@ socket.on("new_message", (msg) => {
   container.scrollTop = container.scrollHeight;
 });
 
-// renamed listener only
-socket.on("message_update", (msg) => {
-  if (msg.whatsapp !== whatsapp) return;
-});
-
-// renamed listener only
-socket.on("chat_deleted", (msg) => {
-  if (msg.whatsapp !== whatsapp) return;
-});
-
-// renamed listener only
-socket.on("chat_archived", (msg) => {
-  if (msg.whatsapp !== whatsapp) return;
-});
+// renamed listeners only
+socket.on("message_update", (msg) => { if (msg.whatsapp !== whatsapp) return; });
+socket.on("chat_deleted", (msg) => { if (msg.whatsapp !== whatsapp) return; });
+socket.on("chat_archived", (msg) => { if (msg.whatsapp !== whatsapp) return; });
 
 // Send message
 document.getElementById("sendBtn").addEventListener("click", () => {

@@ -4,39 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent Login</title>
-<script src="/socket.io/socket.io.js"></script>
 <style>
-  body { font-family: Arial; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-  input { margin: 5px; padding: 5px; width: 200px; }
-  button { padding: 5px 10px; }
+body { font-family: Arial; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+input { margin: 5px; padding: 5px; }
+button { padding: 5px 10px; }
 </style>
 </head>
 <body>
 <h2>Agent Login</h2>
 <input type="text" id="agentId" placeholder="Agent ID">
-<input type="password" id="password" placeholder="Password">
+<input type="password" id="agentPassword" placeholder="Password">
 <button id="loginBtn">Login</button>
+<p id="errorMsg" style="color:red"></p>
 
 <script>
-const socket = io();
+document.getElementById("loginBtn").addEventListener("click", () => {
+  const id = document.getElementById("agentId").value.trim();
+  const password = document.getElementById("agentPassword").value.trim();
 
-document.getElementById('loginBtn').addEventListener('click', () => {
-  const agentId = document.getElementById('agentId').value.trim();
-  const password = document.getElementById('password').value.trim();
-  if (!agentId || !password) return alert("Enter ID and password");
+  // Check credentials against hardcoded agents (add more as needed)
+  const agents = {
+    "agent1": "password123",
+    "agent2": "mypassword456"
+  };
 
-  // Attempt login
-  socket.emit("agent_login", { agentId, password, persistent: true });
-
-  socket.on("agent_login_response", (res) => {
-    if (res.success) {
-      // Store agentId and redirect to dashboard
-      localStorage.setItem("agentId", agentId);
-      window.location.href = "agent.html";
-    } else {
-      alert(res.message);
-    }
-  });
+  if (agents[id] && agents[id] === password) {
+    localStorage.setItem("agentVerified", "true");
+    localStorage.setItem("agentId", id);
+    window.location.href = `${id}.html`; // redirect to specific agent file
+  } else {
+    document.getElementById("errorMsg").textContent = "Invalid ID or password";
+  }
 });
 </script>
 </body>

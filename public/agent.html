@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -20,7 +20,14 @@ body { font-family: Arial; display: flex; flex-direction: column; height: 100vh;
 </div>
 
 <script>
-// Initialize socket with reconnection options
+// ===== Hardcoded credentials for this file =====
+const agentId = "agent1";
+const agentPassword = "agent1";
+
+// Ensure permanent session
+if (!localStorage.getItem("agentVerified")) window.location.href = "login.html";
+
+// ===== SOCKET CONNECTION WITH RECONNECTION ===== //
 const socket = io({
   reconnection: true,
   reconnectionAttempts: Infinity,
@@ -28,27 +35,31 @@ const socket = io({
   reconnectionDelayMax: 5000
 });
 
-const agentId = localStorage.getItem("agentId");
-let currentlyJoinedRooms = new Set(); // prevents duplicate joins
+let currentlyJoinedRooms = new Set();
 
-if (!agentId) window.location.href = "login.html";
-
-// Function to register agent and fetch users
+// Register permanent agent
 function registerAgent() {
   socket.emit("register_permanent_agent", {
     id: agentId,
     name: agentId,
-    password: agentId
+    password: agentPassword
   });
-  fetchActiveUsers();
 }
+
+// Register immediately
+registerAgent();
+
+// Re-register on reconnect to keep session alive
+socket.on("connect", () => {
+  registerAgent();
+  fetchActiveUsers();
+});
 
 // Request active users from the server
 function fetchActiveUsers() {
   socket.emit("get_active_users_for_agent", { agentId });
 }
 
-// Handle active users list
 socket.on("active_users_list", (users) => {
   const container = document.getElementById("activeMessages");
   container.innerHTML = "";
@@ -74,27 +85,12 @@ fetchActiveUsers();
 setInterval(fetchActiveUsers, 4000);
 
 // ===== USER ROOM EVENTS ===== //
-socket.on("new_message", (msg) => {
-  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
-  highlightUser(msg.whatsapp);
-});
+socket.on("new_message", (msg) => { if (!currentlyJoinedRooms.has(msg.whatsapp)) return; highlightUser(msg.whatsapp); });
+socket.on("message_update", (msg) => { if (!currentlyJoinedRooms.has(msg.whatsapp)) return; highlightUser(msg.whatsapp); });
+socket.on("chat_deleted", (msg) => { if (!currentlyJoinedRooms.has(msg.whatsapp)) return; highlightUser(msg.whatsapp); });
+socket.on("chat_archived", (msg) => { if (!currentlyJoinedRooms.has(msg.whatsapp)) return; highlightUser(msg.whatsapp); });
 
-socket.on("message_update", (msg) => {
-  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
-  highlightUser(msg.whatsapp);
-});
-
-socket.on("chat_deleted", (msg) => {
-  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
-  highlightUser(msg.whatsapp);
-});
-
-socket.on("chat_archived", (msg) => {
-  if (!currentlyJoinedRooms.has(msg.whatsapp)) return;
-  highlightUser(msg.whatsapp);
-});
-
-// highlight unread messages
+// highlight unread
 function highlightUser(whatsapp){
   const items = document.getElementsByClassName("user-item");
   for(let i of items){
@@ -103,17 +99,6 @@ function highlightUser(whatsapp){
     }
   }
 }
-
-// Handle reconnection
-socket.on("connect", () => {
-  console.log("Connected to server");
-  registerAgent();
-});
-
-socket.on("disconnect", (reason) => {
-  console.log("Disconnected:", reason);
-});
-
 </script>
 </body>
 </html>
