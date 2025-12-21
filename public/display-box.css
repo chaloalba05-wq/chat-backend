@@ -175,7 +175,7 @@ body {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #c1c1c1 #f1f1f1;
+  scrollbar-color: #667eea #f1f1f1;
   background: #f8f9fa;
 }
 
@@ -351,7 +351,7 @@ body {
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
-/* ===== CHAT CONTAINER - SIMPLIFIED VERSION ===== */
+/* ===== CHAT CONTAINER ===== */
 .chat-container {
     flex: 1;
     min-height: 0;
@@ -361,7 +361,7 @@ body {
     position: relative;
 }
 
-/* ===== CHAT WRAPPER (FLEX CONTAINER FOR PROPER SCROLLING) ===== */
+/* ===== CHAT WRAPPER ===== */
 .chat-wrapper {
     flex: 1;
     min-height: 0;
@@ -369,7 +369,7 @@ body {
     flex-direction: column;
 }
 
-/* ===== HEADER SECTION (FIXED TOP) ===== */
+/* ===== HEADER SECTION ===== */
 .chat-header {
     flex-shrink: 0;
     background: white;
@@ -392,7 +392,7 @@ body {
     color: #666;
 }
 
-/* ===== MESSAGES SECTION (SCROLLABLE AREA - FIXED) ===== */
+/* ===== MESSAGES SECTION ===== */
 .messages-section {
     flex: 1;
     min-height: 0;
@@ -401,40 +401,28 @@ body {
     position: relative;
     background: #f8f9fa;
     height: 100%;
-    overflow: hidden !important;
+    overflow: hidden;
 }
 
-/* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED ALWAYS SCROLLABLE ===== */
+/* ===== SCROLLABLE MESSAGES CONTAINER ===== */
 .messages-container {
     flex: 1;
     min-height: 0;
-    overflow-y: scroll !important; /* FORCE scroll, not auto */
-    overflow-x: hidden !important;
+    overflow-y: scroll;
+    overflow-x: hidden;
     padding: 16px;
     scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch !important;
+    -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    
-    /* CRITICAL: Force scrollbar to always be rendered */
-    scrollbar-width: thin !important; /* Firefox: 'thin' makes it always visible */
-    scrollbar-color: #667eea #f1f1f1 !important;
-    
-    /* Flex container for messages */
+    scrollbar-width: thin;
+    scrollbar-color: #667eea #f1f1f1;
     display: flex;
     flex-direction: column;
     position: relative;
     height: 100%;
     max-height: 100%;
-    
-    /* Prevent any hiding */
-    -ms-overflow-style: auto !important; /* IE/Edge */
-    
-    /* Ensure it's always movable */
-    touch-action: pan-y !important;
-    overscroll-behavior: contain !important;
-    
-    /* Reserve space for scrollbar - CRITICAL FOR PERMANENT SCROLLBAR */
-    scrollbar-gutter: stable !important;
+    -ms-overflow-style: scrollbar;
+    touch-action: pan-y;
 }
 
 /* Bottom padding for messages */
@@ -447,61 +435,27 @@ body {
     pointer-events: none;
 }
 
-/* ===== SCROLLBAR STYLING - ALWAYS VISIBLE, ALWAYS MOVABLE ===== */
-/* WebKit browsers (Chrome, Safari, Edge) */
+/* Simple scrollbar styling */
 .messages-container::-webkit-scrollbar {
-    width: 12px !important; /* Thicker for better grabbing */
-    display: block !important; /* Force display */
-    visibility: visible !important;
-    opacity: 1 !important;
-    -webkit-appearance: none !important; /* Disable default styling */
-    background-color: #f1f1f1 !important;
+    width: 8px;
 }
 
 .messages-container::-webkit-scrollbar-track {
-    background: #f1f1f1 !important;
-    border-radius: 6px !important;
-    border: 1px solid #e0e0e0 !important;
-    box-shadow: inset 0 0 4px rgba(0,0,0,0.1) !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    background: #f1f1f1;
+    border-radius: 4px;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-    background: #667eea !important;
-    border-radius: 6px !important;
-    border: 2px solid #f1f1f1 !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
-    min-height: 40px !important; /* Ensures it's always tall enough to grab */
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    cursor: grab !important;
-    transition: all 0.3s ease !important;
+    background: #667eea;
+    border-radius: 4px;
+    border: 2px solid #f1f1f1;
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-    background: #5a6fd8 !important;
-    border: 2px solid #e8e8e8 !important;
-    cursor: grab !important;
+    background: #5a6fd8;
 }
 
-.messages-container::-webkit-scrollbar-thumb:active {
-    background: #4a56b0 !important;
-    border: 2px solid #667eea !important;
-    cursor: grabbing !important;
-}
-
-/* Firefox scrollbar - ALWAYS VISIBLE */
-@supports (scrollbar-width: thin) {
-    .messages-container {
-        scrollbar-width: thin !important; /* Always shows scrollbar */
-        scrollbar-color: #667eea #f1f1f1 !important;
-    }
-}
-
-/* ===== INPUT SECTION (FIXED BOTTOM) ===== */
+/* ===== INPUT SECTION ===== */
 .input-section {
     flex-shrink: 0;
     background: white;
@@ -510,7 +464,6 @@ body {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
-/* Input area wrapper */
 .input-wrapper {
     display: flex;
     align-items: flex-end;
@@ -518,7 +471,6 @@ body {
     width: 100%;
 }
 
-/* Message input textarea */
 .message-input {
     flex: 1;
     border: 2px solid #e8e8e8;
@@ -542,7 +494,6 @@ body {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* Action buttons */
 .action-buttons {
     display: flex;
     align-items: center;
@@ -592,7 +543,7 @@ body {
 .send-btn:disabled {
     background: #cccccc;
     cursor: not-allowed;
-    transform: none !important;
+    transform: none;
     box-shadow: none;
 }
 
@@ -608,7 +559,25 @@ body {
     }
 }
 
-/* User messages (right side) */
+.message-wrapper {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.message-bubble {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 20px;
+    word-wrap: break-word;
+    position: relative;
+    animation: fadeIn 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    line-height: 1.5;
+    flex-shrink: 0;
+}
+
 .user-message {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -617,7 +586,6 @@ body {
     border-bottom-right-radius: 6px;
 }
 
-/* Agent messages (left side) */
 .agent-message {
     background: white;
     border: 1px solid #e8e8e8;
@@ -738,7 +706,7 @@ body {
     }
 }
 
-/* ===== EMPTY STATE - FIXED FOR SCROLLING ===== */
+/* ===== EMPTY STATE ===== */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1004,10 +972,6 @@ body {
     height: 40px;
     font-size: 16px;
   }
-  
-  .chat-detail-view {
-    position: fixed;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1111,71 +1075,19 @@ body {
   }
 }
 
-/* ===== FALLBACK FOR OLDER BROWSERS ===== */
-.no-flexbox .chat-wrapper {
-  display: block;
-  height: calc(100vh - 130px);
+/* ===== SCROLLBAR ENHANCEMENTS ===== */
+/* Ensure scrollbars are always visible on all browsers */
+html {
+    overflow-y: scroll;
 }
 
-.no-flexbox .messages-section {
-  height: 100%;
-  overflow-y: auto;
-}
-
-/* ===== CRITICAL: ALWAYS-VISIBLE SCROLLBAR FIXES ===== */
-/* Mobile-specific: Ensure scrollbar is always visible */
-@media (max-width: 768px) {
-  .messages-container {
-    /* Force permanent scrollbar on mobile */
-    overflow-y: scroll !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: thin !important;
+/* Make scrollbar thumb slightly larger on touch devices */
+@media (hover: none) and (pointer: coarse) {
+    .messages-container::-webkit-scrollbar-thumb {
+        min-height: 40px;
+    }
     
-    /* Prevent hiding behaviors */
-    -ms-overflow-style: auto !important;
-  }
-  
-  .messages-container::-webkit-scrollbar {
-    display: block !important;
-    width: 10px !important;
-  }
-  
-  /* Make scrollbar thumb more touch-friendly */
-  .messages-container::-webkit-scrollbar-thumb {
-    min-height: 50px !important; /* Larger for touch */
-    background: #667eea !important;
-    border-radius: 5px !important;
-    border: 2px solid #f1f1f1 !important;
-    opacity: 0.8 !important; /* Make it always visible on mobile */
-  }
-  
-  .messages-container::-webkit-scrollbar-thumb:hover {
-    opacity: 1 !important;
-  }
-}
-
-/* ===== IOS FIX ===== */
-@supports (-webkit-touch-callout: none) {
-  .chat-detail-view {
-    height: -webkit-fill-available;
-  }
-  
-  .messages-container {
-    -webkit-overflow-scrolling: touch !important;
-    overflow-y: scroll !important;
-  }
-  
-  .message-input:focus {
-    font-size: 16px !important;
-  }
-}
-
-/* ===== SCROLLBAR SPACER STYLES (for JavaScript solution) ===== */
-.scrollbar-spacer {
-    height: calc(100% + 1px) !important;
-    width: 1px !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    position: absolute !important;
-    z-index: -1 !important;
+    .messages-container {
+        scrollbar-color: #667eea #f1f1f1;
+    }
 }
