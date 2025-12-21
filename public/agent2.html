@@ -357,29 +357,8 @@
       flex-shrink: 0;
       box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     }
-    
-    /* ===== CHAT CONTAINER (REMOVE THIS DUPLICATE - IT'S BLOCKING SCROLL) ===== */
-    /* DELETE OR COMMENT OUT THIS BLOCK - Lines 216-220 */
-    /*
-    .chat-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: 100vh;
-        height: 100dvh;
-        background: #f8f9fa;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;  THIS WAS BLOCKING SCROLL!
-        z-index: 1000;
-    }
-    */
-    
+
     /* ===== CHAT CONTAINER - SIMPLIFIED VERSION ===== */
-    /* Replace lines 216-220 with this: */
     .chat-container {
         flex: 1;
         min-height: 0;
@@ -387,15 +366,6 @@
         flex-direction: column;
         background: #f8f9fa;
         position: relative;
-    }
-
-    /* ===== CHAT WRAPPER (FLEX CONTAINER FOR PROPER SCROLLING) ===== */
-    .chat-wrapper {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        /* REMOVE overflow: hidden - This blocks scrolling! */
     }
 
     /* ===== HEADER SECTION (FIXED TOP) ===== */
@@ -427,10 +397,8 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        /* REMOVE overflow: hidden - This was blocking scrolling! */
         position: relative;
         background: #f8f9fa;
-        /* ADD height property to ensure it takes space */
         height: 100%;
     }
 
@@ -452,7 +420,6 @@
         /* Flex container for messages */
         display: flex;
         flex-direction: column;
-        /* ADD these to ensure proper scrolling */
         position: relative;
         height: 100%;
         max-height: 100%;
@@ -1184,63 +1151,62 @@
       </div>
     </div>
     
-    <!-- Chat UI Structure - SIMPLIFIED -->
-    <!-- REMOVE the nested chat-container that was here -->
-    <!-- Instead, use this direct structure: -->
-    
-    <!-- Fixed header section -->
-    <header class="chat-header">
-      <div class="header-info">
-        <h2 id="chatHeaderUser">User Chat</h2>
-        <p id="chatHeaderStatus">Status or description</p>
-      </div>
-    </header>
-    
-    <!-- Scrollable messages section -->
-    <section class="messages-section">
-      <!-- Messages container (scrollable area) -->
-      <div class="messages-container" id="chatMessages">
-        
-        <!-- Empty state (shown when no messages) -->
-        <div class="empty-state" id="emptyState">
-          <p>No messages yet</p>
-          <small>Start a conversation</small>
+    <!-- Chat Container -->
+    <div class="chat-container">
+      <!-- Fixed header section -->
+      <header class="chat-header">
+        <div class="header-info">
+          <h2 id="chatHeaderUser">User Chat</h2>
+          <p id="chatHeaderStatus">Status or description</p>
         </div>
-        
-        <!-- Messages will be dynamically inserted here -->
-      </div>
+      </header>
       
-      <!-- Scroll to bottom button -->
-      <button class="scroll-bottom-btn" id="scrollBottomBtn">
-        ↓
-      </button>
-    </section>
-    
-    <!-- Fixed input section at bottom -->
-    <section class="input-section">
-      <div class="input-wrapper">
-        <!-- Text input area -->
-        <textarea 
-          class="message-input" 
-          id="messageInput"
-          placeholder="Type your message..." 
-          rows="1"
-          disabled
-        ></textarea>
-        
-        <!-- Action buttons -->
-        <div class="action-buttons">
-          <button class="file-attach-btn" type="button" onclick="document.getElementById('fileInput').click()">
-            📎
-          </button>
-          <button class="send-btn" type="button" id="sendButton" onclick="sendMessage()" disabled>
-            Send
-          </button>
+      <!-- Scrollable messages section -->
+      <section class="messages-section">
+        <!-- Messages container (scrollable area) -->
+        <div class="messages-container" id="chatMessages">
+          
+          <!-- Empty state (shown when no messages) -->
+          <div class="empty-state" id="emptyState">
+            <p>No messages yet</p>
+            <small>Start a conversation</small>
+          </div>
+          
+          <!-- Messages will be dynamically inserted here -->
         </div>
-      </div>
-    </section>
-    
-    <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect()">
+        
+        <!-- Scroll to bottom button -->
+        <button class="scroll-bottom-btn" id="scrollBottomBtn">
+          ↓
+        </button>
+      </section>
+      
+      <!-- Fixed input section at bottom -->
+      <section class="input-section">
+        <div class="input-wrapper">
+          <!-- Text input area -->
+          <textarea 
+            class="message-input" 
+            id="messageInput"
+            placeholder="Type your message..." 
+            rows="1"
+            disabled
+          ></textarea>
+          
+          <!-- Action buttons -->
+          <div class="action-buttons">
+            <button class="file-attach-btn" type="button" onclick="document.getElementById('fileInput').click()">
+              📎
+            </button>
+            <button class="send-btn" type="button" id="sendButton" onclick="sendMessage()" disabled>
+              Send
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect()">
+    </div>
   </div>
 </div>
 
