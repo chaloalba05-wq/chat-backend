@@ -134,56 +134,6 @@
   };
   
   // ================================================
-  // MOBILE SCROLLING FIX - MINIMAL FIX
-  // ================================================
-  function initMobileScrolling() {
-    console.log("📱 Initializing mobile scrolling fix");
-    
-    // Fix iOS 100vh issue
-    function setVH() {
-      let vh = window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
-    }
-    
-    setVH();
-    window.addEventListener('resize', setVH);
-    window.addEventListener('orientationchange', setVH);
-    
-    // Fix for iOS momentum scrolling
-    const messagesContainer = document.querySelector('.messages-container');
-    if (messagesContainer) {
-        // Force hardware acceleration for smoother scrolling
-        messagesContainer.style.transform = 'translateZ(0)';
-        messagesContainer.style.webkitTransform = 'translateZ(0)';
-        
-        // Enable momentum scrolling on iOS
-        messagesContainer.style.webkitOverflowScrolling = 'touch';
-        
-        console.log("✅ Mobile scrolling fix applied to messages container");
-    }
-    
-    // Fix for user list scrolling on mobile
-    const userList = document.querySelector('.user-list');
-    if (userList) {
-        userList.style.webkitOverflowScrolling = 'touch';
-    }
-    
-    // Prevent body scrolling but allow scrolling in chat containers
-    document.body.addEventListener('touchmove', function(e) {
-      // Check if we're touching a scrollable area
-      const scrollableSelectors = ['.messages-container', '.user-list', '.message-input'];
-      const isScrollable = scrollableSelectors.some(selector => 
-        e.target.closest(selector) || e.target.matches(selector)
-      );
-      
-      // If not in a scrollable area, prevent default to stop body scroll
-      if (!isScrollable) {
-        e.preventDefault();
-      }
-    }, { passive: false });
-  }
-  
-  // ================================================
   // SINGLE ROOM SYSTEM CONSTANTS (NO BROADCAST)
   // ================================================
   const ROOM_CONFIG = {
@@ -509,9 +459,6 @@
       document.getElementById('agentAvatar').textContent = currentAgent.name.charAt(0).toUpperCase();
       
       document.getElementById('app').style.display = 'flex';
-      
-      // Initialize mobile scrolling fix
-      initMobileScrolling();
       
       initPersistentConnection();
       initializeSocketConnection();
@@ -1560,18 +1507,11 @@
   function scrollToBottom() {
     const messagesDiv = document.getElementById("chatMessages");
     if (messagesDiv) {
-      // Use requestAnimationFrame for smoother scrolling on mobile
       requestAnimationFrame(() => {
-        // Try smooth scrolling first, fallback to instant if needed
-        try {
-          messagesDiv.scrollTo({
-            top: messagesDiv.scrollHeight,
-            behavior: 'smooth'
-          });
-        } catch (e) {
-          // Fallback for browsers that don't support smooth scrolling
-          messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
+        messagesDiv.scrollTo({
+          top: messagesDiv.scrollHeight,
+          behavior: 'smooth'
+        });
       });
       isScrolledToBottom = true;
       const scrollBtn = document.getElementById("scrollBottomBtn");
