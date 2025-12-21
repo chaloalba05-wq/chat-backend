@@ -306,10 +306,10 @@ body {
   z-index: 1000;
   transform: translateX(100%);
   transition: transform 0.3s ease;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  touch-action: pan-y; /* Disable browser gestures */
+  overflow: visible; /* allow children to scroll */
+  touch-action: pan-y;
 }
 
 .chat-detail-view.active {
@@ -380,7 +380,7 @@ body {
     background: #f8f9fa;
     position: relative;
     overflow-y: auto;
-    overflow-x: hidden;/* Constrain scrolling children */
+    overflow-x: visible;/* Constrain scrolling children */
     height: 100%;
     width: 100%;
 }
