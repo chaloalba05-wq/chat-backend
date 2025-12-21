@@ -105,9 +105,11 @@ html, body {
     min-height: 0; /* Allow it to shrink */
     flex: 1 1 0%; /* Added fix */
     min-height: 0 !important; /* Added fix */
+    -webkit-overflow-scrolling: touch; /* Mobile fix added */
+    touch-action: pan-y; /* Mobile fix added */
 }
 
-/* ===== SCROLLABLE MESSAGES CONTAINER - FIXED WITH ABSOLUTE POSITIONING ===== */
+/* ===== SCROLLABLE MESSAGES CONTAINER - FIXED FOR MOBILE ===== */
 .messages-container {
     position: absolute; /* Use absolute positioning for reliable scrolling */
     top: 0;
@@ -118,11 +120,17 @@ html, body {
     overflow-x: hidden;
     padding: 16px;
     padding-bottom: 32px; /* Add space at bottom for messages */
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch; /* Critical for iOS momentum scrolling */
     overscroll-behavior: contain;
     background: #f8f9fa;
     display: flex;
     flex-direction: column;
+    touch-action: pan-y; /* Mobile fix added - enable vertical touch scrolling */
+    
+    /* Mobile-specific hardware acceleration */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
 }
 
 /* Remove the ::after pseudo-element since we're using padding-bottom instead */
@@ -571,6 +579,38 @@ html, body {
     .chat-container {
         height: -webkit-fill-available;
     }
+    
+    /* Enhanced iOS scrolling fix */
+    .messages-section {
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    .messages-container {
+        -webkit-overflow-scrolling: touch !important;
+        position: relative !important; /* Alternative for iOS */
+    }
+    
+    /* Prevent iOS zoom on input focus */
+    .message-input:focus {
+        font-size: 16px !important;
+    }
+}
+
+/* ===== ANDROID/CHROME FIX ===== */
+@supports not (-webkit-touch-callout: none) {
+    .messages-container {
+        overscroll-behavior-y: contain;
+    }
+}
+
+/* ===== BODY SCROLL PREVENTION FOR MOBILE ===== */
+body {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: none; /* Prevent all body touch actions */
 }
 
 /* ===== ALTERNATIVE FIX - Use this if scrolling still doesn't work ===== */
