@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Display</title>
+  <link rel="stylesheet" href="chat-display.css">
+</head>
+<body>
+
+  <!-- ISOLATED CHAT DETAIL VIEW -->
+  <div class="chat-detail-view active">
+    <div class="chat-detail-header">
+      <button class="back-button">&larr;</button>
+      <div class="chat-detail-user-avatar">U</div>
+      <div class="header-info">
+        <h2>User Name</h2>
+        <p>Online</p>
+      </div>
+    </div>
+
+    <div class="chat-container">
+      <div class="messages-section">
+        <div class="messages-container">
+          <!-- Example messages -->
+          <div class="message-wrapper">
+            <div class="message-bubble agent-message">
+              <div class="message-meta">
+                <span class="message-sender">Agent</span>
+                <span class="message-time">10:01 AM</span>
+              </div>
+              <div class="message-content">Hello! How can I help you?</div>
+            </div>
+          </div>
+
+          <div class="message-wrapper">
+            <div class="message-bubble user-message">
+              <div class="message-meta">
+                <span class="message-sender">User</span>
+                <span class="message-time">10:02 AM</span>
+              </div>
+              <div class="message-content">Hi, I have a question about my order.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-section">
+        <div class="input-wrapper">
+          <textarea class="message-input" placeholder="Type a message"></textarea>
+          <button class="send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll to bottom button -->
+  <button class="scroll-bottom-btn">&#x2193;</button>
+
+  <script src="chat-display.js"></script>
+</body>
+</html>

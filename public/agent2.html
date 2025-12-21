@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Agent Admin</title>
-  <!-- Load external CSS file for display box styling -->
+  <!-- Load display box layout -->
   <link rel="stylesheet" href="display-box.css">
+  <!-- Load chat-specific styles -->
+  <link rel="stylesheet" href="chat-display.css">
 </head>
 <body>
 
@@ -86,9 +88,7 @@
         </div>
         
         <!-- Scroll to bottom button -->
-        <button class="scroll-bottom-btn" id="scrollBottomBtn">
-          ↓
-        </button>
+        <button class="scroll-bottom-btn" id="scrollBottomBtn">↓</button>
       </section>
       
       <!-- Fixed input section at bottom -->
@@ -105,12 +105,8 @@
           
           <!-- Action buttons -->
           <div class="action-buttons">
-            <button class="file-attach-btn" type="button" onclick="document.getElementById('fileInput').click()">
-              📎
-            </button>
-            <button class="send-btn" type="button" id="sendButton" onclick="sendMessage()" disabled>
-              Send
-            </button>
+            <button class="file-attach-btn" type="button" onclick="document.getElementById('fileInput').click()">📎</button>
+            <button class="send-btn" type="button" id="sendButton" onclick="sendMessage()" disabled>Send</button>
           </div>
         </div>
       </section>
@@ -122,7 +118,12 @@
 
 <!-- JavaScript -->
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="chat-display.js"></script>
 <script>
+  // Existing agent JS can remain here
+</script>
+</body>
+</html>
   // ================================================
   // AGENT CONFIGURATION - FIXED VALUES
   // ================================================
