@@ -1,1032 +1,1181 @@
-/* ===== ENHANCED CHAT SCRIPT WITH GUARANTEED MOBILE SCROLLING ===== */
+/* ===== CHAT UI - GUARANTEED MOBILE SCROLLING ===== */
 
-// ===== GLOBAL VARIABLES =====
-const socket = io("https://chat-backend-p2b9.onrender.com", {
-  reconnection: true,
-  reconnectionAttempts: Infinity,
-  reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
-  timeout: 20000,
-  transports: ['websocket', 'polling'],
-  query: {
-    clientType: 'agent',
-    version: '2.0'
-  }
-});
+/* ===== GLOBAL RESET WITH MOBILE FIXES ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+}
 
-let currentUserId = "";
-let selectedFile = null;
-let isScrolledToBottom = true;
-let messages = {};
-let activeChatUser = null;
-let userTypingTimeout = null;
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Changed from 'none' to allow scrolling */
+    touch-action: pan-y pan-x; /* Allow both vertical and horizontal panning */
+    overscroll-behavior: none; /* Prevent pull-to-refresh */
+}
 
-// ===== LOCAL STORAGE UTILITIES =====
-const Storage = {
-  prefix: 'chat_agent_',
-  
-  save(key, data) {
-    try {
-      localStorage.setItem(this.prefix + key, JSON.stringify(data));
-    } catch (error) {
-      console.error('Storage error:', error);
-    }
-  },
-  
-  load(key) {
-    try {
-      const data = localStorage.getItem(this.prefix + key);
-      return data ? JSON.parse(data) : null;
-    } catch (error) {
-      console.error('Storage error:', error);
-      return null;
-    }
-  },
-  
-  clear(key) {
-    localStorage.removeItem(this.prefix + key);
-  },
-  
-  saveMessages(userId, messages) {
-    this.save(`messages_${userId}`, {
-      messages: messages,
-      timestamp: Date.now()
-    });
-  },
-  
-  loadMessages(userId) {
-    const data = this.load(`messages_${userId}`);
-    return data ? data.messages : [];
-  }
-};
+body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+    margin: 0; 
+    background: #f8f9fa; 
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: 100dvh; /* Dynamic viewport height for mobile */
+    overflow: hidden;
+    position: fixed; /* Prevent body scrolling on mobile */
+    width: 100%;
+}
 
-// ===== PERSISTENT CONNECTION MANAGER =====
-const ConnectionManager = {
-  status: 'disconnected',
-  reconnectAttempts: 0,
-  maxReconnectAttempts: 20,
-  
-  init() {
-    this.setupEventListeners();
-  },
-  
-  setupEventListeners() {
-    window.addEventListener('online', () => {
-      console.log('🌐 Online - reconnecting...');
-      this.reconnect();
-    });
+/* ===== RESPONSIVE HEADER ===== */
+#header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-align: center;
+  padding: 12px 16px;
+  height: auto;
+  min-height: 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.logo-text {
+  font-size: clamp(1.8rem, 6vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.logo-subtext {
+  font-size: clamp(0.8rem, 3vw, 1rem);
+  opacity: 0.95;
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+  font-weight: 400;
+}
+
+/* ===== MAIN LAYOUT ===== */
+.container { 
+  display: flex; 
+  height: calc(100dvh - 70px); /* Use dynamic viewport height */
+  height: calc(var(--vh, 100vh) - 70px); /* Fallback */
+  width: 100%;
+  position: relative;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar { 
+  width: 100%;
+  height: 100%;
+  background: white; 
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sidebar-header { 
+  padding: clamp(16px, 3vw, 20px); 
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.agent-info {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2vw, 12px);
+  margin-bottom: clamp(12px, 2vw, 15px);
+}
+
+.agent-avatar {
+  width: clamp(36px, 8vw, 40px);
+  height: clamp(36px, 8vw, 40px);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: clamp(14px, 3vw, 16px);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.agent-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-name {
+  font-weight: 600;
+  color: #333;
+  font-size: clamp(14px, 2vw, 15px);
+  line-height: 1.2;
+}
+
+.agent-id {
+  font-size: clamp(11px, 1.5vw, 12px);
+  color: #666;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.status-container {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.connection-dot {
+  width: clamp(6px, 1.5vw, 8px);
+  height: clamp(6px, 1.5vw, 8px);
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dot-connected { background-color: #4CAF50; }
+.dot-connecting { background-color: #FFC107; animation: pulse 1.5s infinite; }
+.dot-disconnected { background-color: #f44336; }
+.dot-error { background-color: #9C27B0; }
+
+.connection-status {
+  font-size: clamp(11px, 1.5vw, 12px);
+  color: #666;
+  line-height: 1.2;
+}
+
+.mute-status {
+  padding: clamp(3px, 1vw, 4px) clamp(8px, 2vw, 10px);
+  border-radius: 12px;
+  font-size: clamp(10px, 1.5vw, 11px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.muted { background: #ffebee; color: #c62828; }
+.unmuted { background: #e8f5e9; color: #2e7d32; }
+
+/* ===== USER LIST ===== */
+.user-list {
+  flex: 1;
+  position: absolute; /* Absolute positioning for guaranteed scrolling */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #667eea #f1f1f1;
+  background: #f8f9fa;
+  touch-action: pan-y; /* Allow vertical panning only */
+}
+
+.user-list-title {
+  padding: clamp(12px, 2vw, 15px) clamp(16px, 3vw, 20px) clamp(8px, 1.5vw, 10px);
+  font-size: clamp(11px, 1.5vw, 12px);
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.user-item {
+  padding: clamp(14px, 2.5vw, 16px) clamp(16px, 3vw, 20px);
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(10px, 2vw, 12px);
+  touch-action: manipulation;
+  background: white;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.user-item:active {
+  background: #f0f0f0;
+  transform: scale(0.99);
+}
+
+.user-item:hover { background: #f9f9f9; }
+.user-item.active { 
+  background: #e8f0fe;
+  border-left: 4px solid #667eea;
+}
+
+.user-avatar {
+  width: clamp(32px, 6vw, 36px);
+  height: clamp(32px, 6vw, 36px);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: clamp(12px, 2vw, 14px);
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.2);
+}
+
+.user-item.active .user-avatar {
+  background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%);
+  transform: scale(1.05);
+}
+
+.user-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #333;
+  font-size: clamp(13px, 1.8vw, 14px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+.user-time {
+  font-size: clamp(10px, 1.5vw, 11px);
+  color: #999;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.user-preview {
+  font-size: clamp(12px, 1.8vw, 13px);
+  color: #666;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+/* ===== CHAT DETAIL VIEW ===== */
+.chat-detail-view {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #f8f9fa;
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Changed from 'none' to allow scrolling */
+  touch-action: pan-y; /* Allow vertical scrolling */
+}
+
+.chat-detail-view.active {
+  transform: translateX(0);
+}
+
+/* ===== CHAT DETAIL HEADER ===== */
+.chat-detail-header {
+  padding: clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px);
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 15px);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  padding-top: max(clamp(16px, 3vw, 20px), env(safe-area-inset-top));
+}
+
+.back-button {
+  padding: 10px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  color: #667eea;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.back-button:active {
+  background: #667eea;
+  color: white;
+  transform: scale(0.95);
+}
+
+.chat-detail-user-avatar {
+  width: clamp(36px, 8vw, 44px);
+  height: clamp(36px, 8vw, 44px);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: clamp(14px, 3vw, 16px);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* ===== CHAT CONTAINER - MOBILE OPTIMIZED ===== */
+.chat-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+    position: relative;
+    /* Changed from 'hidden' to allow scrolling */
+    overflow: visible; /* Allow scrolling to work properly */
+    height: 100%;
+    width: 100%;
+}
+
+/* ===== HEADER SECTION ===== */
+.chat-header {
+    flex-shrink: 0;
+    background: white;
+    padding: 16px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    min-height: 70px;
+    z-index: 10;
+}
+
+.header-info h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.header-info p {
+    font-size: 14px;
+    color: #666;
+}
+
+/* ===== MESSAGES SECTION - MOBILE FIXED SCROLLING ===== */
+.messages-section {
+    flex: 1;
+    min-height: 0;
+    /* Changed from relative to static for better flex behavior */
+    position: static;
+    /* Changed from hidden to allow scrolling */
+    overflow: visible;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+/* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED MOBILE SCROLLING ===== */
+.messages-container {
+    /* REMOVED position: absolute - this was breaking mobile scrolling */
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+    width: 100%;
+    height: 100%;
     
-    window.addEventListener('offline', () => {
-      console.log('🌐 Offline');
-      this.showStatus('disconnected', 'Offline - Will reconnect automatically');
-    });
+    /* Mobile touch optimization - KEEP THESE */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+    touch-action: pan-y; /* Allow vertical panning for scrolling */
+    -webkit-user-select: none;
+    user-select: none;
     
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && !socket.connected) {
-        console.log('👀 Page visible - reconnecting...');
-        this.reconnect();
-      }
-    });
-  },
+    /* Always show scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
+}
+
+.messages-container::after {
+    content: '';
+    display: block;
+    height: 16px;
+    width: 100%;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+/* PERMANENT SCROLLBAR STYLING */
+.messages-container::-webkit-scrollbar {
+    width: 6px; /* Thinner for mobile */
+    height: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+    margin: 8px 0;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.7);
+    border-radius: 3px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    min-height: 40px;
+    
+    background-image: linear-gradient(
+        to bottom,
+        rgba(102, 126, 234, 0.7),
+        rgba(102, 126, 234, 0.9)
+    );
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.9);
+}
+
+.messages-container::-webkit-scrollbar-thumb:active {
+    background: #667eea;
+}
+
+/* ===== INPUT SECTION ===== */
+.input-section {
+    flex-shrink: 0;
+    background: white;
+    border-top: 1px solid #e8e8e8;
+    padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    position: relative;
+    z-index: 5;
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    width: 100%;
+}
+
+.message-input {
+    flex: 1;
+    border: 2px solid #e8e8e8;
+    border-radius: 25px;
+    padding: 14px 16px;
+    font-size: 16px;
+    font-family: inherit;
+    background: #f8f9fa;
+    resize: none;
+    min-height: 50px;
+    max-height: 120px;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    line-height: 1.4;
+    -webkit-user-select: text;
+    user-select: text;
+    touch-action: manipulation;
+}
+
+.message-input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.file-attach-btn,
+.send-btn {
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.file-attach-btn {
+    background: transparent;
+    color: #667eea;
+    font-size: 24px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+}
+
+.file-attach-btn:active {
+    background: rgba(102, 126, 234, 0.1);
+    transform: scale(0.95);
+}
+
+.send-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 14px 24px;
+    border-radius: 25px;
+    font-weight: 600;
+    min-width: 80px;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.send-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.send-btn:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ===== MESSAGE BUBBLES ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-wrapper {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+    min-height: min-content;
+}
+
+.message-bubble {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 20px;
+    word-wrap: break-word;
+    position: relative;
+    animation: fadeIn 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    line-height: 1.5;
+    flex-shrink: 0;
+    min-height: min-content;
+}
+
+.user-message {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    align-self: flex-end;
+    margin-left: auto;
+    border-bottom-right-radius: 6px;
+}
+
+.agent-message {
+    background: white;
+    border: 1px solid #e8e8e8;
+    align-self: flex-start;
+    border-bottom-left-radius: 6px;
+}
+
+.message-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+}
+
+.message-sender {
+    font-weight: 600;
+}
+
+.user-message .message-sender {
+    color: rgba(255,255,255,0.95);
+}
+
+.agent-message .message-sender {
+    color: #444;
+}
+
+.message-time {
+    opacity: 0.8;
+    font-weight: 400;
+}
+
+.user-message .message-time {
+    color: rgba(255,255,255,0.8);
+}
+
+.agent-message .message-time {
+    color: #666;
+}
+
+.message-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* ===== SCROLL TO BOTTOM BUTTON ===== */
+.scroll-bottom-btn {
+    position: fixed; /* Fixed to viewport for mobile */
+    bottom: 90px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #667eea;
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    z-index: 100;
+    transition: all 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.scroll-bottom-btn.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.scroll-bottom-btn:active {
+    background: #5a6fd8;
+    transform: scale(0.95);
+}
+
+/* ===== TYPING INDICATOR ===== */
+.typing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    align-self: flex-start;
+    margin-top: 8px;
+    flex-shrink: 0;
+}
+
+.typing-dot {
+    width: 8px;
+    height: 8px;
+    background: #667eea;
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-6px);
+    }
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #999;
+    text-align: center;
+    padding: 40px 20px;
+    flex-shrink: 0;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.empty-state p {
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.empty-state small {
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+/* ===== UPLOAD PREVIEW ===== */
+.upload-preview {
+    background: #f8f9fa;
+    padding: 12px 16px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.progress-bar {
+    height: 6px;
+    background: linear-gradient(90deg, #4CAF50, #8BC34A);
+    border-radius: 10px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+/* ===== UTILITIES ===== */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.hidden { display: none; }
+
+/* ===== NOTIFICATION ===== */
+.notification {
+  position: fixed;
+  top: 90px;
+  right: 20px;
+  left: 20px;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: slideIn 0.3s ease;
+  border-left: 4px solid #4CAF50;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ===== CONNECTION STATUS ===== */
+.connection-status-indicator {
+  position: fixed;
+  top: 80px;
+  right: 10px;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 1000;
+  display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.connected {
+  background: #4CAF50;
+  color: white;
+}
+
+.disconnected {
+  background: #f44336;
+  color: white;
+}
+
+.reconnecting {
+  background: #FFC107;
+  color: #333;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #666;
+}
+
+.empty-state-subtitle {
+  font-size: 14px;
+  color: #999;
+  max-width: 300px;
+  line-height: 1.4;
+}
+
+.loading {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.date-separator {
+  text-align: center;
+  margin: 20px 0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.date-separator span {
+  background: #f0f0f0;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.attachment {
+  margin-top: 8px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.attachment a {
+  display: flex;
+  align-items: center;
+  color: #667eea;
+  text-decoration: none;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.attachment a:hover {
+  background: #f0f7ff;
+}
+
+.attachment img,
+.attachment video,
+.attachment audio {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+/* ===== RESPONSIVE ADJUSTMENTS FOR MOBILE ===== */
+@media (max-width: 768px) {
+  /* Set dynamic viewport height for mobile */
+  :root {
+    --vh: 100dvh;
+  }
   
-  reconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('🛑 Max reconnection attempts reached');
-      return;
+  .container {
+    height: calc(100dvh - 60px);
+    height: calc(var(--vh, 100vh) - 60px);
+  }
+  
+  #header {
+    min-height: 60px;
+  }
+  
+  .logo-text {
+    font-size: 1.6rem;
+  }
+  
+  .chat-header {
+    padding: 12px 16px;
+    min-height: 60px;
+  }
+  
+  .header-info h2 {
+    font-size: 16px;
+  }
+  
+  .header-info p {
+    font-size: 13px;
+  }
+  
+  .messages-container {
+    padding: 12px;
+  }
+  
+  .input-section {
+    padding: 12px;
+  }
+  
+  .message-input {
+    padding: 12px 16px;
+    min-height: 46px;
+    font-size: 15px;
+  }
+  
+  .file-attach-btn,
+  .send-btn {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+  }
+  
+  .message-bubble {
+    max-width: 90%;
+    padding: 10px 14px;
+  }
+  
+  .scroll-bottom-btn {
+    bottom: 80px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+  
+  .back-button {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    height: calc(100dvh - 56px);
+    height: calc(var(--vh, 100vh) - 56px);
+  }
+  
+  #header {
+    min-height: 56px;
+    padding: 8px 12px;
+  }
+  
+  .logo-text {
+    font-size: 1.4rem;
+  }
+  
+  .logo-subtext {
+    font-size: 0.75rem;
+  }
+  
+  .chat-header {
+    padding: 10px 12px;
+    min-height: 56px;
+  }
+  
+  .messages-container {
+    padding: 10px;
+  }
+  
+  .input-section {
+    padding: 10px;
+  }
+  
+  .message-input {
+    padding: 10px 14px;
+    min-height: 44px;
+    font-size: 14px;
+  }
+  
+  .send-btn {
+    min-width: 70px;
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+  
+  .message-bubble {
+    max-width: 92%;
+    padding: 8px 12px;
+  }
+  
+  .scroll-bottom-btn {
+    bottom: 75px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  
+  .chat-detail-header {
+    padding: 12px 16px;
+  }
+  
+  .back-button {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  
+  .chat-detail-user-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  
+  /* Mobile-specific scrollbar */
+  .messages-container::-webkit-scrollbar {
+    width: 4px;
+  }
+}
+
+/* ===== SAFE AREA SUPPORT ===== */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+  
+  .sidebar-header, .chat-detail-header {
+    padding-left: max(clamp(16px, 3vw, 20px), env(safe-area-inset-left));
+    padding-right: max(clamp(16px, 3vw, 20px), env(safe-area-inset-right));
+  }
+  
+  .chat-header {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  
+  .messages-container {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  
+  .input-section {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+/* ===== MOBILE SCROLLING FIXES ===== */
+/* iOS momentum scrolling */
+@supports (-webkit-touch-callout: none) {
+    .messages-container {
+        -webkit-overflow-scrolling: touch;
+        overflow-y: scroll;
     }
     
-    this.reconnectAttempts++;
-    console.log(`🔄 Reconnection attempt ${this.reconnectAttempts}`);
-    
-    socket.connect();
-  },
-  
-  showStatus(status, message) {
-    this.status = status;
-    
-    const indicator = document.getElementById('connectionStatusIndicator');
-    if (indicator) {
-      indicator.className = `connection-status-indicator ${status}`;
-      indicator.textContent = message;
-      indicator.style.display = 'block';
-      
-      if (status === 'connected') {
-        setTimeout(() => {
-          indicator.style.display = 'none';
-        }, 3000);
-      }
+    /* Fix for iOS elastic scrolling */
+    body {
+        overscroll-behavior-y: none;
     }
-  },
-  
-  reset() {
-    this.reconnectAttempts = 0;
-    this.status = 'connected';
-  }
-};
+}
 
-// ===== SEND CONTROLLER =====
-const SendController = {
-  isSending: false,
-  lastSendTime: 0,
-  
-  canSend() {
-    const now = Date.now();
-    
-    if (this.isSending) {
-      return { canSend: false, reason: 'Already sending' };
+/* Android Chrome fix */
+@supports (-webkit-appearance:none) and (not (-webkit-overflow-scrolling:touch)) {
+    .messages-container {
+        overflow-y: auto;
     }
-    
-    if (now - this.lastSendTime < 500) {
-      return { canSend: false, reason: 'Too fast' };
+}
+
+/* Edge/IE fix */
+@supports (-ms-ime-align:auto) {
+    .messages-container {
+        overflow-y: auto;
+        -ms-overflow-style: -ms-autohiding-scrollbar;
     }
-    
-    return { canSend: true };
-  },
-  
-  beginSend() {
-    this.isSending = true;
-    this.lastSendTime = Date.now();
-  },
-  
-  finishSend() {
-    this.isSending = false;
-  }
-};
-
-// ===== FORMATTING FUNCTIONS =====
-function formatTime(timestamp) {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: true 
-  });
 }
 
-function formatDate(timestamp) {
-  const date = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  if (date.toDateString() === today.toDateString()) {
-    return 'Today';
-  } else if (date.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday';
-  } else {
-    return date.toLocaleDateString([], { 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  }
-}
-
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// ===== MOBILE SCROLLING MANAGEMENT =====
-function setupMobileScrolling() {
-  const messagesContainer = document.querySelector('.messages-container');
-  const scrollBtn = document.querySelector('.scroll-bottom-btn');
-  
-  if (!messagesContainer) return;
-  
-  // Set up scroll listener
-  messagesContainer.addEventListener('scroll', handleScroll, { passive: true });
-  
-  // Set up scroll to bottom button
-  if (scrollBtn) {
-    scrollBtn.addEventListener('click', scrollToBottom);
-  }
-  
-  // Initial scroll to bottom
-  setTimeout(() => {
-    scrollToBottom();
-  }, 100);
-  
-  // Handle keyboard show/hide on mobile
-  let viewportHeight = window.innerHeight;
-  let keyboardVisible = false;
-  
-  window.addEventListener('resize', () => {
-    const newHeight = window.innerHeight;
-    const heightDiff = Math.abs(viewportHeight - newHeight);
-    
-    // Check if keyboard appeared/disappeared (viewport height changed significantly)
-    if (heightDiff > 100) {
-      keyboardVisible = newHeight < viewportHeight;
-      
-      if (keyboardVisible) {
-        // Keyboard appeared - scroll to bottom after a delay
-        setTimeout(scrollToBottom, 300);
-      } else {
-        // Keyboard disappeared
-        setTimeout(() => {
-          if (isScrolledToBottom) {
-            scrollToBottom();
-          }
-        }, 100);
-      }
-      
-      viewportHeight = newHeight;
+/* Firefox fix */
+@-moz-document url-prefix() {
+    .messages-container {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
     }
-  });
 }
-
-function handleScroll() {
-  const container = document.querySelector('.messages-container');
-  if (!container) return;
-  
-  const scrollTop = container.scrollTop;
-  const scrollHeight = container.scrollHeight;
-  const clientHeight = container.clientHeight;
-  const scrollBottom = scrollHeight - scrollTop - clientHeight;
-  
-  // Check if we're near bottom (within 50px)
-  isScrolledToBottom = scrollBottom < 50;
-  
-  // Show/hide scroll button
-  const scrollBtn = document.querySelector('.scroll-bottom-btn');
-  if (scrollBtn) {
-    if (scrollBottom > 100) {
-      scrollBtn.classList.add('visible');
-    } else {
-      scrollBtn.classList.remove('visible');
-    }
-  }
-}
-
-function scrollToBottom() {
-  const container = document.querySelector('.messages-container');
-  if (!container) return;
-  
-  container.scrollTop = container.scrollHeight;
-  isScrolledToBottom = true;
-  
-  const scrollBtn = document.querySelector('.scroll-bottom-btn');
-  if (scrollBtn) {
-    scrollBtn.classList.remove('visible');
-  }
-}
-
-function scrollToBottomSmooth() {
-  const container = document.querySelector('.messages-container');
-  if (!container) return;
-  
-  if (isScrolledToBottom) {
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: 'smooth'
-    });
-  }
-}
-
-// ===== UI MANAGEMENT =====
-function showChatDetail(user) {
-  activeChatUser = user;
-  currentUserId = user.id;
-  
-  // Update chat detail header
-  const userAvatar = document.querySelector('.chat-detail-user-avatar');
-  const userName = document.querySelector('.chat-detail-user-name');
-  const userNumber = document.querySelector('.chat-detail-user-number');
-  
-  if (userAvatar) {
-    userAvatar.textContent = user.name.charAt(0).toUpperCase();
-  }
-  
-  if (userName) {
-    userName.textContent = user.name;
-  }
-  
-  if (userNumber) {
-    userNumber.textContent = user.id;
-  }
-  
-  // Show chat detail view
-  const chatDetail = document.querySelector('.chat-detail-view');
-  if (chatDetail) {
-    chatDetail.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  }
-  
-  // Load messages
-  loadMessagesForUser(user.id);
-  
-  // Set up mobile scrolling for this chat
-  setTimeout(setupMobileScrolling, 100);
-  
-  // Focus on input
-  setTimeout(() => {
-    const input = document.querySelector('.message-input');
-    if (input) input.focus();
-  }, 200);
-}
-
-function hideChatDetail() {
-  const chatDetail = document.querySelector('.chat-detail-view');
-  if (chatDetail) {
-    chatDetail.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-  
-  activeChatUser = null;
-  currentUserId = "";
-  
-  // Save current messages before leaving
-  if (currentUserId) {
-    Storage.saveMessages(currentUserId, messages[currentUserId] || []);
-  }
-}
-
-function updateUserList(users) {
-  const userList = document.querySelector('.user-list');
-  if (!userList) return;
-  
-  // Clear existing users (except title)
-  const userItems = userList.querySelectorAll('.user-item');
-  userItems.forEach(item => item.remove());
-  
-  if (users.length === 0) {
-    const emptyState = document.createElement('div');
-    emptyState.className = 'empty-state';
-    emptyState.innerHTML = `
-      <div class="empty-state-icon">💬</div>
-      <div class="empty-state-title">No active chats</div>
-      <div class="empty-state-subtitle">Users will appear here when they start chatting</div>
-    `;
-    userList.appendChild(emptyState);
-    return;
-  }
-  
-  // Add users
-  users.forEach(user => {
-    const userItem = createUserItem(user);
-    userList.appendChild(userItem);
-  });
-}
-
-function createUserItem(user) {
-  const div = document.createElement('div');
-  div.className = 'user-item';
-  if (user.id === currentUserId) {
-    div.classList.add('active');
-  }
-  
-  div.innerHTML = `
-    <div class="user-avatar">${user.name.charAt(0).toUpperCase()}</div>
-    <div class="user-content">
-      <div class="user-name-row">
-        <div class="user-name">${user.name}</div>
-        <div class="user-time">${formatTime(user.lastActivity)}</div>
-      </div>
-      <div class="user-preview">${user.lastMessage || 'No messages yet'}</div>
-    </div>
-  `;
-  
-  div.addEventListener('click', () => showChatDetail(user));
-  
-  return div;
-}
-
-function createMessageElement(msg) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'message-wrapper';
-  
-  const bubble = document.createElement('div');
-  bubble.className = `message-bubble ${msg.sender === 'user' ? 'user-message' : 'agent-message'}`;
-  
-  let content = msg.text || msg.message || '';
-  let attachmentHtml = '';
-  
-  if (msg.attachment) {
-    attachmentHtml = formatAttachment(msg.attachment);
-  }
-  
-  const senderName = msg.sender === 'user' ? (msg.userName || 'User') : 'You';
-  
-  bubble.innerHTML = `
-    <div class="message-meta">
-      <span class="message-sender">${senderName}</span>
-      <span class="message-time">${formatTime(msg.timestamp)}</span>
-    </div>
-    <div class="message-content">${content}</div>
-    ${attachmentHtml}
-  `;
-  
-  wrapper.appendChild(bubble);
-  return wrapper;
-}
-
-function formatAttachment(attachment) {
-  if (!attachment) return '';
-  
-  const fileType = attachment.mimetype ? attachment.mimetype.split('/')[0] : 'file';
-  const fileUrl = attachment.url || attachment.path;
-  const fileName = attachment.originalname || attachment.filename || 'file';
-  const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
-  
-  let icon = '📄';
-  let preview = '';
-  
-  if (fileType === 'image') {
-    icon = '🖼️';
-    preview = `<img src="${fileUrl}" alt="${fileName}" loading="lazy" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 8px;">`;
-  } else if (fileType === 'video') {
-    icon = '🎬';
-    preview = `<video src="${fileUrl}" controls style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 8px;"></video>`;
-  } else if (fileType === 'audio') {
-    icon = '🎵';
-    preview = `<audio src="${fileUrl}" controls style="width: 100%; margin-top: 8px;"></audio>`;
-  }
-  
-  return `
-    <div class="attachment">
-      <a href="${fileUrl}" target="_blank" download="${fileName}">
-        ${icon} ${fileName}
-        ${fileSize ? `<span style="font-size: 0.9em; color: #666;">(${fileSize})</span>` : ''}
-      </a>
-      ${preview}
-    </div>
-  `;
-}
-
-function displayMessage(msg, userId, scroll = true) {
-  if (!messages[userId]) {
-    messages[userId] = [];
-  }
-  
-  // Check for duplicates
-  const isDuplicate = messages[userId].some(m => 
-    m.id === msg.id || 
-    (m.timestamp === msg.timestamp && m.text === msg.text && m.sender === msg.sender)
-  );
-  
-  if (isDuplicate) {
-    console.log('Skipping duplicate message:', msg);
-    return;
-  }
-  
-  messages[userId].push(msg);
-  
-  // If this is the active chat, display it
-  if (userId === currentUserId) {
-    const container = document.querySelector('.messages-container');
-    if (!container) return;
-    
-    // Remove empty state if present
-    const emptyState = container.querySelector('.empty-state');
-    if (emptyState) {
-      emptyState.remove();
-    }
-    
-    const messageElement = createMessageElement(msg);
-    container.appendChild(messageElement);
-    
-    // Auto-scroll if at bottom or this is our message
-    if (scroll && (isScrolledToBottom || msg.sender === 'agent')) {
-      setTimeout(() => {
-        if (msg.sender === 'user') {
-          scrollToBottomSmooth();
-        } else if (isScrolledToBottom) {
-          scrollToBottomSmooth();
-        }
-      }, 100);
-    }
-    
-    // Save to storage
-    Storage.saveMessages(userId, messages[userId]);
-  }
-}
-
-function displayMessages(userId, msgArray) {
-  const container = document.querySelector('.messages-container');
-  if (!container) return;
-  
-  // Clear container
-  container.innerHTML = '';
-  
-  if (!msgArray || msgArray.length === 0) {
-    const emptyState = document.createElement('div');
-    emptyState.className = 'empty-state';
-    emptyState.innerHTML = `
-      <div class="empty-state-icon">💬</div>
-      <div class="empty-state-title">No messages yet</div>
-      <div class="empty-state-subtitle">Start the conversation by sending a message</div>
-    `;
-    container.appendChild(emptyState);
-    return;
-  }
-  
-  // Sort messages by timestamp
-  const sortedMessages = [...msgArray].sort((a, b) => 
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-  
-  // Store messages
-  messages[userId] = sortedMessages;
-  
-  // Display messages
-  const fragment = document.createDocumentFragment();
-  sortedMessages.forEach(msg => {
-    const element = createMessageElement(msg);
-    fragment.appendChild(element);
-  });
-  
-  container.appendChild(fragment);
-  
-  // Scroll to bottom
-  setTimeout(scrollToBottom, 50);
-}
-
-function loadMessagesForUser(userId) {
-  // Load from storage first
-  const storedMessages = Storage.loadMessages(userId);
-  
-  if (storedMessages.length > 0) {
-    console.log(`📂 Loaded ${storedMessages.length} messages from storage for ${userId}`);
-    displayMessages(userId, storedMessages);
-  }
-  
-  // Then request from server
-  socket.emit('get_messages', { userId: userId });
-}
-
-// ===== MESSAGE SENDING =====
-function sendMessage() {
-  if (!currentUserId) {
-    showNotification('Please select a user to chat with', 'error');
-    return;
-  }
-  
-  const input = document.querySelector('.message-input');
-  const text = input.value.trim();
-  const fileInput = document.getElementById('fileInput');
-  
-  if (!text && !selectedFile) {
-    showNotification('Please enter a message or select a file', 'warning');
-    return;
-  }
-  
-  const canSend = SendController.canSend();
-  if (!canSend.canSend) {
-    showNotification('Please wait before sending another message', 'warning');
-    return;
-  }
-  
-  SendController.beginSend();
-  
-  const sendBtn = document.querySelector('.send-btn');
-  const originalText = sendBtn.textContent;
-  sendBtn.disabled = true;
-  sendBtn.innerHTML = '<div class="loading"></div>';
-  
-  if (selectedFile) {
-    uploadFile(function(fileInfo) {
-      if (fileInfo) {
-        sendMessageToServer(text, fileInfo);
-      } else {
-        SendController.finishSend();
-        sendBtn.disabled = false;
-        sendBtn.textContent = originalText;
-      }
-    });
-  } else {
-    sendMessageToServer(text);
-  }
-  
-  input.value = '';
-  input.style.height = 'auto';
-  
-  // Reset file selection
-  selectedFile = null;
-  const filePreview = document.querySelector('.upload-preview');
-  if (filePreview) {
-    filePreview.style.display = 'none';
-  }
-  if (fileInput) {
-    fileInput.value = '';
-  }
-}
-
-function sendMessageToServer(text, attachment = null) {
-  const messageData = {
-    userId: currentUserId,
-    message: text,
-    attachment: attachment
-  };
-  
-  socket.emit('agent_message', messageData);
-  
-  // Create optimistic message
-  const optimisticMsg = {
-    id: 'temp_' + Date.now(),
-    sender: 'agent',
-    text: text,
-    timestamp: new Date().toISOString(),
-    attachment: attachment,
-    optimistic: true
-  };
-  
-  displayMessage(optimisticMsg, currentUserId);
-  
-  // Re-enable send button after a delay
-  setTimeout(() => {
-    const sendBtn = document.querySelector('.send-btn');
-    if (sendBtn) {
-      sendBtn.disabled = false;
-      sendBtn.textContent = 'Send';
-    }
-    SendController.finishSend();
-  }, 1000);
-}
-
-function uploadFile(callback) {
-  if (!selectedFile) {
-    callback(null);
-    return;
-  }
-  
-  const formData = new FormData();
-  formData.append('file', selectedFile);
-  
-  const xhr = new XMLHttpRequest();
-  const progressBar = document.querySelector('.progress-bar');
-  const uploadPreview = document.querySelector('.upload-preview');
-  
-  if (uploadPreview) {
-    uploadPreview.style.display = 'flex';
-    uploadPreview.innerHTML = `📎 ${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
-  }
-  
-  if (progressBar) {
-    progressBar.style.width = '0%';
-  }
-  
-  xhr.upload.addEventListener('progress', (e) => {
-    if (e.lengthComputable && progressBar) {
-      const percentComplete = (e.loaded / e.total) * 100;
-      progressBar.style.width = percentComplete + '%';
-    }
-  });
-  
-  xhr.onload = function() {
-    if (xhr.status === 200) {
-      try {
-        const response = JSON.parse(xhr.responseText);
-        if (response.success) {
-          callback(response.file);
-        } else {
-          showNotification('Upload failed: ' + response.message, 'error');
-          callback(null);
-        }
-      } catch (e) {
-        showNotification('Upload failed: Invalid response', 'error');
-        callback(null);
-      }
-    } else {
-      showNotification('Upload failed with status: ' + xhr.status, 'error');
-      callback(null);
-    }
-  };
-  
-  xhr.onerror = function() {
-    showNotification('Upload failed. Please check your connection.', 'error');
-    callback(null);
-  };
-  
-  xhr.open('POST', '/upload');
-  xhr.send(formData);
-}
-
-// ===== FILE HANDLING =====
-function handleFileSelect(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  
-  // Check file size (max 10MB)
-  const maxSize = 10 * 1024 * 1024;
-  if (file.size > maxSize) {
-    showNotification('File size too large. Maximum size is 10MB.', 'error');
-    event.target.value = '';
-    return;
-  }
-  
-  selectedFile = file;
-}
-
-// ===== NOTIFICATION SYSTEM =====
-function showNotification(message, type = 'info') {
-  // Remove existing notifications
-  const existing = document.querySelector('.notification');
-  if (existing) {
-    existing.remove();
-  }
-  
-  const notification = document.createElement('div');
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  
-  document.body.appendChild(notification);
-  
-  // Auto-remove after 5 seconds
-  setTimeout(() => {
-    if (notification.parentNode) {
-      notification.remove();
-    }
-  }, 5000);
-}
-
-// ===== TYPING INDICATOR =====
-function showTypingIndicator(userId) {
-  if (userId !== currentUserId) return;
-  
-  const container = document.querySelector('.messages-container');
-  if (!container) return;
-  
-  // Remove existing typing indicator
-  const existing = container.querySelector('.typing-indicator');
-  if (existing) {
-    existing.remove();
-  }
-  
-  const indicator = document.createElement('div');
-  indicator.className = 'typing-indicator';
-  indicator.innerHTML = `
-    <div class="typing-dot"></div>
-    <div class="typing-dot"></div>
-    <div class="typing-dot"></div>
-  `;
-  
-  container.appendChild(indicator);
-  scrollToBottomSmooth();
-}
-
-function hideTypingIndicator(userId) {
-  if (userId !== currentUserId) return;
-  
-  const container = document.querySelector('.messages-container');
-  if (!container) return;
-  
-  const indicator = container.querySelector('.typing-indicator');
-  if (indicator) {
-    indicator.remove();
-  }
-}
-
-// ===== SOCKET EVENT HANDLERS =====
-socket.on('connect', () => {
-  console.log('✅ Connected to server with ID:', socket.id);
-  ConnectionManager.showStatus('connected', 'Connected');
-  ConnectionManager.reset();
-  
-  // Register as agent
-  socket.emit('register_agent', {
-    agentId: 'agent_' + Date.now(),
-    name: 'Support Agent'
-  });
-});
-
-socket.on('disconnect', (reason) => {
-  console.log('❌ Disconnected:', reason);
-  ConnectionManager.showStatus('disconnected', 'Disconnected - Reconnecting...');
-});
-
-socket.on('connect_error', (error) => {
-  console.error('🔌 Connection error:', error);
-  ConnectionManager.showStatus('error', 'Connection error');
-});
-
-socket.on('registered', (data) => {
-  console.log('✅ Registered as agent:', data);
-});
-
-socket.on('user_list', (users) => {
-  console.log('👥 User list:', users);
-  updateUserList(users);
-});
-
-socket.on('new_message', (msg) => {
-  console.log('📨 New message:', msg);
-  
-  const userId = msg.userId || msg.senderId;
-  if (userId) {
-    displayMessage(msg, userId);
-    
-    // Update user list preview
-    const userItem = document.querySelector(`[data-user-id="${userId}"]`);
-    if (userItem) {
-      const preview = userItem.querySelector('.user-preview');
-      if (preview) {
-        preview.textContent = msg.text || msg.message || 'Attachment';
-      }
-    }
-  }
-});
-
-socket.on('message_history', (data) => {
-  console.log('📜 Message history for', data.userId, ':', data.messages.length, 'messages');
-  
-  const storedMessages = Storage.loadMessages(data.userId);
-  const allMessages = mergeMessages(storedMessages, data.messages);
-  
-  if (data.userId === currentUserId) {
-    displayMessages(data.userId, allMessages);
-  }
-  
-  Storage.saveMessages(data.userId, allMessages);
-});
-
-socket.on('user_typing', (data) => {
-  if (data.userId === currentUserId) {
-    showTypingIndicator(data.userId);
-    
-    // Clear previous timeout
-    if (userTypingTimeout) {
-      clearTimeout(userTypingTimeout);
-    }
-    
-    // Hide typing indicator after 3 seconds
-    userTypingTimeout = setTimeout(() => {
-      hideTypingIndicator(data.userId);
-    }, 3000);
-  }
-});
-
-socket.on('user_stop_typing', (data) => {
-  if (data.userId === currentUserId) {
-    hideTypingIndicator(data.userId);
-  }
-});
-
-socket.on('user_connected', (user) => {
-  console.log('🟢 User connected:', user);
-  showNotification(`${user.name} is now online`, 'success');
-});
-
-socket.on('user_disconnected', (user) => {
-  console.log('🔴 User disconnected:', user);
-  showNotification(`${user.name} is now offline`, 'warning');
-});
-
-// ===== MESSAGE MERGING =====
-function mergeMessages(localMessages, serverMessages) {
-  const messageMap = new Map();
-  
-  // Add local messages
-  localMessages.forEach(msg => {
-    if (msg.id && !msg.optimistic) {
-      messageMap.set(msg.id, msg);
-    }
-  });
-  
-  // Add/overwrite with server messages
-  serverMessages.forEach(msg => {
-    if (msg.id) {
-      messageMap.set(msg.id, msg);
-    }
-  });
-  
-  // Convert to array and sort
-  const merged = Array.from(messageMap.values());
-  merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  
-  return merged;
-}
-
-// ===== EVENT LISTENERS =====
-function setupEventListeners() {
-  // Back button
-  const backBtn = document.querySelector('.back-button');
-  if (backBtn) {
-    backBtn.addEventListener('click', hideChatDetail);
-  }
-  
-  // Send button
-  const sendBtn = document.querySelector('.send-btn');
-  if (sendBtn) {
-    sendBtn.addEventListener('click', sendMessage);
-  }
-  
-  // Message input
-  const messageInput = document.querySelector('.message-input');
-  if (messageInput) {
-    messageInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-    
-    // Auto-resize
-    messageInput.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-    });
-    
-    // Typing indicator
-    let typingTimeout;
-    messageInput.addEventListener('input', () => {
-      if (currentUserId) {
-        socket.emit('agent_typing', { userId: currentUserId });
-        
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-          socket.emit('agent_stop_typing', { userId: currentUserId });
-        }, 1000);
-      }
-    });
-  }
-  
-  // File input
-  const fileInput = document.getElementById('fileInput');
-  if (fileInput) {
-    fileInput.addEventListener('change', handleFileSelect);
-  }
-  
-  // File attach button
-  const attachBtn = document.querySelector('.file-attach-btn');
-  if (attachBtn) {
-    attachBtn.addEventListener('click', () => {
-      fileInput.click();
-    });
-  }
-  
-  // Handle mobile back button
-  window.addEventListener('popstate', (e) => {
-    if (document.querySelector('.chat-detail-view.active')) {
-      hideChatDetail();
-      history.pushState(null, '', window.location.pathname);
-    }
-  });
-  
-  // Prevent drag-and-drop file upload (for simplicity)
-  document.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-  
-  document.addEventListener('drop', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    showNotification('Please use the attachment button to send files', 'info');
-  });
-}
-
-// ===== INITIALIZATION =====
-function init() {
-  console.log('🚀 Initializing agent chat...');
-  
-  // Initialize managers
-  ConnectionManager.init();
-  
-  // Setup event listeners
-  setupEventListeners();
-  
-  // Setup mobile scrolling
-  setupMobileScrolling();
-  
-  // Handle viewport height for mobile
-  function setViewportHeight() {
-    const vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-  }
-  
-  window.addEventListener('resize', setViewportHeight);
-  setViewportHeight();
-  
-  // Load any saved state
-  const savedState = Storage.load('state');
-  if (savedState) {
-    console.log('📱 Restored saved state');
-  }
-  
-  console.log('✅ Agent chat initialized');
-}
-
-// ===== CLEANUP =====
-window.addEventListener('beforeunload', () => {
-  // Save all messages
-  Object.keys(messages).forEach(userId => {
-    Storage.saveMessages(userId, messages[userId]);
-  });
-  
-  // Save state
-  Storage.save('state', {
-    currentUserId: currentUserId,
-    lastActive: Date.now()
-  });
-  
-  // Send disconnect event
-  if (socket.connected) {
-    socket.emit('agent_disconnecting');
-  }
-});
-
-// ===== START APPLICATION =====
-document.addEventListener('DOMContentLoaded', init);
