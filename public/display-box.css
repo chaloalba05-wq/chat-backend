@@ -11,7 +11,7 @@ html, body {
     width: 100%;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #f8f9fa;
-    overflow: hidden; /* Prevent body scrolling - KEEP THIS */
+    overflow: hidden; /* Prevent body scrolling */
 }
 
 /* ===== MAIN CHAT CONTAINER ===== */
@@ -28,7 +28,6 @@ html, body {
     display: flex;
     flex-direction: column;
     z-index: 1000;
-    /* REMOVED: overflow: hidden - This was preventing scroll */
 }
 
 /* ===== CHAT WRAPPER ===== */
@@ -39,7 +38,8 @@ html, body {
     width: 100%;
     min-height: 0;
     flex: 1;
-    /* REMOVED: overflow: hidden - This was preventing scroll */
+    min-height: 0 !important; /* Added fix */
+    overflow: hidden; /* Added fix */
 }
 
 /* ===== CHAT HEADER - UPDATED (NOW VISIBLE WITH BACK BUTTON) ===== */
@@ -99,64 +99,50 @@ html, body {
 /* ===== MESSAGES SECTION - FIXED FOR SCROLLING ===== */
 .messages-section {
     flex: 1; /* Takes remaining space */
-    display: flex;
-    flex-direction: column;
-    min-height: 0; /* CRITICAL: Allows shrinking */
-    position: relative;
+    position: relative; /* CRITICAL for absolute positioning of child */
     background: #f8f9fa;
-    /* REMOVED: overflow: hidden - This was the main issue! */
-    /* ADDED: These ensure proper scroll container */
-    height: 100%;
-    overflow: visible;
+    overflow: hidden; /* CRITICAL: Contain the scrolling child */
+    min-height: 0; /* Allow it to shrink */
+    flex: 1 1 0%; /* Added fix */
+    min-height: 0 !important; /* Added fix */
 }
 
-/* ===== SCROLLABLE MESSAGES CONTAINER - FIXED ===== */
+/* ===== SCROLLABLE MESSAGES CONTAINER - FIXED WITH ABSOLUTE POSITIONING ===== */
 .messages-container {
-    flex: 1;
+    position: absolute; /* Use absolute positioning for reliable scrolling */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
+    padding-bottom: 32px; /* Add space at bottom for messages */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     background: #f8f9fa;
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    /* ADDED: These properties ensure proper scrolling */
-    position: relative;
-    height: 100%;
-    max-height: 100%;
-    /* Ensure proper flex behavior */
-    flex-grow: 1;
-    flex-shrink: 1;
-    flex-basis: 0;
 }
 
-/* Bottom padding for messages - FIXED */
-.messages-container::after {
+/* Remove the ::after pseudo-element since we're using padding-bottom instead */
+/* .messages-container::after {
     content: '';
     display: block;
-    height: 8px; /* Reduced from 16px */
+    height: 8px;
     width: 100%;
     flex-shrink: 0;
     pointer-events: none;
-}
+} */
 
-/* Ensure message container can shrink properly */
-.messages-container > * {
-    flex-shrink: 0;
-}
-
-/* Important: Make sure messages align to top */
+/* Keep messages aligned to top */
 .messages-container {
-    justify-content: flex-start; /* Align to top instead of stretch */
+    justify-content: flex-start;
 }
 
-/* Fix for empty container - ensures it can grow */
-.messages-container:empty::before {
-    content: '';
-    flex: 1;
-    min-height: 1px;
+/* Ensure message bubbles don't shrink */
+.message-bubble {
+    flex-shrink: 0;
 }
 
 /* ===== SCROLLBAR STYLING - IMPROVED VISIBILITY ===== */
@@ -202,7 +188,6 @@ html, body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     line-height: 1.5;
     margin-bottom: 8px;
-    flex-shrink: 0;
     align-self: flex-start;
 }
 
@@ -473,6 +458,7 @@ html, body {
     
     .messages-container {
         padding: 12px;
+        padding-bottom: 28px;
     }
     
     .input-section {
@@ -529,6 +515,7 @@ html, body {
     
     .messages-container {
         padding: 10px;
+        padding-bottom: 24px;
     }
     
     .input-section {
@@ -587,7 +574,9 @@ html, body {
 }
 
 /* ===== ALTERNATIVE FIX - Use this if scrolling still doesn't work ===== */
-/* Uncomment if needed:
+/* Uncomment the section below if the main fix doesn't work for your browser */
+
+/*
 .chat-container-alt {
     display: flex;
     flex-direction: column;
@@ -607,5 +596,17 @@ html, body {
     right: 0;
     bottom: 0;
     overflow-y: auto;
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+    background: #f8f9fa;
 }
+*/
+
+/* ===== DEBUG HELPER - Uncomment to see layout boundaries ===== */
+/*
+.chat-container { border: 2px solid red; }
+.chat-wrapper { border: 2px solid blue; }
+.messages-section { border: 2px solid green; }
+.messages-container { border: 2px solid orange; }
+.input-section { border: 2px solid purple; }
 */
