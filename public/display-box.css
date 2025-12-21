@@ -8,14 +8,17 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
 }
 
 html, body {
     height: 100%;
     width: 100%;
-    overflow: hidden; /* prevent double scroll */
-    touch-action: pan-y;
-    overscroll-behavior: none;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Changed from 'none' to allow scrolling */
+    touch-action: pan-y pan-x; /* Allow both vertical and horizontal panning */
+    overscroll-behavior: none; /* Prevent pull-to-refresh */
 }
 
 body { 
@@ -25,9 +28,8 @@ body {
     height: 100vh;
     height: -webkit-fill-available;
     height: 100dvh; /* Dynamic viewport height for mobile */
-    overflow-y: auto;
-    overflow-x: hidden;
-    position: relative; /* Changed from fixed */
+    overflow: hidden;
+    position: fixed; /* Prevent body scrolling on mobile */
     width: 100%;
 }
 
@@ -70,20 +72,22 @@ body {
 /* ===== MAIN LAYOUT ===== */
 .container { 
   display: flex; 
-  height: 100%; /* Use full height */
+  height: calc(100dvh - 70px); /* Use dynamic viewport height */
+  height: calc(var(--vh, 100vh) - 70px); /* Fallback */
   width: 100%;
   position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
 }
 
 /* ===== SIDEBAR ===== */
 .sidebar { 
-    display: flex;
-    flex-direction: column;
-    height: 100%;       /* allows child flex:1 to work */
-    width: 100%;
-    overflow: hidden; 
+  width: 100%;
+  height: 100%;
+  background: white; 
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
 }
 
 .sidebar-header { 
@@ -174,18 +178,21 @@ body {
 .muted { background: #ffebee; color: #c62828; }
 .unmuted { background: #e8f5e9; color: #2e7d32; }
 
-/* ===== USER LIST - FIXED SCROLLING ===== */
+/* ===== USER LIST ===== */
 .user-list {
-  flex: 1;                  /* fills available space in sidebar */
-  min-height: 0;            /* CRITICAL for flex scrolling on mobile */
-  overflow-y: auto;         /* enables vertical scrolling */
-  overflow-x: hidden;       /* prevent horizontal scroll */
-  -webkit-overflow-scrolling: touch; /* smooth iOS momentum scrolling */
-  overscroll-behavior: contain;     /* prevent scroll chaining */
-  background: #f8f9fa;      /* optional styling */
-  display: flex;
-  flex-direction: column;   /* ensures child items stack vertically */
-  width: 100%;
+  flex: 1;
+  position: absolute; /* Absolute positioning for guaranteed scrolling */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #667eea #f1f1f1;
+  background: #f8f9fa;
+  touch-action: pan-y; /* Allow vertical panning only */
 }
 
 .user-list-title {
@@ -210,6 +217,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: clamp(10px, 2vw, 12px);
+  touch-action: manipulation;
   background: white;
   -webkit-user-select: none;
   user-select: none;
@@ -290,14 +298,19 @@ body {
 
 /* ===== CHAT DETAIL VIEW ===== */
 .chat-detail-view {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 1000;
-    background: #f8f9fa;
-    overflow: hidden; /* parent doesn't scroll, child scrolls */
-    touch-action: pan-y;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #f8f9fa;
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* keep header/input visible, scroll only messages */
+  touch-action: pan-y;
 }
 
 .chat-detail-view.active {
@@ -362,14 +375,11 @@ body {
 /* ===== CHAT CONTAINER - MOBILE OPTIMIZED ===== */
 .chat-container {
     flex: 1;
-    min-height: 0; /* critical */
+    min-height: 0; /* needed for flex children to scroll */
     display: flex;
     flex-direction: column;
-    overflow-y: auto; /* scrollable */
-    overflow-x: hidden;
-    width: 100%;
-    height: 100%;
-    -webkit-overflow-scrolling: touch; /* iOS momentum */
+    background: #f8f9fa;
+    position: relative;
 }
 
 /* ===== HEADER SECTION ===== */
@@ -395,38 +405,41 @@ body {
     color: #666;
 }
 
-/* ===== MESSAGES SECTION - FIXED FLEX CONTAINER ===== */
+/* ===== MESSAGES SECTION - MOBILE FIXED SCROLLING ===== */
+/* ===== MESSAGES SECTION ===== */
 .messages-section {
     flex: 1;
-    min-height: 0; /* critical for flex scrolling */
+    min-height: 0; /* allows child flex to shrink properly */
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* prevent nested scroll conflicts */
-    position: relative;
-    width: 100%;
+    overflow: hidden; /* parent hides overflow, child scrolls */
+    background: #f8f9fa;
 }
 
-/* ===== SCROLLABLE MESSAGES CONTAINER - GUARANTEED MOBILE SCROLLING ===== */
+/* ===== SCROLLABLE MESSAGES CONTAINER ===== */
 .messages-container {
-    flex: 1;
-    min-height: 0; /* critical for flex scrolling */
-    overflow-y: auto;
+    flex: 1; /* take up remaining space */
+    min-height: 0; /* required for proper flex scrolling */
+    overflow-y: auto; /* vertical scroll */
     overflow-x: hidden;
-    -webkit-overflow-scrolling: touch; /* smooth iOS scrolling */
+    padding: 16px;
     scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch; /* momentum scroll iOS */
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
-    padding: 16px;
     background: #f8f9fa;
     width: 100%;
+    height: 100%;
     
     /* Mobile touch optimization */
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     will-change: transform;
-    touch-action: pan-y; /* Allow vertical scrolling only */
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
     
-    /* Always show scrollbar */
     scrollbar-width: thin;
     scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
 }
@@ -440,9 +453,9 @@ body {
     pointer-events: none;
 }
 
-/* PERMANENT SCROLLBAR STYLING */
+/* ===== SCROLLBAR STYLING ===== */
 .messages-container::-webkit-scrollbar {
-    width: 6px; /* Thinner for mobile */
+    width: 6px;
     height: 6px;
 }
 
@@ -460,12 +473,7 @@ body {
     border: 1px solid transparent;
     background-clip: padding-box;
     min-height: 40px;
-    
-    background-image: linear-gradient(
-        to bottom,
-        rgba(102, 126, 234, 0.7),
-        rgba(102, 126, 234, 0.9)
-    );
+    background-image: linear-gradient(to bottom, rgba(102, 126, 234, 0.7), rgba(102, 126, 234, 0.9));
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
@@ -476,15 +484,16 @@ body {
     background: #667eea;
 }
 
+
 /* ===== INPUT SECTION ===== */
 .input-section {
     flex-shrink: 0;
     background: white;
     border-top: 1px solid #e8e8e8;
+    padding: 16px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
-    z-index: 10;
-    position: sticky;
-    bottom: 0;
+    position: relative;
+    z-index: 5;
 }
 
 .input-wrapper {
@@ -663,7 +672,7 @@ body {
 
 /* ===== SCROLL TO BOTTOM BUTTON ===== */
 .scroll-bottom-btn {
-    position: fixed;
+    position: fixed; /* Fixed to viewport for mobile */
     bottom: 90px;
     right: 20px;
     width: 40px;
@@ -748,6 +757,11 @@ body {
     flex-shrink: 0;
     width: 100%;
     height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .empty-state p {
@@ -940,7 +954,8 @@ body {
   }
   
   .container {
-    height: 100%; /* Use full height */
+    height: calc(100dvh - 60px);
+    height: calc(var(--vh, 100vh) - 60px);
   }
   
   #header {
@@ -1006,6 +1021,11 @@ body {
 }
 
 @media (max-width: 480px) {
+  .container {
+    height: calc(100dvh - 56px);
+    height: calc(var(--vh, 100vh) - 56px);
+  }
+  
   #header {
     min-height: 56px;
     padding: 8px 12px;
@@ -1075,7 +1095,7 @@ body {
   
   /* Mobile-specific scrollbar */
   .messages-container::-webkit-scrollbar {
-    width: 4px;
+    width: 6px;
   }
 }
 
@@ -1108,14 +1128,15 @@ body {
   }
 }
 
+/* ===== MOBILE SCROLLING FIXES ===== */
 /* iOS momentum scrolling */
 @supports (-webkit-touch-callout: none) {
-    .messages-container,
-    .user-list {
+    .messages-container {
         -webkit-overflow-scrolling: touch;
         overflow-y: scroll;
     }
     
+    /* Fix for iOS elastic scrolling */
     body {
         overscroll-behavior-y: none;
     }
@@ -1123,16 +1144,14 @@ body {
 
 /* Android Chrome fix */
 @supports (-webkit-appearance:none) and (not (-webkit-overflow-scrolling:touch)) {
-    .messages-container,
-    .user-list {
+    .messages-container {
         overflow-y: auto;
     }
 }
 
 /* Edge/IE fix */
 @supports (-ms-ime-align:auto) {
-    .messages-container,
-    .user-list {
+    .messages-container {
         overflow-y: auto;
         -ms-overflow-style: -ms-autohiding-scrollbar;
     }
@@ -1140,8 +1159,7 @@ body {
 
 /* Firefox fix */
 @-moz-document url-prefix() {
-    .messages-container,
-    .user-list {
+    .messages-container {
         scrollbar-width: thin;
         scrollbar-color: rgba(102, 126, 234, 0.6) #f1f1f1;
     }
