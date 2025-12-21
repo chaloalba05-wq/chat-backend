@@ -31,8 +31,6 @@ const agentId = localStorage.getItem("agentId");
 
 document.getElementById("header").textContent = `Chat with ${whatsapp}`;
 
-if (!agentId || !whatsapp) window.location.href = "agent.html";
-
 // Connect socket with reconnection enabled
 const socket = io({ 
   reconnection: true, 

@@ -50,7 +50,7 @@ const broadcastMessages = [];      // All messages in broadcast room
 // This ensures agents are always available even on server restart
 function preRegisterDefaultAgents() {
   const defaultAgents = [
-    { id: "agent1", name: "Agent 1", password: "agent1", filename: "agent1.html" },
+    { id: "agent1", name: "agent1", password: "agent1", filename: "agent1.html" },
     { id: "agent2", name: "Agent 2", password: "agent2", filename: "agent2.html" },
     { id: "agent3", name: "Agent 3", password: "agent3", filename: "agent3.html" }
   ];

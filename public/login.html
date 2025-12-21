@@ -30,11 +30,15 @@ document.getElementById("loginBtn").addEventListener("click", () => {
     return;
   }
 
+  // Remove previous listeners to avoid duplicates
+  socket.off("agent_registration_response");
+  socket.off("agent_login_response");
+
   // 1️⃣ First, register the agent (server will skip if already exists)
   socket.emit("register_agent", { id, name: id, password });
 
   // Listen for registration response
-  socket.once("agent_registration_response", (res) => {
+  socket.on("agent_registration_response", (res) => {
     if (!res.success) {
       document.getElementById("errorMsg").textContent = "Registration failed: " + res.message;
       return;
@@ -45,7 +49,7 @@ document.getElementById("loginBtn").addEventListener("click", () => {
     // 2️⃣ Then, login as the agent
     socket.emit("agent_login", { agentId: id, password, persistent: true });
 
-    socket.once("agent_login_response", (loginRes) => {
+    socket.on("agent_login_response", (loginRes) => {
       if (!loginRes.success) {
         document.getElementById("errorMsg").textContent = "Login failed: " + loginRes.message;
         return;
