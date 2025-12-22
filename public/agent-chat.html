@@ -580,7 +580,7 @@ body {
       
       <!-- Messages Container - This will scroll -->
       <div id="messages">
-        <div class="empty-state">Loading messages...</div>
+        <div class="empty-state">Connecting...</div>
       </div>
     </div>
     
@@ -594,8 +594,8 @@ body {
           <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
             📎
           </button>
-          <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
-          <button class="send-btn" onclick="sendMessage()" id="sendButton">Send</button>
+          <textarea id="messageInput" placeholder="Type your message..." rows="1" disabled></textarea>
+          <button class="send-btn" onclick="sendMessage()" id="sendButton" disabled>Send</button>
         </div>
       </div>
     </div>
@@ -613,16 +613,22 @@ body {
 // ===== ESSENTIAL VARIABLES =====
 const params = new URLSearchParams(window.location.search);
 const whatsapp = params.get("whatsapp");
-const agentId = localStorage.getItem("agentId");
+const agentId = "agent1"; // HARDCODED TO FIX THE ISSUE
+const agentPassword = "agent1"; // HARDCODED TO FIX THE ISSUE
 let isScrolledToBottom = true;
 let displayedMessageIds = new Set();
 let connectionTimeout;
 let messageLoadTimeout;
+let isAgentLoggedIn = false;
 let sendController = {
   isSending: false,
   canSend() {
     if (this.isSending) {
       console.log('⚠️ Already sending, please wait...');
+      return false;
+    }
+    if (!isAgentLoggedIn) {
+      console.log('⚠️ Agent not logged in yet');
       return false;
     }
     return true;
@@ -669,9 +675,28 @@ function updateStatus(status, text) {
   statusEl.className = `connection-status ${status}`;
 }
 
-// ===== MESSAGE LOADING WITH TIMEOUT =====
-function loadMessagesWithTimeout() {
-  if (whatsapp && agentId) {
+// ===== AGENT LOGIN FUNCTION =====
+function loginAgent() {
+  console.log(`Attempting to login agent: ${agentId}`);
+  socket.emit("agent_login", { 
+    agentId: agentId, 
+    password: agentPassword, 
+    persistent: true 
+  });
+}
+
+// ===== JOIN USER ROOM FUNCTION =====
+function joinUserRoom() {
+  if (whatsapp && isAgentLoggedIn) {
+    console.log(`Joining user room for: ${whatsapp}`);
+    socket.emit("join_user_room", { whatsapp });
+  }
+}
+
+// ===== MESSAGE LOADING =====
+function loadMessages() {
+  if (whatsapp && isAgentLoggedIn) {
+    console.log(`Loading messages for: ${whatsapp}`);
     socket.emit("get_messages", { whatsapp, agentId });
     
     messageLoadTimeout = setTimeout(() => {
@@ -683,12 +708,19 @@ function loadMessagesWithTimeout() {
   }
 }
 
-// ===== JOIN USER ROOM FUNCTION =====
-function joinUserRoom() {
-  if (whatsapp && agentId) {
-    console.log(`Joining user room for: ${whatsapp}`);
-    socket.emit("join_user_room", { whatsapp });
-  }
+// ===== ENABLE/DISABLE CHAT CONTROLS =====
+function enableChatControls() {
+  document.getElementById("messageInput").disabled = false;
+  document.getElementById("sendButton").disabled = false;
+  document.getElementById("messageInput").placeholder = "Type your message...";
+  console.log("✅ Chat controls enabled");
+}
+
+function disableChatControls() {
+  document.getElementById("messageInput").disabled = true;
+  document.getElementById("sendButton").disabled = true;
+  document.getElementById("messageInput").placeholder = "Connecting...";
+  console.log("⏳ Chat controls disabled");
 }
 
 // ===== SOCKET CONNECTION =====
@@ -702,41 +734,76 @@ const socket = io("https://chat-backend-p2b9.onrender.com", {
 
 // Connection events
 socket.on("connect", () => {
-  console.log("✅ Connected");
+  console.log("✅ Socket Connected");
   updateStatus('connected', 'Connected');
   clearTimeout(connectionTimeout);
-  clearTimeout(messageLoadTimeout);
   
   // Show chat interface
   document.getElementById('header').style.display = 'flex';
   document.getElementById('chat').style.display = 'flex';
   
-  // FIXED: Join user room after connection
-  joinUserRoom();
-  loadMessagesWithTimeout();
+  // FIXED: Login agent first, then join room
+  loginAgent();
 });
 
 socket.on("disconnect", () => {
-  console.log("❌ Disconnected");
+  console.log("❌ Socket Disconnected");
   updateStatus('disconnected', 'Disconnected');
+  isAgentLoggedIn = false;
+  disableChatControls();
 });
 
 socket.on("reconnect", () => {
-  console.log("🔄 Reconnected");
-  updateStatus('connected', 'Connected');
-  joinUserRoom(); // FIXED: Re-join room on reconnect
-  loadMessagesWithTimeout();
+  console.log("🔄 Socket Reconnected");
+  updateStatus('connected', 'Reconnected');
+  loginAgent(); // Re-login on reconnect
 });
 
-socket.on("connect_error", () => {
+socket.on("connect_error", (error) => {
+  console.error("Connection error:", error);
   updateStatus('disconnected', 'Connection Error');
+  isAgentLoggedIn = false;
+  disableChatControls();
   const messagesDiv = document.getElementById("messages");
   messagesDiv.innerHTML = '<div class="empty-state">Connection error. Reconnecting...</div>';
+});
+
+// FIXED: AGENT LOGIN RESPONSE HANDLER
+socket.on("agent_login_response", (response) => {
+  console.log("Agent login response:", response);
+  
+  if (response.success) {
+    console.log(`✅ Agent logged in successfully: ${response.name}`);
+    isAgentLoggedIn = true;
+    updateStatus('connected', `Agent: ${response.name}`);
+    
+    // Enable chat controls
+    enableChatControls();
+    
+    // Now join the user room and load messages
+    joinUserRoom();
+    loadMessages();
+    
+    // Clear any loading messages
+    const messagesDiv = document.getElementById("messages");
+    if (messagesDiv.innerHTML.includes('Connecting...')) {
+      messagesDiv.innerHTML = '<div class="empty-state">Loading messages...</div>';
+    }
+  } else {
+    console.error(`❌ Agent login failed: ${response.message}`);
+    isAgentLoggedIn = false;
+    updateStatus('disconnected', 'Login Failed');
+    disableChatControls();
+    
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv.innerHTML = `<div class="empty-state">Login failed: ${response.message}</div>`;
+  }
 });
 
 // FIXED: Add handler for room join confirmation
 socket.on("user_room_joined", (data) => {
   console.log(`✅ Successfully joined room for: ${data.whatsapp}`);
+  console.log(`✅ Ready to send/receive messages for ${data.whatsapp}`);
 });
 
 // ===== SCROLL MANAGEMENT =====
@@ -907,7 +974,7 @@ socket.on("message_history", (messages) => {
   displayedMessageIds.clear();
   
   if (messages.length === 0) {
-    messagesDiv.innerHTML = '<div class="empty-state">No messages yet</div>';
+    messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
     return;
   }
   
@@ -935,7 +1002,7 @@ socket.on("new_message", (msg) => {
 
 socket.on("broadcast_message", (msg) => {
   // Listen for broadcast messages that might be from this agent
-  if (msg.whatsapp === whatsapp || msg.agentId === agentId) {
+  if (msg.whatsapp === whatsapp) {
     displayMessage(msg);
   }
 });
@@ -944,6 +1011,18 @@ socket.on("broadcast_message", (msg) => {
 socket.on("user_message_update", (msg) => {
   if (msg.whatsapp === whatsapp) {
     displayMessage(msg);
+  }
+});
+
+// FIXED: Add handler for agent's own messages (from broadcast)
+socket.on("agent_message_success", (msg) => {
+  if (msg.whatsapp === whatsapp) {
+    // Update temporary message to permanent
+    const tempElement = document.querySelector(`[data-message-id="temp_"]`);
+    if (tempElement) {
+      displayMessage(msg);
+      tempElement.remove();
+    }
   }
 });
 
@@ -958,6 +1037,11 @@ async function sendMessage() {
   
   if (!text && !fileInput.files.length) {
     alert("Please enter a message or select a file");
+    return;
+  }
+  
+  if (!isAgentLoggedIn) {
+    alert("Agent not logged in. Please wait...");
     return;
   }
   
@@ -984,7 +1068,8 @@ async function sendMessage() {
   const messageData = {
     whatsapp: whatsapp,
     message: text,
-    timestamp: tempMsg.timestamp
+    timestamp: tempMsg.timestamp,
+    agentId: agentId
   };
   
   if (fileInput.files.length > 0) {
@@ -1012,7 +1097,7 @@ async function sendMessage() {
         }
       }
       
-      // FIXED: Use "agent_message" event instead of "user_message"
+      console.log('Sending agent message:', messageData);
       socket.emit("agent_message", messageData);
       resetInput();
     };
@@ -1028,7 +1113,7 @@ async function sendMessage() {
     
     reader.readAsDataURL(file);
   } else {
-    // FIXED: Use "agent_message" event instead of "user_message"
+    console.log('Sending agent message:', messageData);
     socket.emit("agent_message", messageData);
     resetInput();
   }
@@ -1109,13 +1194,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   
-  if (!agentId) {
-    alert("Please login first");
-    window.location.href = "/login.html";
-    return;
-  }
+  console.log(`Initializing chat for: ${whatsapp}`);
+  console.log(`Agent ID: ${agentId}`);
   
   updateStatus('connecting', 'Connecting...');
+  disableChatControls(); // Start with controls disabled
   
   connectionTimeout = setTimeout(() => {
     if (socket.disconnected) {
