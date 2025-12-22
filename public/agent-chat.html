@@ -750,7 +750,7 @@ async function sendMessage() {
         }
       }
       
-      socket.emit("agent_message", messageData);
+      socket.emit("user_message", messageData);
       resetInput();
     };
     
@@ -765,7 +765,7 @@ async function sendMessage() {
     
     reader.readAsDataURL(file);
   } else {
-    socket.emit("agent_message", messageData);
+    socket.emit("user_message", messageData);
     resetInput();
   }
   
@@ -808,27 +808,20 @@ document.getElementById("messageInput").addEventListener("keypress", (e) => {
 
 // ===== BACK BUTTON =====
 document.getElementById("backToDashboard").addEventListener("click", () => {
-  window.location.href = "/dashboard.html"; // Update as needed
+  window.location.href = "/agent1.html"; // Redirects to agent1.html
 });
-
-// ===== STATUS UPDATE =====
-function updateStatus(status, text) {
-  const statusEl = document.getElementById('connectionStatus');
-  statusEl.textContent = text;
-  statusEl.className = `connection-status ${status}`;
-}
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
   if (!whatsapp) {
     alert("No chat selected");
-    window.location.href = "/dashboard.html";
+    window.location.href = "/agent1.html"; // Redirects to agent1.html
     return;
   }
   
   if (!agentId) {
     alert("Please login first");
-    window.location.href = "/login.html";
+    window.location.href = "/login.html"; // Keep login separate
     return;
   }
   
