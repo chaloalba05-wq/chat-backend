@@ -172,6 +172,57 @@ body {
   font-size: 15px;
 }
 
+/* Attachment Styles */
+.attachment {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.attachment-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  display: block;
+}
+
+.attachment-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.user-message .attachment-file {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.attachment-icon {
+  font-size: 20px;
+}
+
+.attachment-info {
+  flex: 1;
+}
+
+.attachment-name {
+  font-weight: 500;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-size {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
 /* Input Section */
 .input-section {
   background: white;
@@ -263,6 +314,18 @@ body {
   visibility: visible;
 }
 
+/* Empty State */
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 40px 20px;
+  font-size: 16px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Mobile Optimizations */
 @media (max-width: 480px) {
   #header {
@@ -288,6 +351,10 @@ body {
     right: 12px;
     width: 32px;
     height: 32px;
+  }
+  
+  .attachment-image {
+    max-height: 150px;
   }
 }
 
@@ -352,6 +419,7 @@ const params = new URLSearchParams(window.location.search);
 const whatsapp = params.get("whatsapp");
 const agentId = localStorage.getItem("agentId");
 let isScrolledToBottom = true;
+let displayedMessageIds = new Set(); // Track displayed message IDs to prevent duplicates
 
 // Initialize
 document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
@@ -391,7 +459,7 @@ socket.on("connect_error", () => {
   updateStatus('disconnected', 'Connection Error');
 });
 
-// ===== SCROLL MANAGEMENT - THIS WILL WORK =====
+// ===== SCROLL MANAGEMENT =====
 function setupScrollListener() {
   const messagesDiv = document.getElementById("messages");
   const scrollBtn = document.getElementById("scrollToBottomBtn");
@@ -425,17 +493,91 @@ function scrollToBottomSmooth() {
   }
 }
 
+// ===== FILE ATTACHMENT DISPLAY =====
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function renderAttachment(attachment) {
+  if (!attachment) return '';
+  
+  let html = '<div class="attachment">';
+  
+  if (attachment.mimetype && attachment.mimetype.startsWith('image/')) {
+    // Image attachment
+    const imageUrl = attachment.data || attachment.url;
+    html += `
+      <img src="${imageUrl}" alt="${attachment.name || 'Image'}" class="attachment-image">
+    `;
+  } else {
+    // File attachment
+    const fileUrl = attachment.data || attachment.url;
+    const fileName = attachment.name || attachment.originalname || 'File';
+    const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
+    const icon = getFileIcon(attachment.mimetype);
+    
+    html += `
+      <a href="${fileUrl}" target="_blank" download="${fileName}" class="attachment-file">
+        <span class="attachment-icon">${icon}</span>
+        <div class="attachment-info">
+          <div class="attachment-name">${fileName}</div>
+          ${fileSize ? `<div class="attachment-size">${fileSize}</div>` : ''}
+        </div>
+      </a>
+    `;
+  }
+  
+  html += '</div>';
+  return html;
+}
+
+function getFileIcon(mimetype) {
+  if (!mimetype) return '📄';
+  
+  if (mimetype.startsWith('image/')) return '🖼️';
+  if (mimetype.startsWith('video/')) return '🎬';
+  if (mimetype.startsWith('audio/')) return '🎵';
+  if (mimetype.includes('pdf')) return '📕';
+  if (mimetype.includes('word') || mimetype.includes('document')) return '📝';
+  if (mimetype.includes('excel') || mimetype.includes('spreadsheet')) return '📊';
+  if (mimetype.includes('zip') || mimetype.includes('compressed')) return '🗜️';
+  
+  return '📄';
+}
+
 // ===== MESSAGE DISPLAY =====
 function displayMessage(msg) {
+  // Check for duplicate message ID
+  const messageId = msg.id || (msg.timestamp + '_' + (msg.text || ''));
+  if (displayedMessageIds.has(messageId)) {
+    console.log('⚠️ Skipping duplicate message:', messageId);
+    return;
+  }
+  
+  displayedMessageIds.add(messageId);
+  
   const messagesDiv = document.getElementById("messages");
   const emptyState = messagesDiv.querySelector('.empty-state');
   if (emptyState) emptyState.remove();
   
+  // Check if message already exists (update instead of create)
+  const existingMessage = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (existingMessage && existingMessage.dataset.isTemporary !== 'true') {
+    console.log('🔄 Updating existing message:', messageId);
+    updateMessageElement(existingMessage, msg);
+    return;
+  }
+  
   const div = document.createElement("div");
-  const isAgent = msg.sender === "agent";
+  const isAgent = msg.sender === "agent" || msg.sender === "agent";
   
   div.className = `message-container ${isAgent ? 'agent-message' : 'user-message'}`;
-  div.dataset.messageId = msg.id || Date.now().toString();
+  div.dataset.messageId = messageId;
+  div.dataset.isTemporary = msg.isTemporary ? 'true' : 'false';
   
   const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { 
     hour: '2-digit', minute: '2-digit' 
@@ -443,13 +585,23 @@ function displayMessage(msg) {
     hour: '2-digit', minute: '2-digit' 
   });
   
+  let content = msg.text || msg.message || '';
+  if (msg.attachment) {
+    content += renderAttachment(msg.attachment);
+  }
+  
   div.innerHTML = `
     <div class="message-header">
       <span class="message-sender">${isAgent ? 'You' : 'User'}</span>
       <span class="message-time">${time}</span>
     </div>
-    <div class="message-content">${msg.text || msg.message || ''}</div>
+    <div class="message-content">${content}</div>
   `;
+  
+  // If this is a temporary message, mark it for replacement
+  if (msg.isTemporary) {
+    div.style.opacity = '0.7';
+  }
   
   messagesDiv.appendChild(div);
   
@@ -459,17 +611,56 @@ function displayMessage(msg) {
   }
 }
 
+function updateMessageElement(element, msg) {
+  const isAgent = msg.sender === "agent" || msg.sender === "agent";
+  const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { 
+    hour: '2-digit', minute: '2-digit' 
+  }) : new Date().toLocaleTimeString([], { 
+    hour: '2-digit', minute: '2-digit' 
+  });
+  
+  let content = msg.text || msg.message || '';
+  if (msg.attachment) {
+    content += renderAttachment(msg.attachment);
+  }
+  
+  element.innerHTML = `
+    <div class="message-header">
+      <span class="message-sender">${isAgent ? 'You' : 'User'}</span>
+      <span class="message-time">${time}</span>
+    </div>
+    <div class="message-content">${content}</div>
+  `;
+  
+  element.style.opacity = '1';
+  element.dataset.isTemporary = 'false';
+}
+
 socket.on("message_history", (messages) => {
   const messagesDiv = document.getElementById("messages");
   messagesDiv.innerHTML = '';
+  displayedMessageIds.clear();
   
   if (messages.length === 0) {
     messagesDiv.innerHTML = '<div class="empty-state">No messages yet</div>';
     return;
   }
   
-  messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-         .forEach(msg => displayMessage(msg));
+  // Sort by timestamp and display without duplicates
+  const uniqueMessages = [];
+  const seenIds = new Set();
+  
+  messages
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .forEach(msg => {
+      const id = msg.id || (msg.timestamp + '_' + (msg.text || ''));
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueMessages.push(msg);
+      }
+    });
+  
+  uniqueMessages.forEach(msg => displayMessage(msg));
   
   setTimeout(scrollToBottom, 100);
 });
@@ -479,12 +670,33 @@ socket.on("new_message", (msg) => {
   displayMessage(msg);
 });
 
+// Handle message updates (for replacing temporary messages)
+socket.on("message_sent", (confirmedMsg) => {
+  if (confirmedMsg.whatsapp !== whatsapp) return;
+  
+  // Find and replace temporary message
+  const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
+  tempMessages.forEach(tempMsg => {
+    // Simple heuristic: if timestamps are close and content matches
+    const tempTime = new Date(tempMsg.dataset.messageId.replace('temp_', ''));
+    const confirmedTime = new Date(confirmedMsg.timestamp);
+    const timeDiff = Math.abs(tempTime - confirmedTime);
+    
+    if (timeDiff < 5000) { // Within 5 seconds
+      updateMessageElement(tempMsg, confirmedMsg);
+    }
+  });
+});
+
 // ===== MESSAGE SENDING =====
 async function sendMessage() {
   const text = document.getElementById("messageInput").value.trim();
   const fileInput = document.getElementById('fileInput');
   
-  if (!text && !fileInput.files.length) return;
+  if (!text && !fileInput.files.length) {
+    alert("Please enter a message or select a file");
+    return;
+  }
   
   const sendBtn = document.getElementById('sendButton');
   sendBtn.disabled = true;
@@ -495,7 +707,8 @@ async function sendMessage() {
     sender: 'agent',
     text: text || 'Sending file...',
     timestamp: new Date().toISOString(),
-    id: 'temp_' + Date.now()
+    id: 'temp_' + Date.now(),
+    isTemporary: true
   };
   
   displayMessage(tempMsg);
@@ -511,16 +724,43 @@ async function sendMessage() {
   // Handle file upload if present
   if (fileInput.files.length > 0) {
     const file = fileInput.files[0];
+    
+    // Show uploading preview
+    const preview = document.getElementById('filePreview');
+    preview.textContent = `📤 Uploading ${file.name}...`;
+    preview.style.display = 'block';
+    
     const reader = new FileReader();
     
     reader.onload = () => {
       messageData.attachment = {
         name: file.name,
         data: reader.result,
-        mimetype: file.type
+        mimetype: file.type,
+        size: file.size
       };
+      
+      // Update temporary message with file info
+      const attachmentHtml = renderAttachment(messageData.attachment);
+      const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
+      if (tempElement) {
+        const contentElement = tempElement.querySelector('.message-content');
+        if (contentElement) {
+          contentElement.innerHTML = (text || '') + attachmentHtml;
+        }
+      }
+      
       socket.emit("agent_message", messageData);
       resetInput();
+    };
+    
+    reader.onerror = () => {
+      alert('Error reading file. Please try again.');
+      resetInput();
+      // Remove the temporary message
+      const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
+      if (tempElement) tempElement.remove();
+      displayedMessageIds.delete(tempMsg.id);
     };
     
     reader.readAsDataURL(file);
@@ -546,7 +786,7 @@ document.getElementById('fileInput').addEventListener('change', function() {
   const file = this.files[0];
   if (file) {
     const preview = document.getElementById('filePreview');
-    const size = (file.size / 1024).toFixed(1) + ' KB';
+    const size = formatFileSize(file.size);
     preview.textContent = `📎 ${file.name} (${size})`;
     preview.style.display = 'block';
   }
@@ -606,6 +846,20 @@ window.addEventListener('resize', () => {
   }
   viewportHeight = window.innerHeight;
 });
+
+// Periodically clean up old temporary messages (in case they never get confirmed)
+setInterval(() => {
+  const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
+  const now = Date.now();
+  
+  tempMessages.forEach(msg => {
+    const tempTime = parseInt(msg.dataset.messageId.replace('temp_', ''));
+    if (now - tempTime > 30000) { // 30 seconds old
+      msg.remove();
+      displayedMessageIds.delete(msg.dataset.messageId);
+    }
+  });
+}, 10000);
 </script>
 </body>
 </html>
