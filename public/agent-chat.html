@@ -683,6 +683,14 @@ function loadMessagesWithTimeout() {
   }
 }
 
+// ===== JOIN USER ROOM FUNCTION =====
+function joinUserRoom() {
+  if (whatsapp && agentId) {
+    console.log(`Joining user room for: ${whatsapp}`);
+    socket.emit("join_user_room", { whatsapp });
+  }
+}
+
 // ===== SOCKET CONNECTION =====
 const socket = io("https://chat-backend-p2b9.onrender.com", {
   reconnection: true,
@@ -703,6 +711,8 @@ socket.on("connect", () => {
   document.getElementById('header').style.display = 'flex';
   document.getElementById('chat').style.display = 'flex';
   
+  // FIXED: Join user room after connection
+  joinUserRoom();
   loadMessagesWithTimeout();
 });
 
@@ -714,6 +724,7 @@ socket.on("disconnect", () => {
 socket.on("reconnect", () => {
   console.log("🔄 Reconnected");
   updateStatus('connected', 'Connected');
+  joinUserRoom(); // FIXED: Re-join room on reconnect
   loadMessagesWithTimeout();
 });
 
@@ -721,6 +732,11 @@ socket.on("connect_error", () => {
   updateStatus('disconnected', 'Connection Error');
   const messagesDiv = document.getElementById("messages");
   messagesDiv.innerHTML = '<div class="empty-state">Connection error. Reconnecting...</div>';
+});
+
+// FIXED: Add handler for room join confirmation
+socket.on("user_room_joined", (data) => {
+  console.log(`✅ Successfully joined room for: ${data.whatsapp}`);
 });
 
 // ===== SCROLL MANAGEMENT =====
@@ -920,6 +936,13 @@ socket.on("new_message", (msg) => {
 socket.on("broadcast_message", (msg) => {
   // Listen for broadcast messages that might be from this agent
   if (msg.whatsapp === whatsapp || msg.agentId === agentId) {
+    displayMessage(msg);
+  }
+});
+
+// FIXED: Add handler for user-specific messages
+socket.on("user_message_update", (msg) => {
+  if (msg.whatsapp === whatsapp) {
     displayMessage(msg);
   }
 });
