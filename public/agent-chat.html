@@ -917,29 +917,11 @@ socket.on("new_message", (msg) => {
   displayMessage(msg);
 });
 
-socket.on("message_sent", (confirmedMsg) => {
-  if (confirmedMsg.whatsapp !== whatsapp) return;
-  
-  const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
-  tempMessages.forEach(tempMsg => {
-    const tempTime = new Date(tempMsg.dataset.messageId.replace('temp_', ''));
-    const confirmedTime = new Date(confirmedMsg.timestamp);
-    const timeDiff = Math.abs(tempTime - confirmedTime);
-    
-    if (timeDiff < 5000) {
-      updateMessageElement(tempMsg, confirmedMsg);
-    }
-  });
-  
-  // Clear sending state
-  finishMessageSend();
-});
-
-// Handle message loading errors
-socket.on("get_messages_error", (error) => {
-  clearTimeout(messageLoadTimeout);
-  const messagesDiv = document.getElementById("messages");
-  messagesDiv.innerHTML = '<div class="empty-state">Failed to load messages</div>';
+socket.on("broadcast_message", (msg) => {
+  // Listen for broadcast messages that might be from this agent
+  if (msg.whatsapp === whatsapp || msg.agentId === agentId) {
+    displayMessage(msg);
+  }
 });
 
 // ===== MESSAGE SENDING =====
@@ -970,14 +952,14 @@ async function sendMessage() {
     text: text || 'Sending file...',
     timestamp: new Date().toISOString(),
     id: 'temp_' + Date.now(),
-    isTemporary: true
+    isTemporary: true,
+    whatsapp: whatsapp
   };
   
   displayMessage(tempMsg);
   
   const messageData = {
     whatsapp: whatsapp,
-    agentId: agentId,
     message: text,
     timestamp: tempMsg.timestamp
   };
@@ -1007,7 +989,8 @@ async function sendMessage() {
         }
       }
       
-      socket.emit("user_message", messageData);
+      // FIXED: Use "agent_message" event instead of "user_message"
+      socket.emit("agent_message", messageData);
       resetInput();
     };
     
@@ -1022,7 +1005,8 @@ async function sendMessage() {
     
     reader.readAsDataURL(file);
   } else {
-    socket.emit("user_message", messageData);
+    // FIXED: Use "agent_message" event instead of "user_message"
+    socket.emit("agent_message", messageData);
     resetInput();
   }
   
