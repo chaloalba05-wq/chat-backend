@@ -88,6 +88,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   background: #f8f9fa;
+  position: relative; /* Added for absolute positioning of messages */
 }
 
 /* Chat Header */
@@ -111,13 +112,18 @@ body {
 
 /* Messages Container - THIS IS THE KEY PART */
 #messages {
-  flex: 1;
+  position: absolute;
+  top: 53px; /* Height of chat-header */
+  bottom: 76px; /* Height of input-section */
+  left: 0;
+  right: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
   background: #f8f9fa;
   -webkit-overflow-scrolling: touch;
+  z-index: 1;
 }
 
 /* Message Bubbles */
@@ -184,6 +190,7 @@ body {
   max-height: 200px;
   border-radius: 8px;
   display: block;
+  cursor: pointer; /* Added for clickable images */
 }
 
 .attachment-file {
@@ -223,12 +230,17 @@ body {
   margin-top: 2px;
 }
 
-/* Input Section */
+/* Input Section - FIXED AT BOTTOM */
 .input-section {
   background: white;
   border-top: 1px solid #e8e8e8;
   padding: 12px 16px;
   flex-shrink: 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
 }
 
 .input-area {
@@ -289,7 +301,7 @@ body {
 /* Scroll to Bottom Button */
 .scroll-to-bottom-btn {
   position: fixed;
-  bottom: 80px;
+  bottom: 90px; /* Adjusted to be above input section */
   right: 20px;
   width: 36px;
   height: 36px;
@@ -339,6 +351,8 @@ body {
   
   #messages {
     padding: 12px;
+    top: 49px; /* Adjusted for mobile */
+    bottom: 72px; /* Adjusted for mobile */
   }
   
   .message-container {
@@ -347,7 +361,7 @@ body {
   }
   
   .scroll-to-bottom-btn {
-    bottom: 70px;
+    bottom: 84px; /* Adjusted for mobile */
     right: 12px;
     width: 32px;
     height: 32px;
@@ -363,6 +377,51 @@ body {
   .input-section {
     padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
+}
+
+/* Fullscreen Image Overlay */
+.image-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease;
+}
+
+.image-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.image-overlay img {
+  max-width: 90%;
+  max-height: 90%;
+  border-radius: 4px;
+  cursor: zoom-out;
+}
+
+.image-overlay-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: white;
+  font-size: 30px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
 </head>
@@ -398,7 +457,7 @@ body {
     <div class="empty-state">Loading messages...</div>
   </div>
   
-  <!-- Input Section -->
+  <!-- Input Section - Fixed at bottom -->
   <div class="input-section">
     <div class="file-preview" id="filePreview"></div>
     <div class="input-area">
@@ -410,6 +469,12 @@ body {
       <button class="send-btn" onclick="sendMessage()" id="sendButton">Send</button>
     </div>
   </div>
+</div>
+
+<!-- Fullscreen Image Overlay -->
+<div class="image-overlay" id="imageOverlay">
+  <span class="image-overlay-close" onclick="closeFullscreenImage()">×</span>
+  <img id="fullscreenImage" src="" alt="Fullscreen image">
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -516,6 +581,28 @@ function scrollToBottomSmooth() {
   }
 }
 
+// ===== FULLSCREEN IMAGE FUNCTIONALITY =====
+function showFullscreenImage(imageSrc) {
+  const overlay = document.getElementById('imageOverlay');
+  const fullscreenImg = document.getElementById('fullscreenImage');
+  fullscreenImg.src = imageSrc;
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFullscreenImage() {
+  const overlay = document.getElementById('imageOverlay');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// Close overlay when clicking outside the image
+document.getElementById('imageOverlay').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeFullscreenImage();
+  }
+});
+
 // ===== FILE ATTACHMENT DISPLAY =====
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
@@ -532,7 +619,7 @@ function renderAttachment(attachment) {
   
   if (attachment.mimetype && attachment.mimetype.startsWith('image/')) {
     const imageUrl = attachment.data || attachment.url;
-    html += `<img src="${imageUrl}" alt="${attachment.name || 'Image'}" class="attachment-image">`;
+    html += `<img src="${imageUrl}" alt="${attachment.name || 'Image'}" class="attachment-image" onclick="showFullscreenImage('${imageUrl}')">`;
   } else {
     const fileUrl = attachment.data || attachment.url;
     const fileName = attachment.name || attachment.originalname || 'File';
@@ -603,6 +690,12 @@ function displayMessage(msg) {
   
   messagesDiv.appendChild(div);
   
+  // Make images in this message clickable for fullscreen
+  const images = div.querySelectorAll('.attachment-image');
+  images.forEach(img => {
+    img.style.cursor = 'pointer';
+  });
+  
   if (isScrolledToBottom || isAgent) {
     setTimeout(scrollToBottomSmooth, 50);
   }
@@ -631,6 +724,12 @@ function updateMessageElement(element, msg) {
   
   element.style.opacity = '1';
   element.dataset.isTemporary = 'false';
+  
+  // Make images in this updated message clickable for fullscreen
+  const images = element.querySelectorAll('.attachment-image');
+  images.forEach(img => {
+    img.style.cursor = 'pointer';
+  });
 }
 
 // Socket message handlers
@@ -800,6 +899,8 @@ document.getElementById("messageInput").addEventListener("keypress", (e) => {
 document.getElementById("backToDashboard").addEventListener("click", () => {
   window.location.href = "/agent1.html";
 });
+
+document.getElementById("scrollToBottomBtn").addEventListener("click", scrollToBottom);
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
