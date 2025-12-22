@@ -6,17 +6,132 @@
 <title>Chat</title>
 <script src="/socket.io/socket.io.js"></script>
 <style>
-body { font-family: Arial; display: flex; flex-direction: column; height: 100vh; margin: 0; }
-#header { background: #333; color: #fff; padding: 10px; }
-#messages { flex: 1; overflow-y: auto; padding: 10px; background: #f9f9f9; }
-.message { margin: 5px 0; }
-#inputSection { display: flex; padding: 10px; border-top: 1px solid #ccc; }
-#inputSection input[type=text] { flex: 1; padding: 5px; margin-right: 5px; }
-#inputSection button { padding: 5px 10px; }
+body { 
+  font-family: Arial; 
+  display: flex; 
+  flex-direction: column; 
+  height: 100vh; 
+  margin: 0; 
+}
+#header { 
+  background: #333; 
+  color: #fff; 
+  padding: 10px; 
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+#connectionStatus {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: #666;
+}
+#connectionStatus.connected { background: #2ecc71; }
+#connectionStatus.connecting { background: #f39c12; }
+#connectionStatus.disconnected { background: #e74c3c; }
+#messages { 
+  flex: 1; 
+  overflow-y: auto; 
+  padding: 10px; 
+  background: #f9f9f9; 
+  display: flex;
+  flex-direction: column;
+}
+.message { 
+  margin: 5px 0;
+  padding: 8px 12px;
+  border-radius: 15px;
+  max-width: 70%;
+  position: relative;
+  word-wrap: break-word;
+}
+.message.received { 
+  background: #e6e6e6;
+  align-self: flex-start;
+  border-bottom-left-radius: 5px;
+}
+.message.sent { 
+  background: #007aff;
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 5px;
+}
+.message-status {
+  font-size: 11px;
+  opacity: 0.8;
+  text-align: right;
+  margin-top: 2px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 3px;
+}
+.message.received .message-status {
+  justify-content: flex-start;
+  color: #666;
+}
+.message-header {
+  font-weight: bold;
+  margin-bottom: 3px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+.attachment {
+  margin-top: 5px;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 5px;
+  padding: 8px;
+  background: rgba(255,255,255,0.1);
+}
+.image-attachment {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 5px;
+  display: block;
+}
+.file-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+.file-attachment img {
+  width: 24px;
+  height: 24px;
+}
+#inputSection { 
+  display: flex; 
+  padding: 10px; 
+  border-top: 1px solid #ccc; 
+  background: white;
+}
+#inputSection input[type=text] { 
+  flex: 1; 
+  padding: 8px; 
+  margin-right: 5px; 
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+#inputSection button { 
+  padding: 8px 15px; 
+  background: #007aff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#inputSection button:hover {
+  background: #0056cc;
+}
 </style>
 </head>
 <body>
-<div id="header">Chat</div>
+<div id="header">
+  <span id="chatTitle">Chat</span>
+  <span id="connectionStatus">Connecting...</span>
+</div>
 <div id="messages"></div>
 <div id="inputSection">
   <input type="text" id="messageInput" placeholder="Type message...">
@@ -29,7 +144,10 @@ const params = new URLSearchParams(window.location.search);
 const whatsapp = params.get("whatsapp");
 const agentId = localStorage.getItem("agentId");
 
-document.getElementById("header").textContent = `Chat with ${whatsapp}`;
+document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
+
+// Connection status element
+const connectionStatus = document.getElementById("connectionStatus");
 
 // Connect socket with reconnection enabled
 const socket = io({ 
@@ -39,17 +157,123 @@ const socket = io({
   reconnectionDelayMax: 5000 
 });
 
-// Fetch chat history automatically for this user
-socket.emit("get_messages", { whatsapp, agentId });
+// Connection status handlers
+socket.on("connect", () => {
+  console.log("Connected to server");
+  connectionStatus.textContent = "Connected";
+  connectionStatus.className = "connected";
+  // Fetch chat history when connected
+  socket.emit("get_messages", { whatsapp, agentId });
+});
+
+socket.on("disconnect", () => {
+  console.log("Disconnected from server");
+  connectionStatus.textContent = "Disconnected";
+  connectionStatus.className = "disconnected";
+});
+
+socket.on("reconnect_attempt", () => {
+  console.log("Attempting to reconnect...");
+  connectionStatus.textContent = "Reconnecting...";
+  connectionStatus.className = "connecting";
+});
+
+socket.on("reconnect", () => {
+  console.log("Reconnected successfully");
+  connectionStatus.textContent = "Connected";
+  connectionStatus.className = "connected";
+  // Refresh messages after reconnection
+  socket.emit("get_messages", { whatsapp, agentId });
+});
+
+socket.on("connect_error", (error) => {
+  console.error("Connection error:", error);
+  connectionStatus.textContent = "Connection Error";
+  connectionStatus.className = "disconnected";
+});
+
+function renderAttachment(attachment) {
+  if (!attachment) return '';
+  
+  if (attachment.mimetype.startsWith('image/')) {
+    return `
+      <div class="attachment">
+        <img src="${attachment.data}" alt="${attachment.name}" class="image-attachment">
+        <div style="font-size: 11px; margin-top: 5px;">${attachment.name}</div>
+      </div>
+    `;
+  } else {
+    return `
+      <div class="attachment">
+        <a href="${attachment.data}" download="${attachment.name}" class="file-attachment">
+          <img src="https://cdn-icons-png.flaticon.com/512/136/136549.png" alt="File icon">
+          <span>${attachment.name}</span>
+        </a>
+      </div>
+    `;
+  }
+}
+
+function getStatusIcon(status) {
+  switch(status) {
+    case 'sent': return '✓';
+    case 'delivered': return '✓✓';
+    case 'read': return '✓✓ (Read)';
+    default: return '';
+  }
+}
+
+function addMessage(msg) {
+  const container = document.getElementById("messages");
+  const div = document.createElement("div");
+  
+  const isSent = msg.sender === 'agent';
+  div.className = `message ${isSent ? 'sent' : 'received'}`;
+  
+  const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  }) : new Date().toLocaleTimeString([], { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+  
+  let content = '';
+  if (msg.text) {
+    content = msg.text;
+  } else if (msg.attachment) {
+    content = renderAttachment(msg.attachment);
+  }
+  
+  div.innerHTML = `
+    <div class="message-header">${isSent ? 'You' : 'User'}</div>
+    ${content}
+    <div class="message-status">
+      <span>${timestamp}</span>
+      ${isSent && msg.status ? `<span>${getStatusIcon(msg.status)}</span>` : ''}
+    </div>
+  `;
+  
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  
+  // Return the message element for status updates
+  return div;
+}
+
+// Store message elements for status updates
+const messageElements = new Map();
 
 socket.on("message_history", (messages) => {
   const container = document.getElementById("messages");
   container.innerHTML = "";
+  messageElements.clear();
+  
   messages.forEach(msg => {
-    const div = document.createElement("div");
-    div.className = "message";
-    div.textContent = `${msg.sender === 'agent' ? 'You' : 'User'}: ${msg.text || '[Attachment]'}`;
-    container.appendChild(div);
+    const element = addMessage(msg);
+    if (msg.id) {
+      messageElements.set(msg.id, element);
+    }
   });
   container.scrollTop = container.scrollHeight;
 });
@@ -57,16 +281,27 @@ socket.on("message_history", (messages) => {
 // Listen for new messages from this user
 socket.on("new_message", (msg) => {
   if (msg.whatsapp !== whatsapp) return;
-  const container = document.getElementById("messages");
-  const div = document.createElement("div");
-  div.className = "message";
-  div.textContent = `${msg.sender === 'agent' ? 'You' : 'User'}: ${msg.text || '[Attachment]'}`;
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
+  const element = addMessage(msg);
+  if (msg.id) {
+    messageElements.set(msg.id, element);
+  }
 });
 
-// renamed listeners only
-socket.on("message_update", (msg) => { if (msg.whatsapp !== whatsapp) return; });
+// Handle message status updates
+socket.on("message_update", (update) => {
+  if (update.whatsapp !== whatsapp) return;
+  if (!update.id || !update.status) return;
+  
+  const messageElement = messageElements.get(update.id);
+  if (messageElement) {
+    const statusElement = messageElement.querySelector('.message-status span:last-child');
+    if (statusElement) {
+      statusElement.textContent = getStatusIcon(update.status);
+    }
+  }
+});
+
+// These listeners remain as they were
 socket.on("chat_deleted", (msg) => { if (msg.whatsapp !== whatsapp) return; });
 socket.on("chat_archived", (msg) => { if (msg.whatsapp !== whatsapp) return; });
 
@@ -77,12 +312,33 @@ document.getElementById("sendBtn").addEventListener("click", () => {
 
   if (!text && !file) return;
 
-  const message = { whatsapp, message: text };
+  const message = { 
+    whatsapp, 
+    message: text,
+    timestamp: new Date().toISOString(),
+    status: 'pending'
+  };
+
+  // Add temporary pending message
+  const tempMessage = {
+    sender: 'agent',
+    text: text || 'Sending attachment...',
+    timestamp: message.timestamp,
+    status: 'pending'
+  };
+  
+  const tempElement = addMessage(tempMessage);
+  const tempId = Date.now(); // Temporary ID
+  messageElements.set(tempId, tempElement);
 
   if (file) {
     const reader = new FileReader();
     reader.onload = () => {
-      message.attachment = { name: file.name, data: reader.result, mimetype: file.type };
+      message.attachment = { 
+        name: file.name, 
+        data: reader.result, 
+        mimetype: file.type 
+      };
       socket.emit("agent_message", message);
     };
     reader.readAsDataURL(file);
@@ -92,6 +348,13 @@ document.getElementById("sendBtn").addEventListener("click", () => {
 
   document.getElementById("messageInput").value = "";
   document.getElementById("fileInput").value = "";
+});
+
+// Allow sending with Enter key
+document.getElementById("messageInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    document.getElementById("sendBtn").click();
+  }
 });
 </script>
 </body>
