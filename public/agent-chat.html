@@ -34,6 +34,8 @@ body {
   align-items: center;
   flex-shrink: 0;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 100;
 }
 
 .header-left {
@@ -83,9 +85,10 @@ body {
 
 /* Chat Container - CHANGED TO FIXED */
 #chat {
-  display: flex;
+  display: none;
   flex-direction: column;
   height: 100vh;
+  height: -webkit-fill-available;
   background: #f8f9fa;
   position: fixed;
   top: 0;
@@ -107,7 +110,7 @@ body {
   min-height: 0;
 }
 
-/* Messages Section - NEW: Wrapper for header and messages */
+/* Messages Section - FIXED BOX WITH SCROLL */
 .messages-section {
   flex: 1;
   display: flex;
@@ -140,10 +143,11 @@ body {
   font-weight: 500;
 }
 
-/* Messages Container - MODIFIED: Now uses flex instead of absolute */
+/* Messages Container - FIXED SCROLLABLE BOX */
 #messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -160,6 +164,31 @@ body {
   flex: 0 0 16px;
 }
 
+/* Optimized scrollbar */
+#messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+#messages::-webkit-scrollbar-track {
+  background: rgba(241, 241, 241, 0.5);
+  border-radius: 3px;
+}
+
+#messages::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.5);
+  border-radius: 3px;
+}
+
+#messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.7);
+}
+
+/* Firefox scrollbar */
+#messages {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
+}
+
 /* Message Bubbles */
 .message-container {
   margin: 8px 0;
@@ -168,6 +197,7 @@ body {
   max-width: 80%;
   word-wrap: break-word;
   animation: fadeIn 0.3s ease;
+  flex-shrink: 0;
 }
 
 @keyframes fadeIn {
@@ -268,22 +298,41 @@ body {
   margin-top: 2px;
 }
 
-/* Input Section - MODIFIED: Now uses sticky positioning */
+/* Input Section - FIXED AT BOTTOM */
 .input-section {
+  flex-shrink: 0;
   background: white;
   border-top: 1px solid #e8e8e8;
-  padding: 12px 16px;
-  flex-shrink: 0;
   z-index: 10;
   position: sticky;
   bottom: 0;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
+.input-area-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.file-preview {
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #666;
+  margin: 8px 16px;
+  display: none;
+  flex-shrink: 0;
+}
+
 .input-area {
+  padding: 12px 16px;
+  background: white;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 #messageInput {
@@ -308,6 +357,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   min-width: 70px;
+  min-height: 44px;
 }
 
 .send-btn:disabled {
@@ -323,16 +373,16 @@ body {
   font-size: 20px;
   cursor: pointer;
   padding: 10px;
+  min-height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 
-.file-preview {
-  padding: 8px 12px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 8px;
-  display: none;
+.file-upload-btn:active {
+  background: rgba(102, 126, 234, 0.1);
 }
 
 /* Scroll to Bottom Button - ADJUSTED POSITION */
@@ -361,6 +411,11 @@ body {
 .scroll-to-bottom-btn.visible {
   opacity: 1;
   visibility: visible;
+}
+
+.scroll-to-bottom-btn:hover {
+  background: #764ba2;
+  transform: translateY(-2px);
 }
 
 /* Empty State */
@@ -405,12 +460,34 @@ body {
   .attachment-image {
     max-height: 150px;
   }
+  
+  .input-area {
+    padding: 10px;
+  }
+  
+  #messageInput {
+    padding: 10px 14px;
+    min-height: 40px;
+  }
+  
+  .send-btn {
+    padding: 10px 16px;
+    min-width: 60px;
+    min-height: 40px;
+  }
+  
+  .file-upload-btn {
+    min-height: 40px;
+    min-width: 40px;
+    font-size: 18px;
+  }
 }
 
 /* Safe Area Support for iOS */
 @supports (padding: max(0px)) {
-  .input-section {
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  .input-area, .input-section {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
   }
 }
 
@@ -458,6 +535,17 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+/* Loading indicator */
+.sending-indicator {
+  padding: 8px 16px;
+  font-size: 14px;
+  text-align: center;
+  display: none;
+  flex-shrink: 0;
+  color: #666;
+  background: #fff9c4;
+}
 </style>
 </head>
 <body>
@@ -498,14 +586,17 @@ body {
     
     <!-- Input Section - Always fixed at bottom -->
     <div class="input-section">
-      <div class="file-preview" id="filePreview"></div>
-      <div class="input-area">
-        <input type="file" id="fileInput" style="display: none;">
-        <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-          📎
-        </button>
-        <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
-        <button class="send-btn" onclick="sendMessage()" id="sendButton">Send</button>
+      <div class="input-area-container">
+        <div class="file-preview" id="filePreview"></div>
+        <div class="sending-indicator" id="sendingIndicator">Sending...</div>
+        <div class="input-area">
+          <input type="file" id="fileInput" style="display: none;">
+          <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+            📎
+          </button>
+          <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+          <button class="send-btn" onclick="sendMessage()" id="sendButton">Send</button>
+        </div>
       </div>
     </div>
   </div>
@@ -527,6 +618,22 @@ let isScrolledToBottom = true;
 let displayedMessageIds = new Set();
 let connectionTimeout;
 let messageLoadTimeout;
+let sendController = {
+  isSending: false,
+  canSend() {
+    if (this.isSending) {
+      console.log('⚠️ Already sending, please wait...');
+      return false;
+    }
+    return true;
+  },
+  beginSend() {
+    this.isSending = true;
+  },
+  finishSend() {
+    this.isSending = false;
+  }
+};
 
 // Initialize
 document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
@@ -592,6 +699,10 @@ socket.on("connect", () => {
   clearTimeout(connectionTimeout);
   clearTimeout(messageLoadTimeout);
   
+  // Show chat interface
+  document.getElementById('header').style.display = 'flex';
+  document.getElementById('chat').style.display = 'flex';
+  
   loadMessagesWithTimeout();
 });
 
@@ -621,7 +732,7 @@ function setupScrollListener() {
     const { scrollTop, scrollHeight, clientHeight } = messagesDiv;
     isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 100;
     scrollBtn.classList.toggle('visible', !isScrolledToBottom);
-  });
+  }, { passive: true });
 }
 
 function scrollToBottom() {
@@ -819,6 +930,9 @@ socket.on("message_sent", (confirmedMsg) => {
       updateMessageElement(tempMsg, confirmedMsg);
     }
   });
+  
+  // Clear sending state
+  finishMessageSend();
 });
 
 // Handle message loading errors
@@ -830,6 +944,10 @@ socket.on("get_messages_error", (error) => {
 
 // ===== MESSAGE SENDING =====
 async function sendMessage() {
+  if (!sendController.canSend()) {
+    return;
+  }
+  
   const text = document.getElementById("messageInput").value.trim();
   const fileInput = document.getElementById('fileInput');
   
@@ -838,9 +956,14 @@ async function sendMessage() {
     return;
   }
   
+  sendController.beginSend();
+  
   const sendBtn = document.getElementById('sendButton');
+  const sendingIndicator = document.getElementById('sendingIndicator');
+  
   sendBtn.disabled = true;
   sendBtn.textContent = '...';
+  sendingIndicator.style.display = 'block';
   
   const tempMsg = {
     sender: 'agent',
@@ -890,6 +1013,7 @@ async function sendMessage() {
     
     reader.onerror = () => {
       alert('Error reading file. Please try again.');
+      finishMessageSend();
       resetInput();
       const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
       if (tempElement) tempElement.remove();
@@ -901,16 +1025,32 @@ async function sendMessage() {
     socket.emit("user_message", messageData);
     resetInput();
   }
- 
-  function resetInput() {
-    document.getElementById("messageInput").value = '';
-    document.getElementById("messageInput").style.height = 'auto';
-    document.getElementById("filePreview").style.display = 'none';
-    fileInput.value = '';
-    sendBtn.disabled = false;
-    sendBtn.textContent = 'Send';
-    document.getElementById("messageInput").focus();
-  }
+  
+  // Timeout fallback in case server doesn't respond
+  setTimeout(() => {
+    finishMessageSend();
+  }, 10000);
+}
+
+function finishMessageSend() {
+  sendController.finishSend();
+  
+  const sendBtn = document.getElementById('sendButton');
+  const sendingIndicator = document.getElementById('sendingIndicator');
+  
+  sendBtn.disabled = false;
+  sendBtn.textContent = 'Send';
+  sendingIndicator.style.display = 'none';
+  
+  document.getElementById("messageInput").focus();
+}
+
+function resetInput() {
+  document.getElementById("messageInput").value = '';
+  document.getElementById("messageInput").style.height = 'auto';
+  document.getElementById("filePreview").style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  document.getElementById("messageInput").focus();
 }
 
 // ===== EVENT LISTENERS =====
@@ -942,6 +1082,18 @@ document.getElementById("backToDashboard").addEventListener("click", () => {
 
 document.getElementById("scrollToBottomBtn").addEventListener("click", scrollToBottom);
 
+// Handle mobile keyboard show/hide
+let viewportHeight = window.innerHeight;
+window.addEventListener('resize', function() {
+  const newViewportHeight = window.innerHeight;
+  if (Math.abs(viewportHeight - newViewportHeight) > 100) {
+    setTimeout(() => {
+      scrollToBottomSmooth();
+    }, 300);
+  }
+  viewportHeight = newViewportHeight;
+});
+
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
   if (!whatsapp) {
@@ -967,7 +1119,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 15000);
   
   setupScrollListener();
-  document.getElementById("messageInput").focus();
+  
+  // Connect socket
+  socket.connect();
 });
 
 // Clean up old temporary messages
@@ -983,6 +1137,17 @@ setInterval(() => {
     }
   });
 }, 10000);
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+  if (socket && socket.connected) {
+    socket.emit('agent_disconnecting', { 
+      agentId: agentId,
+      whatsapp: whatsapp 
+    });
+    socket.disconnect();
+  }
+});
 </script>
 </body>
 </html>
