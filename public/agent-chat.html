@@ -81,22 +81,52 @@ body {
 .connection-status.connecting { background: rgba(243, 156, 18, 0.8); }
 .connection-status.disconnected { background: rgba(231, 76, 60, 0.8); }
 
-/* Chat Container */
+/* Chat Container - CHANGED TO FIXED */
 #chat {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f8f9fa;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+/* Chat wrapper for proper layout */
+.chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Messages Section - NEW: Wrapper for header and messages */
+.messages-section {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+  position: relative;
   background: #f8f9fa;
-  position: relative; /* Added for absolute positioning of messages */
 }
 
-/* Chat Header */
+/* Chat Header - MODIFIED: Now inside messages-section */
 .chat-header {
-  padding: 12px 16px;
+  padding: 16px;
   background: white;
   border-bottom: 1px solid #e8e8e8;
   flex-shrink: 0;
+  z-index: 10;
+  position: sticky;
+  top: 0;
 }
 
 .chat-header h3 {
@@ -110,20 +140,24 @@ body {
   font-weight: 500;
 }
 
-/* Messages Container - THIS IS THE KEY PART */
+/* Messages Container - MODIFIED: Now uses flex instead of absolute */
 #messages {
-  position: absolute;
-  top: 53px; /* Height of chat-header */
-  bottom: 76px; /* Height of input-section */
-  left: 0;
-  right: 0;
+  flex: 1;
   overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
   background: #f8f9fa;
   -webkit-overflow-scrolling: touch;
-  z-index: 1;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  min-height: 0;
+}
+
+/* Add bottom padding to messages */
+#messages::after {
+  content: '';
+  flex: 0 0 16px;
 }
 
 /* Message Bubbles */
@@ -178,7 +212,7 @@ body {
   font-size: 15px;
 }
 
-/* Attachment Styles */
+/* Attachment Styles - MODIFIED: Added image clickability */
 .attachment {
   margin-top: 8px;
   border-radius: 8px;
@@ -191,6 +225,10 @@ body {
   border-radius: 8px;
   display: block;
   cursor: pointer; /* Added for clickable images */
+}
+
+.attachment-image:hover {
+  opacity: 0.9;
 }
 
 .attachment-file {
@@ -230,17 +268,16 @@ body {
   margin-top: 2px;
 }
 
-/* Input Section - FIXED AT BOTTOM */
+/* Input Section - MODIFIED: Now uses sticky positioning */
 .input-section {
   background: white;
   border-top: 1px solid #e8e8e8;
   padding: 12px 16px;
   flex-shrink: 0;
-  position: absolute;
+  z-index: 10;
+  position: sticky;
   bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
 .input-area {
@@ -298,10 +335,10 @@ body {
   display: none;
 }
 
-/* Scroll to Bottom Button */
+/* Scroll to Bottom Button - ADJUSTED POSITION */
 .scroll-to-bottom-btn {
-  position: fixed;
-  bottom: 90px; /* Adjusted to be above input section */
+  position: absolute;
+  bottom: 90px;
   right: 20px;
   width: 36px;
   height: 36px;
@@ -351,8 +388,6 @@ body {
   
   #messages {
     padding: 12px;
-    top: 49px; /* Adjusted for mobile */
-    bottom: 72px; /* Adjusted for mobile */
   }
   
   .message-container {
@@ -361,7 +396,7 @@ body {
   }
   
   .scroll-to-bottom-btn {
-    bottom: 84px; /* Adjusted for mobile */
+    bottom: 84px;
     right: 12px;
     width: 32px;
     height: 32px;
@@ -379,7 +414,7 @@ body {
   }
 }
 
-/* Fullscreen Image Overlay */
+/* Fullscreen Image Overlay - ADDED */
 .image-overlay {
   position: fixed;
   top: 0;
@@ -390,7 +425,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease;
@@ -440,38 +475,43 @@ body {
   <div class="connection-status" id="connectionStatus">Connecting...</div>
 </div>
 
-<!-- Chat Container -->
+<!-- Chat Container - MODIFIED STRUCTURE -->
 <div id="chat">
-  <!-- Chat Header -->
-  <div class="chat-header">
-    <h3>Chat with: <span id="chatNumber"></span></h3>
-  </div>
-  
-  <!-- Scroll to bottom button -->
-  <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
-    ↓
-  </button>
-  
-  <!-- Messages Container - This will scroll -->
-  <div id="messages">
-    <div class="empty-state">Loading messages...</div>
-  </div>
-  
-  <!-- Input Section - Fixed at bottom -->
-  <div class="input-section">
-    <div class="file-preview" id="filePreview"></div>
-    <div class="input-area">
-      <input type="file" id="fileInput" style="display: none;">
-      <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
-        📎
+  <div class="chat-wrapper">
+    <!-- Messages Section - Fixed box with scroll -->
+    <div class="messages-section">
+      <!-- Chat Header -->
+      <div class="chat-header">
+        <h3>Chat with: <span id="chatNumber"></span></h3>
+      </div>
+      
+      <!-- Scroll to bottom button -->
+      <button class="scroll-to-bottom-btn" id="scrollToBottomBtn" title="Scroll to bottom">
+        ↓
       </button>
-      <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
-      <button class="send-btn" onclick="sendMessage()" id="sendButton">Send</button>
+      
+      <!-- Messages Container - This will scroll -->
+      <div id="messages">
+        <div class="empty-state">Loading messages...</div>
+      </div>
+    </div>
+    
+    <!-- Input Section - Always fixed at bottom -->
+    <div class="input-section">
+      <div class="file-preview" id="filePreview"></div>
+      <div class="input-area">
+        <input type="file" id="fileInput" style="display: none;">
+        <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
+          📎
+        </button>
+        <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+        <button class="send-btn" onclick="sendMessage()" id="sendButton">Send</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Fullscreen Image Overlay -->
+<!-- Fullscreen Image Overlay - ADDED -->
 <div class="image-overlay" id="imageOverlay">
   <span class="image-overlay-close" onclick="closeFullscreenImage()">×</span>
   <img id="fullscreenImage" src="" alt="Fullscreen image">
@@ -492,6 +532,28 @@ let messageLoadTimeout;
 document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
 document.getElementById("chatSubtitle").textContent = whatsapp;
 document.getElementById("chatNumber").textContent = whatsapp;
+
+// ===== FULLSCREEN IMAGE FUNCTIONALITY - ADDED =====
+function showFullscreenImage(imageSrc) {
+  const overlay = document.getElementById('imageOverlay');
+  const fullscreenImg = document.getElementById('fullscreenImage');
+  fullscreenImg.src = imageSrc;
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFullscreenImage() {
+  const overlay = document.getElementById('imageOverlay');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// Close overlay when clicking outside the image
+document.getElementById('imageOverlay').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeFullscreenImage();
+  }
+});
 
 // ===== STATUS UPDATER =====
 function updateStatus(status, text) {
@@ -581,29 +643,7 @@ function scrollToBottomSmooth() {
   }
 }
 
-// ===== FULLSCREEN IMAGE FUNCTIONALITY =====
-function showFullscreenImage(imageSrc) {
-  const overlay = document.getElementById('imageOverlay');
-  const fullscreenImg = document.getElementById('fullscreenImage');
-  fullscreenImg.src = imageSrc;
-  overlay.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeFullscreenImage() {
-  const overlay = document.getElementById('imageOverlay');
-  overlay.classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-// Close overlay when clicking outside the image
-document.getElementById('imageOverlay').addEventListener('click', function(e) {
-  if (e.target === this) {
-    closeFullscreenImage();
-  }
-});
-
-// ===== FILE ATTACHMENT DISPLAY =====
+// ===== FILE ATTACHMENT DISPLAY - MODIFIED: Added image clickability =====
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
