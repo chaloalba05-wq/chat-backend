@@ -419,27 +419,53 @@ const params = new URLSearchParams(window.location.search);
 const whatsapp = params.get("whatsapp");
 const agentId = localStorage.getItem("agentId");
 let isScrolledToBottom = true;
-let displayedMessageIds = new Set(); // Track displayed message IDs to prevent duplicates
+let displayedMessageIds = new Set();
+let connectionTimeout;
+let messageLoadTimeout;
 
 // Initialize
 document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
 document.getElementById("chatSubtitle").textContent = whatsapp;
 document.getElementById("chatNumber").textContent = whatsapp;
 
+// ===== STATUS UPDATER =====
+function updateStatus(status, text) {
+  const statusEl = document.getElementById('connectionStatus');
+  statusEl.textContent = text;
+  statusEl.className = `connection-status ${status}`;
+}
+
+// ===== MESSAGE LOADING WITH TIMEOUT =====
+function loadMessagesWithTimeout() {
+  if (whatsapp && agentId) {
+    socket.emit("get_messages", { whatsapp, agentId });
+    
+    messageLoadTimeout = setTimeout(() => {
+      const messagesDiv = document.getElementById("messages");
+      if (messagesDiv.innerHTML.includes('Loading messages')) {
+        messagesDiv.innerHTML = '<div class="empty-state">Connection timeout. Please refresh.</div>';
+      }
+    }, 10000);
+  }
+}
+
 // ===== SOCKET CONNECTION =====
 const socket = io("https://chat-backend-p2b9.onrender.com", {
   reconnection: true,
   reconnectionAttempts: 10,
-  reconnectionDelay: 1000
+  reconnectionDelay: 1000,
+  timeout: 20000,
+  transports: ["websocket", "polling"]
 });
 
-// Connection status
+// Connection events
 socket.on("connect", () => {
   console.log("✅ Connected");
   updateStatus('connected', 'Connected');
-  if (whatsapp && agentId) {
-    socket.emit("get_messages", { whatsapp, agentId });
-  }
+  clearTimeout(connectionTimeout);
+  clearTimeout(messageLoadTimeout);
+  
+  loadMessagesWithTimeout();
 });
 
 socket.on("disconnect", () => {
@@ -450,13 +476,13 @@ socket.on("disconnect", () => {
 socket.on("reconnect", () => {
   console.log("🔄 Reconnected");
   updateStatus('connected', 'Connected');
-  if (whatsapp && agentId) {
-    socket.emit("get_messages", { whatsapp, agentId });
-  }
+  loadMessagesWithTimeout();
 });
 
 socket.on("connect_error", () => {
   updateStatus('disconnected', 'Connection Error');
+  const messagesDiv = document.getElementById("messages");
+  messagesDiv.innerHTML = '<div class="empty-state">Connection error. Reconnecting...</div>';
 });
 
 // ===== SCROLL MANAGEMENT =====
@@ -466,10 +492,7 @@ function setupScrollListener() {
   
   messagesDiv.addEventListener('scroll', () => {
     const { scrollTop, scrollHeight, clientHeight } = messagesDiv;
-    // Check if we're near the bottom (within 100px)
     isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 100;
-    
-    // Show/hide scroll to bottom button
     scrollBtn.classList.toggle('visible', !isScrolledToBottom);
   });
 }
@@ -508,17 +531,13 @@ function renderAttachment(attachment) {
   let html = '<div class="attachment">';
   
   if (attachment.mimetype && attachment.mimetype.startsWith('image/')) {
-    // Image attachment
     const imageUrl = attachment.data || attachment.url;
-    html += `
-      <img src="${imageUrl}" alt="${attachment.name || 'Image'}" class="attachment-image">
-    `;
+    html += `<img src="${imageUrl}" alt="${attachment.name || 'Image'}" class="attachment-image">`;
   } else {
-    // File attachment
     const fileUrl = attachment.data || attachment.url;
     const fileName = attachment.name || attachment.originalname || 'File';
     const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
-    const icon = getFileIcon(attachment.mimetype);
+    const icon = '📄';
     
     html += `
       <a href="${fileUrl}" target="_blank" download="${fileName}" class="attachment-file">
@@ -535,28 +554,10 @@ function renderAttachment(attachment) {
   return html;
 }
 
-function getFileIcon(mimetype) {
-  if (!mimetype) return '📄';
-  
-  if (mimetype.startsWith('image/')) return '🖼️';
-  if (mimetype.startsWith('video/')) return '🎬';
-  if (mimetype.startsWith('audio/')) return '🎵';
-  if (mimetype.includes('pdf')) return '📕';
-  if (mimetype.includes('word') || mimetype.includes('document')) return '📝';
-  if (mimetype.includes('excel') || mimetype.includes('spreadsheet')) return '📊';
-  if (mimetype.includes('zip') || mimetype.includes('compressed')) return '🗜️';
-  
-  return '📄';
-}
-
 // ===== MESSAGE DISPLAY =====
 function displayMessage(msg) {
-  // Check for duplicate message ID
   const messageId = msg.id || (msg.timestamp + '_' + (msg.text || ''));
-  if (displayedMessageIds.has(messageId)) {
-    console.log('⚠️ Skipping duplicate message:', messageId);
-    return;
-  }
+  if (displayedMessageIds.has(messageId)) return;
   
   displayedMessageIds.add(messageId);
   
@@ -564,16 +565,14 @@ function displayMessage(msg) {
   const emptyState = messagesDiv.querySelector('.empty-state');
   if (emptyState) emptyState.remove();
   
-  // Check if message already exists (update instead of create)
   const existingMessage = document.querySelector(`[data-message-id="${messageId}"]`);
   if (existingMessage && existingMessage.dataset.isTemporary !== 'true') {
-    console.log('🔄 Updating existing message:', messageId);
     updateMessageElement(existingMessage, msg);
     return;
   }
   
   const div = document.createElement("div");
-  const isAgent = msg.sender === "agent" || msg.sender === "agent";
+  const isAgent = msg.sender === "agent";
   
   div.className = `message-container ${isAgent ? 'agent-message' : 'user-message'}`;
   div.dataset.messageId = messageId;
@@ -598,21 +597,19 @@ function displayMessage(msg) {
     <div class="message-content">${content}</div>
   `;
   
-  // If this is a temporary message, mark it for replacement
   if (msg.isTemporary) {
     div.style.opacity = '0.7';
   }
   
   messagesDiv.appendChild(div);
   
-  // Auto-scroll if at bottom
   if (isScrolledToBottom || isAgent) {
     setTimeout(scrollToBottomSmooth, 50);
   }
 }
 
 function updateMessageElement(element, msg) {
-  const isAgent = msg.sender === "agent" || msg.sender === "agent";
+  const isAgent = msg.sender === "agent";
   const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { 
     hour: '2-digit', minute: '2-digit' 
   }) : new Date().toLocaleTimeString([], { 
@@ -636,7 +633,9 @@ function updateMessageElement(element, msg) {
   element.dataset.isTemporary = 'false';
 }
 
+// Socket message handlers
 socket.on("message_history", (messages) => {
+  clearTimeout(messageLoadTimeout);
   const messagesDiv = document.getElementById("messages");
   messagesDiv.innerHTML = '';
   displayedMessageIds.clear();
@@ -646,7 +645,6 @@ socket.on("message_history", (messages) => {
     return;
   }
   
-  // Sort by timestamp and display without duplicates
   const uniqueMessages = [];
   const seenIds = new Set();
   
@@ -661,7 +659,6 @@ socket.on("message_history", (messages) => {
     });
   
   uniqueMessages.forEach(msg => displayMessage(msg));
-  
   setTimeout(scrollToBottom, 100);
 });
 
@@ -670,22 +667,26 @@ socket.on("new_message", (msg) => {
   displayMessage(msg);
 });
 
-// Handle message updates (for replacing temporary messages)
 socket.on("message_sent", (confirmedMsg) => {
   if (confirmedMsg.whatsapp !== whatsapp) return;
   
-  // Find and replace temporary message
   const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
   tempMessages.forEach(tempMsg => {
-    // Simple heuristic: if timestamps are close and content matches
     const tempTime = new Date(tempMsg.dataset.messageId.replace('temp_', ''));
     const confirmedTime = new Date(confirmedMsg.timestamp);
     const timeDiff = Math.abs(tempTime - confirmedTime);
     
-    if (timeDiff < 5000) { // Within 5 seconds
+    if (timeDiff < 5000) {
       updateMessageElement(tempMsg, confirmedMsg);
     }
   });
+});
+
+// Handle message loading errors
+socket.on("get_messages_error", (error) => {
+  clearTimeout(messageLoadTimeout);
+  const messagesDiv = document.getElementById("messages");
+  messagesDiv.innerHTML = '<div class="empty-state">Failed to load messages</div>';
 });
 
 // ===== MESSAGE SENDING =====
@@ -702,7 +703,6 @@ async function sendMessage() {
   sendBtn.disabled = true;
   sendBtn.textContent = '...';
   
-  // Create temporary message for immediate display
   const tempMsg = {
     sender: 'agent',
     text: text || 'Sending file...',
@@ -713,7 +713,6 @@ async function sendMessage() {
   
   displayMessage(tempMsg);
   
-  // Prepare message data
   const messageData = {
     whatsapp: whatsapp,
     agentId: agentId,
@@ -721,11 +720,8 @@ async function sendMessage() {
     timestamp: tempMsg.timestamp
   };
   
-  // Handle file upload if present
   if (fileInput.files.length > 0) {
     const file = fileInput.files[0];
-    
-    // Show uploading preview
     const preview = document.getElementById('filePreview');
     preview.textContent = `📤 Uploading ${file.name}...`;
     preview.style.display = 'block';
@@ -740,7 +736,6 @@ async function sendMessage() {
         size: file.size
       };
       
-      // Update temporary message with file info
       const attachmentHtml = renderAttachment(messageData.attachment);
       const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
       if (tempElement) {
@@ -757,7 +752,6 @@ async function sendMessage() {
     reader.onerror = () => {
       alert('Error reading file. Please try again.');
       resetInput();
-      // Remove the temporary message
       const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
       if (tempElement) tempElement.remove();
       displayedMessageIds.delete(tempMsg.id);
@@ -768,20 +762,19 @@ async function sendMessage() {
     socket.emit("user_message", messageData);
     resetInput();
   }
-  
+ 
   function resetInput() {
     document.getElementById("messageInput").value = '';
     document.getElementById("messageInput").style.height = 'auto';
     document.getElementById("filePreview").style.display = 'none';
     fileInput.value = '';
-    
     sendBtn.disabled = false;
     sendBtn.textContent = 'Send';
     document.getElementById("messageInput").focus();
   }
 }
 
-// ===== FILE HANDLING =====
+// ===== EVENT LISTENERS =====
 document.getElementById('fileInput').addEventListener('change', function() {
   const file = this.files[0];
   if (file) {
@@ -792,13 +785,11 @@ document.getElementById('fileInput').addEventListener('change', function() {
   }
 });
 
-// ===== INPUT AUTO-RESIZE =====
 document.getElementById("messageInput").addEventListener("input", function() {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, 120) + 'px';
 });
 
-// ===== ENTER KEY SUPPORT =====
 document.getElementById("messageInput").addEventListener("keypress", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -806,48 +797,46 @@ document.getElementById("messageInput").addEventListener("keypress", (e) => {
   }
 });
 
-// ===== BACK BUTTON =====
 document.getElementById("backToDashboard").addEventListener("click", () => {
-  window.location.href = "/agent1.html"; // Redirects to agent1.html
+  window.location.href = "/agent1.html";
 });
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
   if (!whatsapp) {
     alert("No chat selected");
-    window.location.href = "/agent1.html"; // Redirects to agent1.html
+    window.location.href = "/agent1.html";
     return;
   }
   
   if (!agentId) {
     alert("Please login first");
-    window.location.href = "/login.html"; // Keep login separate
+    window.location.href = "/login.html";
     return;
   }
   
+  updateStatus('connecting', 'Connecting...');
+  
+  connectionTimeout = setTimeout(() => {
+    if (socket.disconnected) {
+      updateStatus('disconnected', 'Connection Timeout');
+      document.getElementById("messages").innerHTML = 
+        '<div class="empty-state">Connection timeout. Please refresh.</div>';
+    }
+  }, 15000);
+  
   setupScrollListener();
   document.getElementById("messageInput").focus();
-  
-  console.log('Chat initialized for:', whatsapp);
 });
 
-// Handle keyboard on mobile
-let viewportHeight = window.innerHeight;
-window.addEventListener('resize', () => {
-  if (Math.abs(viewportHeight - window.innerHeight) > 100) {
-    setTimeout(scrollToBottomSmooth, 300);
-  }
-  viewportHeight = window.innerHeight;
-});
-
-// Periodically clean up old temporary messages (in case they never get confirmed)
+// Clean up old temporary messages
 setInterval(() => {
   const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
   const now = Date.now();
   
   tempMessages.forEach(msg => {
     const tempTime = parseInt(msg.dataset.messageId.replace('temp_', ''));
-    if (now - tempTime > 30000) { // 30 seconds old
+    if (now - tempTime > 30000) {
       msg.remove();
       displayedMessageIds.delete(msg.dataset.messageId);
     }
