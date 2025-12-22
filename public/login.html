@@ -5,67 +5,143 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agent Login</title>
 <style>
-body { font-family: Arial; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-input { margin: 5px; padding: 5px; }
-button { padding: 5px 10px; }
+body { 
+  font-family: Arial, sans-serif; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center; 
+  height: 100vh; 
+  margin: 0; 
+  background: #f5f5f5;
+}
+.login-container { 
+  background: white; 
+  padding: 20px; 
+  border-radius: 12px; 
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2); 
+  width: 320px; 
+}
+h2 { text-align: center; margin-bottom: 20px; }
+input { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #ccc; }
+button { width: 100%; padding: 10px; border-radius: 6px; border: none; background: #667eea; color: white; font-weight: bold; cursor: pointer; }
+button:disabled { background: #a0a0f0; cursor: not-allowed; }
+#status { margin-top: 10px; min-height: 20px; color: #333; font-size: 14px; }
+.agent-stats { background: #eef; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
 </style>
 </head>
 <body>
-<h2>Agent Login</h2>
-<input type="text" id="agentId" placeholder="Agent ID">
-<input type="password" id="agentPassword" placeholder="Password">
-<button id="loginBtn">Login</button>
-<p id="errorMsg" style="color:red"></p>
 
-<script src="/socket.io/socket.io.js"></script>
+<div class="login-container">
+  <h2>Agent Login</h2>
+
+  <div class="agent-stats">
+    <div>Agent ID: <span id="displayAgentId">agent2</span></div>
+    <div>Agent Name: <span id="displayAgentName">Agent 2</span></div>
+    <div>Status: <span id="agentStatus">⚡ Idle</span></div>
+  </div>
+
+  <input type="text" id="agentId" placeholder="Agent ID" value="agent2">
+  <input type="password" id="agentPassword" placeholder="Password" value="agent2">
+  <button id="loginBtn">Login</button>
+  <div id="status"></div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-const socket = io("http://localhost:3000"); // Change URL if different
+const AGENT_CONFIG = { 
+  id: "agent2", 
+  name: "Agent 2", 
+  password: "agent2", 
+  filename: "agent2.html" 
+};
 
-document.getElementById("loginBtn").addEventListener("click", () => {
-  const id = document.getElementById("agentId").value.trim();
-  const password = document.getElementById("agentPassword").value.trim();
+let socket = null;
+let loginAttempted = false;
+
+document.getElementById('loginBtn').addEventListener('click', login);
+
+function updateStatus(msg) {
+  document.getElementById('status').textContent = msg;
+  document.getElementById('agentStatus').textContent = msg.includes('Ready') ? '⚡ Ready' : '⏳ Busy';
+}
+
+function login() {
+  if (loginAttempted) return;
+  const id = document.getElementById('agentId').value.trim();
+  const password = document.getElementById('agentPassword').value.trim();
 
   if (!id || !password) {
-    document.getElementById("errorMsg").textContent = "Please enter both ID and password";
+    updateStatus('Please enter both ID and password');
     return;
   }
 
-  // Remove previous listeners to avoid duplicates
-  socket.off("agent_registration_response");
-  socket.off("agent_login_response");
+  loginAttempted = true;
+  document.getElementById('loginBtn').disabled = true;
+  updateStatus('Connecting to server...');
 
-  // 1️⃣ First, register the agent (server will skip if already exists)
-  socket.emit("register_agent", { id, name: id, password });
-
-  // Listen for registration response
-  socket.on("agent_registration_response", (res) => {
-    if (!res.success) {
-      document.getElementById("errorMsg").textContent = "Registration failed: " + res.message;
-      return;
-    }
-
-    console.log("Agent registered/verified:", res.agentId);
-
-    // 2️⃣ Then, login as the agent
-    socket.emit("agent_login", { agentId: id, password, persistent: true });
-
-    socket.on("agent_login_response", (loginRes) => {
-      if (!loginRes.success) {
-        document.getElementById("errorMsg").textContent = "Login failed: " + loginRes.message;
-        return;
-      }
-
-      console.log("Agent logged in:", loginRes.agentId);
-
-      // Store login info in localStorage
-      localStorage.setItem("agentVerified", "true");
-      localStorage.setItem("agentId", loginRes.agentId);
-
-      // Redirect to agent file
-      window.location.href = `${id}.html`;
-    });
+  socket = io("https://chat-backend-p2b9.onrender.com", { 
+    transports: ['websocket', 'polling'], 
+    reconnection: true,           // ✅ enable automatic retries
+    reconnectionAttempts: 5,      // max 5 retries
+    reconnectionDelay: 2000,      // 2 seconds between attempts
+    timeout: 15000
   });
-});
+
+  const connectionTimeout = setTimeout(() => {
+    updateStatus('Connection timeout, please try again');
+    resetLogin();
+  }, 15000);
+
+  socket.once('connect', () => {
+    clearTimeout(connectionTimeout);
+    updateStatus('Connected, verifying agent...');
+    setupSocketListeners();
+
+    // Register agent (server will skip if already exists)
+    socket.emit('register_agent', { id, name: id, password });
+  });
+
+  socket.on('reconnect_attempt', attempt => updateStatus(`Reconnecting... (attempt ${attempt})`));
+  socket.on('reconnect_failed', () => updateStatus('Failed to reconnect after multiple attempts'));
+  socket.on('connect_error', err => {
+    updateStatus('Connection failed: ' + (err.message || 'Server unreachable'));
+  });
+}
+
+function setupSocketListeners() {
+  socket.on('agent_registration_response', res => {
+    if (res.success) {
+      updateStatus('Registration successful, logging in...');
+      socket.emit('agent_login', { agentId: AGENT_CONFIG.id, password: AGENT_CONFIG.password, persistent: true });
+    } else {
+      updateStatus('Registration failed: ' + res.message);
+      resetLogin();
+    }
+  });
+
+  socket.on('agent_login_response', res => {
+    if (res.success) {
+      updateStatus('Login successful! Redirecting...');
+      localStorage.setItem('agentVerified', 'true');
+      localStorage.setItem('agentId', res.agentId);
+      setTimeout(() => window.location.href = AGENT_CONFIG.filename, 500);
+    } else {
+      updateStatus('Login failed: ' + res.message);
+      resetLogin();
+    }
+  });
+
+  socket.on('disconnect', reason => {
+    if (loginAttempted) updateStatus('Disconnected: ' + reason);
+    resetLogin();
+  });
+}
+
+function resetLogin() {
+  loginAttempted = false;
+  document.getElementById('loginBtn').disabled = false;
+}
 </script>
 </body>
 </html>
