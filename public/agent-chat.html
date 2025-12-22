@@ -306,7 +306,7 @@ body {
   z-index: 10;
   position: sticky;
   bottom: 0;
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
 }
 
 .input-area-container {
@@ -331,8 +331,10 @@ body {
   background: white;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 #messageInput {
@@ -620,6 +622,7 @@ let displayedMessageIds = new Set();
 let connectionTimeout;
 let messageLoadTimeout;
 let isAgentLoggedIn = false;
+let messageCheckInterval;
 let sendController = {
   isSending: false,
   canSend() {
@@ -645,6 +648,36 @@ let sendController = {
 document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
 document.getElementById("chatSubtitle").textContent = whatsapp;
 document.getElementById("chatNumber").textContent = whatsapp;
+
+// ===== CONSTANT MESSAGE CHECKING - ADDED =====
+function startConstantMessageChecking() {
+  // Clear any existing interval
+  if (messageCheckInterval) {
+    clearInterval(messageCheckInterval);
+  }
+  
+  // Load messages immediately
+  loadMessages();
+  
+  // Then check every 2 seconds for new messages
+  messageCheckInterval = setInterval(() => {
+    if (whatsapp && isAgentLoggedIn && socket.connected) {
+      // Use a low-impact message check
+      socket.emit("check_new_messages", { 
+        whatsapp, 
+        agentId,
+        lastCheck: Date.now() - 5000 // Last 5 seconds
+      });
+    }
+  }, 2000);
+}
+
+function stopConstantMessageChecking() {
+  if (messageCheckInterval) {
+    clearInterval(messageCheckInterval);
+    messageCheckInterval = null;
+  }
+}
 
 // ===== FULLSCREEN IMAGE FUNCTIONALITY - ADDED =====
 function showFullscreenImage(imageSrc) {
@@ -751,6 +784,9 @@ socket.on("disconnect", () => {
   updateStatus('disconnected', 'Disconnected');
   isAgentLoggedIn = false;
   disableChatControls();
+  
+  // STOP constant message checking - ADDED
+  stopConstantMessageChecking();
 });
 
 socket.on("reconnect", () => {
@@ -784,6 +820,9 @@ socket.on("agent_login_response", (response) => {
     joinUserRoom();
     loadMessages();
     
+    // START CONSTANT MESSAGE CHECKING - ADDED
+    startConstantMessageChecking();
+    
     // Clear any loading messages
     const messagesDiv = document.getElementById("messages");
     if (messagesDiv.innerHTML.includes('Connecting...')) {
@@ -804,6 +843,19 @@ socket.on("agent_login_response", (response) => {
 socket.on("user_room_joined", (data) => {
   console.log(`✅ Successfully joined room for: ${data.whatsapp}`);
   console.log(`✅ Ready to send/receive messages for ${data.whatsapp}`);
+});
+
+// Add this handler for server response to check_new_messages
+socket.on("new_messages_check", (data) => {
+  if (data.whatsapp === whatsapp && data.messages && data.messages.length > 0) {
+    data.messages.forEach(msg => {
+      // Only display if we haven't seen it
+      const messageId = msg.id || (msg.timestamp + '_' + (msg.text || ''));
+      if (!displayedMessageIds.has(messageId)) {
+        displayMessage(msg);
+      }
+    });
+  }
 });
 
 // ===== SCROLL MANAGEMENT =====
@@ -851,12 +903,19 @@ function renderAttachment(attachment) {
   
   let html = '<div class="attachment">';
   
+  // FIXED: Handle both URL and base64 data
+  let fileUrl = attachment.data || attachment.url;
+  
+  // If it's base64 data without prefix, add the data URL prefix
+  if (fileUrl && !fileUrl.startsWith('http') && !fileUrl.startsWith('data:')) {
+    const mimeType = attachment.mimetype || 'application/octet-stream';
+    fileUrl = `data:${mimeType};base64,${fileUrl}`;
+  }
+  
   if (attachment.mimetype && attachment.mimetype.startsWith('image/')) {
-    const imageUrl = attachment.data || attachment.url;
-    html += `<img src="${imageUrl}" alt="${attachment.name || 'Image'}" class="attachment-image" onclick="showFullscreenImage('${imageUrl}')">`;
+    html += `<img src="${fileUrl}" alt="${attachment.name || 'Image'}" class="attachment-image" onclick="showFullscreenImage('${fileUrl}')">`;
   } else {
-    const fileUrl = attachment.data || attachment.url;
-    const fileName = attachment.name || attachment.originalname || 'File';
+    const fileName = attachment.name || attachment.originalname || attachment.filename || 'File';
     const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
     const icon = '📄';
     
@@ -1026,7 +1085,36 @@ socket.on("agent_message_success", (msg) => {
   }
 });
 
-// ===== MESSAGE SENDING =====
+// ===== ADD MESSAGE SEND CONFIRMATION HANDLERS =====
+socket.on("agent_message_delivered", (msg) => {
+  console.log('Message delivered:', msg);
+  
+  // Find and update the temporary message
+  if (msg.whatsapp === whatsapp) {
+    // Remove temporary message if it exists
+    const tempElements = document.querySelectorAll('[data-is-temporary="true"]');
+    tempElements.forEach(element => {
+      const messageId = element.dataset.messageId;
+      if (messageId && messageId.startsWith('temp_')) {
+        element.remove();
+        displayedMessageIds.delete(messageId);
+      }
+    });
+    
+    // Display the confirmed message
+    displayMessage(msg);
+  }
+  
+  finishMessageSend();
+});
+
+socket.on("agent_message_error", (error) => {
+  console.error('Message send error:', error);
+  alert(`Failed to send message: ${error.message || 'Unknown error'}`);
+  finishMessageSend();
+});
+
+// ===== MESSAGE SENDING - FIXED FILE UPLOAD =====
 async function sendMessage() {
   if (!sendController.canSend()) {
     return;
@@ -1065,11 +1153,13 @@ async function sendMessage() {
   
   displayMessage(tempMsg);
   
+  // FIXED: Create proper message data structure
   const messageData = {
     whatsapp: whatsapp,
     message: text,
     timestamp: tempMsg.timestamp,
-    agentId: agentId
+    agentId: agentId,
+    sender: 'agent'  // Explicitly set sender
   };
   
   if (fileInput.files.length > 0) {
@@ -1078,31 +1168,52 @@ async function sendMessage() {
     preview.textContent = `📤 Uploading ${file.name}...`;
     preview.style.display = 'block';
     
+    // FIXED: Use proper file handling for server
     const reader = new FileReader();
     
     reader.onload = () => {
+      // FIXED: Send file data in correct format expected by server
+      const base64Data = reader.result.split(',')[1]; // Remove data:image/...;base64, prefix
+      
       messageData.attachment = {
-        name: file.name,
-        data: reader.result,
+        originalname: file.name,
+        filename: file.name,
         mimetype: file.type,
-        size: file.size
+        size: file.size,
+        data: base64Data,  // Send as base64 without prefix
+        encoding: 'base64'
       };
       
-      const attachmentHtml = renderAttachment(messageData.attachment);
+      // Update the temporary message preview
       const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
       if (tempElement) {
         const contentElement = tempElement.querySelector('.message-content');
         if (contentElement) {
-          contentElement.innerHTML = (text || '') + attachmentHtml;
+          // Create preview for the file being sent
+          let previewHtml = text || '';
+          if (file.type.startsWith('image/')) {
+            previewHtml += `<div class="attachment"><img src="${reader.result}" alt="${file.name}" class="attachment-image" style="max-width: 200px;"></div>`;
+          } else {
+            previewHtml += `<div class="attachment"><div class="attachment-file"><span class="attachment-icon">📄</span><div class="attachment-info"><div class="attachment-name">${file.name}</div></div></div></div>`;
+          }
+          contentElement.innerHTML = previewHtml;
         }
       }
       
-      console.log('Sending agent message:', messageData);
-      socket.emit("agent_message", messageData);
-      resetInput();
+      console.log('Sending agent message with attachment:', messageData);
+      
+      // FIXED: Send message with attachment
+      socket.emit("agent_message_with_attachment", messageData);
+      
+      // Reset input and prepare for next message
+      setTimeout(() => {
+        resetInput();
+        finishMessageSend();
+      }, 500);
     };
     
-    reader.onerror = () => {
+    reader.onerror = (error) => {
+      console.error('Error reading file:', error);
       alert('Error reading file. Please try again.');
       finishMessageSend();
       resetInput();
@@ -1113,15 +1224,16 @@ async function sendMessage() {
     
     reader.readAsDataURL(file);
   } else {
+    // Text-only message
     console.log('Sending agent message:', messageData);
     socket.emit("agent_message", messageData);
     resetInput();
+    
+    // Timeout fallback
+    setTimeout(() => {
+      finishMessageSend();
+    }, 3000);
   }
-  
-  // Timeout fallback in case server doesn't respond
-  setTimeout(() => {
-    finishMessageSend();
-  }, 10000);
 }
 
 function finishMessageSend() {
@@ -1149,10 +1261,24 @@ function resetInput() {
 document.getElementById('fileInput').addEventListener('change', function() {
   const file = this.files[0];
   if (file) {
+    // FIXED: Add file size validation (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('File size exceeds 10MB limit. Please choose a smaller file.');
+      this.value = '';
+      return;
+    }
+    
     const preview = document.getElementById('filePreview');
     const size = formatFileSize(file.size);
-    preview.textContent = `📎 ${file.name} (${size})`;
+    preview.textContent = `📎 ${file.name} (${size}) - Ready to send`;
     preview.style.display = 'block';
+    
+    // Auto-focus on send button if message input is empty
+    const messageInput = document.getElementById("messageInput");
+    if (!messageInput.value.trim()) {
+      document.getElementById("sendButton").focus();
+    }
   }
 });
 
@@ -1230,6 +1356,9 @@ setInterval(() => {
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
+  // Stop message checking
+  stopConstantMessageChecking();
+  
   if (socket && socket.connected) {
     socket.emit('agent_disconnecting', { 
       agentId: agentId,
