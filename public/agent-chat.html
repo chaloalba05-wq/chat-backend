@@ -242,7 +242,7 @@ body {
   font-size: 15px;
 }
 
-/* Attachment Styles - MODIFIED: Added image clickability */
+/* Attachment Styles - MODIFIED: Images as links to new tabs */
 .attachment {
   margin-top: 8px;
   border-radius: 8px;
@@ -493,51 +493,6 @@ body {
   }
 }
 
-/* Fullscreen Image Overlay - ADDED */
-.image-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease;
-}
-
-.image-overlay.active {
-  opacity: 1;
-  visibility: visible;
-}
-
-.image-overlay img {
-  max-width: 90%;
-  max-height: 90%;
-  border-radius: 4px;
-  cursor: zoom-out;
-}
-
-.image-overlay-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  color: white;
-  font-size: 30px;
-  cursor: pointer;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* Loading indicator */
 .sending-indicator {
   padding: 8px 16px;
@@ -628,12 +583,6 @@ body {
   </div>
 </div>
 
-<!-- Fullscreen Image Overlay - ADDED -->
-<div class="image-overlay" id="imageOverlay">
-  <span class="image-overlay-close" onclick="closeFullscreenImage()">×</span>
-  <img id="fullscreenImage" src="" alt="Fullscreen image">
-</div>
-
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
 // ===== ESSENTIAL VARIABLES =====
@@ -673,18 +622,18 @@ let sendController = {
 function normalizeFileUrl(url) {
   if (!url) return null;
 
-  // force leading slash
+  // If already absolute, trust it
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  // Ensure leading slash
   if (!url.startsWith('/')) {
     url = '/' + url;
   }
 
-  // must be under /uploads
-  if (!url.startsWith('/uploads/')) {
-    console.warn('Blocked non-static attachment URL:', url);
-    return null;
-  }
-
-  return url;
+  // Force backend origin
+  return `https://chat-backend-p2b9.onrender.com${url}`;
 }
 
 // Initialize
@@ -721,28 +670,6 @@ function stopConstantMessageChecking() {
     messageCheckInterval = null;
   }
 }
-
-// ===== FULLSCREEN IMAGE FUNCTIONALITY - ADDED =====
-function showFullscreenImage(imageSrc) {
-  const overlay = document.getElementById('imageOverlay');
-  const fullscreenImg = document.getElementById('fullscreenImage');
-  fullscreenImg.src = imageSrc;
-  overlay.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeFullscreenImage() {
-  const overlay = document.getElementById('imageOverlay');
-  overlay.classList.remove('active');
-  document.body.style.overflow = '';
-}
-
-// Close overlay when clicking outside the image
-document.getElementById('imageOverlay').addEventListener('click', function(e) {
-  if (e.target === this) {
-    closeFullscreenImage();
-  }
-});
 
 // ===== STATUS UPDATER =====
 function updateStatus(status, text) {
@@ -808,8 +735,8 @@ const socket = io("https://chat-backend-p2b9.onrender.com", {
   transports: ["websocket", "polling"]
 });
 
-// ===== UPLOAD FILE FUNCTION - FIXED TO OBEY RULE 1 =====
-async function uploadFile(file, tempId) {
+// ===== UPLOAD FILE FUNCTION =====
+async function uploadFile(file) {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -840,7 +767,7 @@ async function uploadFile(file, tempId) {
           if (response.success) {
             console.log('✅ File uploaded successfully:', response);
             
-            // OBEY RULE 1: Use only the metadata provided by server
+            // Use only the metadata provided by server
             const attachmentData = {
               filename: response.originalName || file.name,
               mimetype: response.mimetype || file.type,
@@ -867,7 +794,7 @@ async function uploadFile(file, tempId) {
       reject(new Error('Network error during upload'));
     });
     
-    xhr.open('POST', '/upload');
+    xhr.open('POST', 'https://chat-backend-p2b9.onrender.com/upload');
     xhr.send(formData);
   });
 }
@@ -882,7 +809,7 @@ socket.on("connect", () => {
   document.getElementById('header').style.display = 'flex';
   document.getElementById('chat').style.display = 'flex';
   
-  // FIXED: Login agent first, then join room
+  // Login agent first, then join room
   loginAgent();
 });
 
@@ -892,7 +819,7 @@ socket.on("disconnect", () => {
   isAgentLoggedIn = false;
   disableChatControls();
   
-  // STOP constant message checking - ADDED
+  // STOP constant message checking
   stopConstantMessageChecking();
 });
 
@@ -911,7 +838,7 @@ socket.on("connect_error", (error) => {
   messagesDiv.innerHTML = '<div class="empty-state">Connection error. Reconnecting...</div>';
 });
 
-// FIXED: AGENT LOGIN RESPONSE HANDLER
+// AGENT LOGIN RESPONSE HANDLER
 socket.on("agent_login_response", (response) => {
   console.log("Agent login response:", response);
   
@@ -927,7 +854,7 @@ socket.on("agent_login_response", (response) => {
     joinUserRoom();
     loadMessages();
     
-    // START CONSTANT MESSAGE CHECKING - ADDED
+    // START CONSTANT MESSAGE CHECKING
     startConstantMessageChecking();
     
     // Clear any loading messages
@@ -946,19 +873,19 @@ socket.on("agent_login_response", (response) => {
   }
 });
 
-// FIXED: Add handler for room join confirmation
+// Add handler for room join confirmation
 socket.on("user_room_joined", (data) => {
   console.log(`✅ Successfully joined room for: ${data.whatsapp}`);
   console.log(`✅ Ready to send/receive messages for ${data.whatsapp}`);
 });
 
-// OBEY RULE 5: Only display messages from server echo
+// Only display messages from server echo
 socket.on("new_message", (msg) => {
   console.log('New message received from server:', msg);
   
   if (msg.whatsapp !== whatsapp) return;
   
-  // OBEY RULE 5: Display only server-confirmed messages
+  // Display only server-confirmed messages
   displayMessage(msg);
 });
 
@@ -1002,34 +929,27 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// ===== FILE ATTACHMENT DISPLAY - FIXED TO OBEY RULES 2, 3, AND 4 =====
+// ===== FILE ATTACHMENT DISPLAY - FIXED FOR NEW TAB FUNCTIONALITY =====
 function renderAttachment(attachment) {
   if (!attachment) return '';
   
-  // FIX: Use normalizeFileUrl function
   const fileUrl = normalizeFileUrl(attachment.url || attachment.path);
   if (!fileUrl) return '';
   
-  // Get the filename
   const fileName = attachment.originalname || attachment.filename || 'File';
-  
   let html = '<div class="attachment">';
   
-  // OBEY RULE 3: Image rendering must be inline
   if (attachment.mimetype?.startsWith("image/")) {
-    // FIXED: Remove onclick attribute entirely
+    // Images are displayed inline and open in new tab when clicked
     html += `
-      <img
-        src="${fileUrl}"
-        class="chat-image"
-        alt="${fileName}"
-      />
+      <a href="${fileUrl}" target="_blank" rel="noopener">
+        <img src="${fileUrl}" class="chat-image" alt="${fileName}" />
+      </a>
     `;
   } else {
-    // OBEY RULE 4: Other files use links
+    // Other file types are links that open in new tab
     const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
     const icon = '📄';
-    
     html += `
       <a href="${fileUrl}" target="_blank" rel="noopener" class="attachment-file">
         <span class="attachment-icon">${icon}</span>
@@ -1045,7 +965,7 @@ function renderAttachment(attachment) {
   return html;
 }
 
-// ===== MESSAGE DISPLAY - FIXED TO OBEY RULE 5 =====
+// ===== MESSAGE DISPLAY =====
 function displayMessage(msg) {
   // Use server-provided ID as primary
   const messageId = msg.id || `msg_${msg.timestamp}_${msg.sender}`;
@@ -1093,15 +1013,6 @@ function displayMessage(msg) {
   
   messagesDiv.appendChild(div);
   
-  // Make images in this message clickable for fullscreen
-  const images = div.querySelectorAll('.chat-image');
-  images.forEach(img => {
-    img.style.cursor = 'pointer';
-    img.onclick = function() {
-      showFullscreenImage(this.src);
-    };
-  });
-  
   if (isScrolledToBottom || isAgent) {
     setTimeout(scrollToBottomSmooth, 50);
   }
@@ -1136,7 +1047,7 @@ socket.on("message_history", (messages) => {
   setTimeout(scrollToBottom, 100);
 });
 
-// ===== MESSAGE SENDING - FIXED TO OBEY RULE 5 =====
+// ===== MESSAGE SENDING =====
 async function sendMessage() {
   if (!sendController.canSend()) {
     return;
@@ -1164,7 +1075,7 @@ async function sendMessage() {
   sendBtn.textContent = '...';
   sendingIndicator.style.display = 'block';
   
-  // OBEY RULE 5: NEVER display before server echo
+  // NEVER display before server echo
   // We will NOT create temporary messages here
   
   if (fileInput.files.length > 0) {
@@ -1177,19 +1088,19 @@ async function sendMessage() {
       // Upload file to server
       const attachmentData = await uploadFile(file);
       
-      // OBEY RULE 1: Pass only the read-only metadata object
+      // Pass only the read-only metadata object
       const messageData = {
         whatsapp: whatsapp,
         sender: "agent",
         message: text || "",
         timestamp: new Date().toISOString(),
         agentId: agentId,
-        attachment: attachmentData // This follows RULE 1 format
+        attachment: attachmentData
       };
       
       console.log('📤 Sending message with attachment:', messageData);
       
-      // OBEY RULE 5: Emit and wait for server echo
+      // Emit and wait for server echo
       socket.emit("agent_message", messageData);
       
     } catch (error) {
@@ -1217,7 +1128,7 @@ async function sendMessage() {
     
     console.log('Sending text message:', messageData);
     
-    // OBEY RULE 5: Emit and wait for server echo
+    // Emit and wait for server echo
     socket.emit("agent_message", messageData);
     resetInput();
   }
