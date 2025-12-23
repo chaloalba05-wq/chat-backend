@@ -1171,7 +1171,6 @@ async function sendMessage() {
   // Create temporary message with unique ID
   const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
-  // ✅ FIXED: Only show a minimal placeholder, not the full message
   if (fileInput.files.length > 0) {
     const file = fileInput.files[0];
     const preview = document.getElementById('filePreview');
@@ -1195,47 +1194,65 @@ async function sendMessage() {
     `;
     messagesDiv.appendChild(sendingDiv);
     
-    // Upload file
-    const reader = new FileReader();
+    // ✅ FIXED: UPLOAD FILE VIA HTTP (NOT Socket.IO)
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("whatsapp", whatsapp);
+    formData.append("agentId", agentId);
     
-    reader.onload = () => {
-      const base64Data = reader.result.split(',')[1];
+    try {
+      // Upload file to server
+      const response = await fetch("/upload", {
+        method: "POST",
+        body: formData
+      });
       
-      const messageData = {
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Upload failed');
+      }
+      
+      // ✅ FIXED: Send message with REAL file URL from server
+      socket.emit("agent_message", {
         whatsapp: whatsapp,
-        message: text || '',  // Send empty string if no text
+        sender: "agent",
+        message: text || "",
         timestamp: new Date().toISOString(),
         agentId: agentId,
-        sender: 'agent',
-        tempId: tempId,  // ✅ NEW: Send temp ID to server
+        tempId: tempId,
         attachment: {
-          type: file.type.startsWith('image/') ? 'image' : 'file',
-          url: reader.result, // Use data URL
-          name: file.name,
-          size: file.size,
-          mimetype: file.type
+          url: data.fileUrl,       // ✅ REAL FILE URL from server
+          name: data.originalName,
+          size: data.size,
+          mimetype: data.mimetype
         }
-      };
+      });
       
-      console.log('Sending message with attachment:', messageData);
-      // ✅ FIXED: Use the same agent_message event for both text and files
-      socket.emit("agent_message", messageData);
+      console.log('✅ File uploaded successfully:', data);
       
-      // Reset input immediately
-      resetInput();
-    };
-    
-    reader.onerror = (error) => {
-      console.error('Error reading file:', error);
-      alert('Error reading file. Please try again.');
-      finishMessageSend();
-      resetInput();
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      alert(`Failed to upload file: ${error.message}`);
+      
+      // Remove temporary message
       sendingDiv.remove();
-    };
+      
+      // Reset input
+      resetInput();
+      finishMessageSend();
+      return;
+    }
     
-    reader.readAsDataURL(file);
+    // Reset input
+    resetInput();
+    
   } else {
-    // Text-only message - show minimal placeholder
+    // Text-only message
     const messagesDiv = document.getElementById("messages");
     const sendingDiv = document.createElement("div");
     sendingDiv.className = 'message-container agent-message';
@@ -1258,7 +1275,7 @@ async function sendMessage() {
       timestamp: new Date().toISOString(),
       agentId: agentId,
       sender: 'agent',
-      tempId: tempId  // ✅ NEW: Send temp ID to server
+      tempId: tempId
     };
     
     console.log('Sending text message:', messageData);
