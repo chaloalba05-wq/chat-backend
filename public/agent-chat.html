@@ -548,6 +548,25 @@ body {
   color: #666;
   background: #fff9c4;
 }
+
+/* Upload Progress */
+.upload-progress {
+  width: 100%;
+  background-color: #f3f3f3;
+  border-radius: 10px;
+  margin: 8px 16px;
+  overflow: hidden;
+  display: none;
+  flex-shrink: 0;
+}
+
+.progress-bar {
+  height: 6px;
+  background: linear-gradient(90deg, #4CAF50, #8BC34A);
+  border-radius: 10px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
 </style>
 </head>
 <body>
@@ -589,6 +608,11 @@ body {
     <!-- Input Section - Always fixed at bottom -->
     <div class="input-section">
       <div class="input-area-container">
+        <!-- ADDED: Upload Progress Bar -->
+        <div class="upload-progress" id="uploadProgress">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
         <div class="file-preview" id="filePreview"></div>
         <div class="sending-indicator" id="sendingIndicator">Sending...</div>
         <div class="input-area">
@@ -623,6 +647,7 @@ let connectionTimeout;
 let messageLoadTimeout;
 let isAgentLoggedIn = false;
 let messageCheckInterval;
+let selectedFile = null; // ADDED: Track selected file
 let sendController = {
   isSending: false,
   canSend() {
@@ -765,6 +790,77 @@ const socket = io("https://chat-backend-p2b9.onrender.com", {
   transports: ["websocket", "polling"]
 });
 
+// ===== UPLOAD FILE FUNCTION - FIXED FOR USER COMPATIBILITY =====
+async function uploadFile(file, tempId) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("whatsapp", whatsapp);
+    formData.append("agentId", agentId);
+    
+    const xhr = new XMLHttpRequest();
+    const progressDiv = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('progressBar');
+    
+    // Show progress bar
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    
+    xhr.upload.addEventListener('progress', function(e) {
+      if (e.lengthComputable) {
+        const percentComplete = (e.loaded / e.total) * 100;
+        progressBar.style.width = percentComplete + '%';
+      }
+    });
+    
+    xhr.addEventListener('load', function() {
+      progressDiv.style.display = 'none';
+      
+      if (xhr.status === 200) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (response.success) {
+            console.log('✅ File uploaded successfully:', response);
+            
+            // FORMAT FOR USER COMPATIBILITY - CRITICAL FIX
+            const attachmentData = {
+              url: response.fileUrl,            // Public URL
+              data: response.fileUrl,           // For backward compatibility
+              path: response.fileUrl,           // Some systems expect 'path'
+              name: response.originalName || file.name,
+              filename: response.originalName || file.name,
+              originalname: response.originalName || file.name,
+              size: response.size || file.size,
+              mimetype: response.mimetype || file.type, // MUST INCLUDE THIS
+              type: response.mimetype || file.type,     // Alternative
+              // Additional fields for user chat compatibility
+              fileUrl: response.fileUrl,        // Explicit fileUrl
+              filePath: response.fileUrl,       // Alternative
+              publicUrl: response.fileUrl       // Clear public URL
+            };
+            
+            resolve(attachmentData);
+          } else {
+            reject(new Error(response.message || 'Upload failed'));
+          }
+        } catch (e) {
+          reject(new Error('Invalid server response'));
+        }
+      } else {
+        reject(new Error(`Upload failed with status: ${xhr.status}`));
+      }
+    });
+    
+    xhr.addEventListener('error', function() {
+      progressDiv.style.display = 'none';
+      reject(new Error('Network error during upload'));
+    });
+    
+    xhr.open('POST', '/upload');
+    xhr.send(formData);
+  });
+}
+
 // Connection events
 socket.on("connect", () => {
   console.log("✅ Socket Connected");
@@ -897,7 +993,7 @@ function scrollToBottomSmooth() {
   }
 }
 
-// ===== FILE ATTACHMENT DISPLAY - FIXED VERSION (guarantees inline images) =====
+// ===== FORMAT FILE SIZE =====
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -906,35 +1002,42 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// ===== FILE ATTACHMENT DISPLAY - ENHANCED FOR USER COMPATIBILITY =====
 function renderAttachment(attachment) {
   if (!attachment) return '';
   
   let html = '<div class="attachment">';
   
-  // FIXED: Handle both URL and base64 data
-  let fileUrl = attachment.data || attachment.url;
+  // GET FILE URL - HANDLE MULTIPLE POSSIBLE FIELDS
+  let fileUrl = attachment.url || attachment.data || attachment.fileUrl || 
+                attachment.path || attachment.filePath || attachment.publicUrl;
   
   // If it's base64 data without prefix, add the data URL prefix
   if (fileUrl && !fileUrl.startsWith('http') && !fileUrl.startsWith('data:')) {
-    const mimeType = attachment.mimetype || 'application/octet-stream';
+    const mimeType = attachment.mimetype || attachment.type || 'application/octet-stream';
     fileUrl = `data:${mimeType};base64,${fileUrl}`;
   }
   
-  // ✅ FIXED: Enhanced mimetype detection for images
+  // Enhanced mimetype detection for images
   let mimetype = attachment.mimetype || attachment.type || '';
   
   // If no mimetype, try to guess from file name extension
-  if (!mimetype && attachment.name) {
-    const name = attachment.name.toLowerCase();
+  if (!mimetype && (attachment.name || attachment.originalname || attachment.filename)) {
+    const name = (attachment.name || attachment.originalname || attachment.filename).toLowerCase();
     if (name.endsWith('.jpg') || name.endsWith('.jpeg')) mimetype = 'image/jpeg';
     else if (name.endsWith('.png')) mimetype = 'image/png';
-    else if (name.endsWith('.gif')) mimetype = 'image/gif';
+    else if (name.endsWith('.gif')) mimetype = 'image/gigif';
     else if (name.endsWith('.webp')) mimetype = 'image/webp';
     else if (name.endsWith('.svg')) mimetype = 'image/svg+xml';
+    else if (name.endsWith('.pdf')) mimetype = 'application/pdf';
+    else if (name.endsWith('.doc') || name.endsWith('.docx')) mimetype = 'application/msword';
   }
   
-  // ✅ FIXED: Force inline display for images
-  if (mimetype.startsWith('image/')) {
+  // Always display images inline if we can detect they're images
+  if (mimetype.startsWith('image/') || 
+      (fileUrl && (fileUrl.includes('.jpg') || fileUrl.includes('.jpeg') || 
+                   fileUrl.includes('.png') || fileUrl.includes('.gif') || 
+                   fileUrl.includes('.webp')))) {
     html += `<img src="${fileUrl}" alt="${attachment.name || 'Image'}" class="attachment-image" onclick="showFullscreenImage('${fileUrl}')">`;
   } else {
     const fileName = attachment.name || attachment.originalname || attachment.filename || 'File';
@@ -956,9 +1059,9 @@ function renderAttachment(attachment) {
   return html;
 }
 
-// ===== MESSAGE DISPLAY - FIXED VERSION =====
+// ===== MESSAGE DISPLAY - ENHANCED VERSION =====
 function displayMessage(msg) {
-  // ✅ FIXED: Use server-provided ID as primary, fallback to composite
+  // Use server-provided ID as primary, fallback to composite
   const messageId = msg.id || `msg_${msg.timestamp}_${msg.sender}`;
   
   // Skip if we've already displayed this message (except for temp messages)
@@ -1026,6 +1129,9 @@ function displayMessage(msg) {
   const images = div.querySelectorAll('.attachment-image');
   images.forEach(img => {
     img.style.cursor = 'pointer';
+    img.onclick = function() {
+      showFullscreenImage(this.src);
+    };
   });
   
   if (isScrolledToBottom || isAgent) {
@@ -1061,6 +1167,9 @@ function updateMessageElement(element, msg) {
   const images = element.querySelectorAll('.attachment-image');
   images.forEach(img => {
     img.style.cursor = 'pointer';
+    img.onclick = function() {
+      showFullscreenImage(this.src);
+    };
   });
 }
 
@@ -1093,27 +1202,35 @@ socket.on("message_history", (messages) => {
   setTimeout(scrollToBottom, 100);
 });
 
-// ✅ FIXED: Add message send confirmation handlers
+// FIXED: Handle both old and new message delivery events
 socket.on("agent_message_delivered", (msg) => {
-  console.log('Message delivered:', msg);
+  console.log('Message delivered to user:', msg);
   
-  // Find and update the temporary message
-  if (msg.whatsapp === whatsapp) {
-    // Remove temporary message if it exists
-    const tempElements = document.querySelectorAll('[data-is-temporary="true"]');
-    tempElements.forEach(element => {
-      const messageId = element.dataset.messageId;
-      if (messageId && messageId.startsWith('temp_')) {
-        element.remove();
-        displayedMessageIds.delete(messageId);
-      }
-    });
-    
-    // Display the confirmed message
-    displayMessage(msg);
-  }
+  if (msg.whatsapp !== whatsapp) return;
   
+  // Remove temporary messages
+  const tempElements = document.querySelectorAll('[data-is-temporary="true"]');
+  tempElements.forEach(element => {
+    const messageId = element.dataset.messageId;
+    if (messageId && messageId.startsWith('temp_')) {
+      element.remove();
+      displayedMessageIds.delete(messageId);
+    }
+  });
+  
+  // Display the confirmed message
+  displayMessage(msg);
   finishMessageSend();
+});
+
+// NEW: Handle new_message events (for user messages)
+socket.on("new_message", (msg) => {
+  console.log('New message received from user:', msg);
+  
+  if (msg.whatsapp !== whatsapp) return;
+  
+  // Display the message
+  displayMessage(msg);
 });
 
 socket.on("agent_message_error", (error) => {
@@ -1122,7 +1239,7 @@ socket.on("agent_message_error", (error) => {
   finishMessageSend();
 });
 
-// ===== MESSAGE SENDING - FIXED VERSION (with guaranteed inline images) =====
+// ===== MESSAGE SENDING - ENHANCED VERSION =====
 async function sendMessage() {
   if (!sendController.canSend()) {
     return;
@@ -1176,53 +1293,27 @@ async function sendMessage() {
     `;
     messagesDiv.appendChild(sendingDiv);
     
-    // ✅ FIXED: UPLOAD FILE VIA HTTP (NOT Socket.IO)
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("whatsapp", whatsapp);
-    formData.append("agentId", agentId);
-    
     try {
       // Upload file to server
-      const response = await fetch("/upload", {
-        method: "POST",
-        body: formData
-      });
+      const attachmentData = await uploadFile(file, tempId);
       
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Upload failed');
-      }
-      
-      // ✅ CRITICAL FIX: Ensure mimetype is properly set for images
-      const mimetype = data.mimetype || file.type;
-      
-      // ✅ CRITICAL FIX: Send the attachment data in the correct format
-      socket.emit("agent_message", {
+      // CRITICAL: Send in format compatible with USER chat
+      const messageData = {
         whatsapp: whatsapp,
         sender: "agent",
         message: text || "",
         timestamp: new Date().toISOString(),
         agentId: agentId,
         tempId: tempId,
-        attachment: {
-          url: data.fileUrl,           // ✅ REAL FILE URL from server
-          data: data.fileUrl,          // ✅ ALSO include as data for compatibility
-          name: data.originalName || file.name,
-          filename: data.originalName || file.name,
-          originalname: data.originalName || file.name,
-          size: data.size || file.size,
-          mimetype: mimetype,          // ✅ CRITICAL: Must include correct mimetype
-          type: mimetype               // ✅ Also include as 'type' for compatibility
-        }
-      });
+        attachment: attachmentData, // Use the properly formatted attachment
+        // Add user-compatible fields
+        userId: whatsapp, // For user chat compatibility
+        text: text || "", // Some systems expect 'text'
+        fileUrl: attachmentData.url // Explicit fileUrl for user
+      };
       
-      console.log('✅ File uploaded successfully:', data);
+      console.log('📤 Sending message with attachment:', messageData);
+      socket.emit("agent_message", messageData);
       
     } catch (error) {
       console.error('❌ Upload error:', error);
@@ -1264,7 +1355,10 @@ async function sendMessage() {
       timestamp: new Date().toISOString(),
       agentId: agentId,
       sender: 'agent',
-      tempId: tempId
+      tempId: tempId,
+      // Add user-compatible fields
+      userId: whatsapp,
+      text: text
     };
     
     console.log('Sending text message:', messageData);
@@ -1296,6 +1390,7 @@ function resetInput() {
   document.getElementById("messageInput").style.height = 'auto';
   document.getElementById("filePreview").style.display = 'none';
   document.getElementById('fileInput').value = '';
+  selectedFile = null;
   document.getElementById("messageInput").focus();
 }
 
@@ -1303,7 +1398,7 @@ function resetInput() {
 document.getElementById('fileInput').addEventListener('change', function() {
   const file = this.files[0];
   if (file) {
-    // FIXED: Add file size validation (10MB limit)
+    // Add file size validation (10MB limit)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       alert('File size exceeds 10MB limit. Please choose a smaller file.');
@@ -1311,6 +1406,7 @@ document.getElementById('fileInput').addEventListener('change', function() {
       return;
     }
     
+    selectedFile = file;
     const preview = document.getElementById('filePreview');
     const size = formatFileSize(file.size);
     preview.textContent = `📎 ${file.name} (${size}) - Ready to send`;
