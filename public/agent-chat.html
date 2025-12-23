@@ -659,17 +659,17 @@ function startConstantMessageChecking() {
   // Load messages immediately
   loadMessages();
   
-  // Then check every 2 seconds for new messages
+  // Then check every 5 seconds (less frequent)
   messageCheckInterval = setInterval(() => {
     if (whatsapp && isAgentLoggedIn && socket.connected) {
-      // Use a low-impact message check
-      socket.emit("check_new_messages", { 
+      // Just get message history (server handles deduplication)
+      socket.emit("get_messages", { 
         whatsapp, 
         agentId,
-        lastCheck: Date.now() - 5000 // Last 5 seconds
+        since: Date.now() - 10000 // Last 10 seconds only
       });
     }
-  }, 2000);
+  }, 5000); // Increased to 5 seconds
 }
 
 function stopConstantMessageChecking() {
@@ -845,17 +845,25 @@ socket.on("user_room_joined", (data) => {
   console.log(`✅ Ready to send/receive messages for ${data.whatsapp}`);
 });
 
-// Add this handler for server response to check_new_messages
-socket.on("new_messages_check", (data) => {
-  if (data.whatsapp === whatsapp && data.messages && data.messages.length > 0) {
-    data.messages.forEach(msg => {
-      // Only display if we haven't seen it
-      const messageId = msg.id || (msg.timestamp + '_' + (msg.text || ''));
-      if (!displayedMessageIds.has(messageId)) {
-        displayMessage(msg);
-      }
-    });
-  }
+// ✅ NEW: Handler for server-confirmed messages (SINGLE SOURCE OF TRUTH)
+socket.on("server_message_confirmed", (msg) => {
+  console.log('Server confirmed message:', msg);
+  
+  if (msg.whatsapp !== whatsapp) return;
+  
+  // Remove ALL temporary messages from this agent
+  const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
+  tempMessages.forEach(tempElement => {
+    // Only remove our own temp messages
+    const messageSender = tempElement.querySelector('.message-sender');
+    if (messageSender && messageSender.textContent === 'You') {
+      tempElement.remove();
+      displayedMessageIds.delete(tempElement.dataset.messageId);
+    }
+  });
+  
+  // Display the server-confirmed message
+  displayMessage(msg);
 });
 
 // ===== SCROLL MANAGEMENT =====
@@ -934,16 +942,33 @@ function renderAttachment(attachment) {
   return html;
 }
 
-// ===== MESSAGE DISPLAY =====
+// ===== MESSAGE DISPLAY - FIXED VERSION =====
 function displayMessage(msg) {
-  const messageId = msg.id || (msg.timestamp + '_' + (msg.text || ''));
-  if (displayedMessageIds.has(messageId)) return;
+  // ✅ FIXED: Use server-provided ID as primary, fallback to composite
+  const messageId = msg.id || `msg_${msg.timestamp}_${msg.sender}`;
   
-  displayedMessageIds.add(messageId);
+  // Skip if we've already displayed this message (except for temp messages)
+  if (displayedMessageIds.has(messageId) && !msg.isTemporary) {
+    return;
+  }
+  
+  // Add to displayed IDs if it's a real message
+  if (!msg.isTemporary) {
+    displayedMessageIds.add(messageId);
+  }
   
   const messagesDiv = document.getElementById("messages");
   const emptyState = messagesDiv.querySelector('.empty-state');
   if (emptyState) emptyState.remove();
+  
+  // Check if this is an update to a temporary message
+  if (msg.tempId) {
+    const tempElement = document.querySelector(`[data-message-id="${msg.tempId}"]`);
+    if (tempElement) {
+      tempElement.remove();
+      displayedMessageIds.delete(msg.tempId);
+    }
+  }
   
   const existingMessage = document.querySelector(`[data-message-id="${messageId}"]`);
   if (existingMessage && existingMessage.dataset.isTemporary !== 'true') {
@@ -1054,36 +1079,37 @@ socket.on("message_history", (messages) => {
   setTimeout(scrollToBottom, 100);
 });
 
-socket.on("new_message", (msg) => {
-  if (msg.whatsapp !== whatsapp) return;
-  displayMessage(msg);
-});
+// ❌ REMOVED: These handlers cause duplication
+// socket.on("new_message", (msg) => {
+//   if (msg.whatsapp !== whatsapp) return;
+//   displayMessage(msg);
+// });
 
-socket.on("broadcast_message", (msg) => {
-  // Listen for broadcast messages that might be from this agent
-  if (msg.whatsapp === whatsapp) {
-    displayMessage(msg);
-  }
-});
+// socket.on("broadcast_message", (msg) => {
+//   // Listen for broadcast messages that might be from this agent
+//   if (msg.whatsapp === whatsapp) {
+//     displayMessage(msg);
+//   }
+// });
 
-// FIXED: Add handler for user-specific messages
-socket.on("user_message_update", (msg) => {
-  if (msg.whatsapp === whatsapp) {
-    displayMessage(msg);
-  }
-});
+// ❌ REMOVED: These handlers cause duplication
+// socket.on("user_message_update", (msg) => {
+//   if (msg.whatsapp === whatsapp) {
+//     displayMessage(msg);
+//   }
+// });
 
-// FIXED: Add handler for agent's own messages (from broadcast)
-socket.on("agent_message_success", (msg) => {
-  if (msg.whatsapp === whatsapp) {
-    // Update temporary message to permanent
-    const tempElement = document.querySelector(`[data-message-id="temp_"]`);
-    if (tempElement) {
-      displayMessage(msg);
-      tempElement.remove();
-    }
-  }
-});
+// ❌ REMOVED: These handlers cause duplication
+// socket.on("agent_message_success", (msg) => {
+//   if (msg.whatsapp === whatsapp) {
+//     // Update temporary message to permanent
+//     const tempElement = document.querySelector(`[data-message-id="temp_"]`);
+//     if (tempElement) {
+//       displayMessage(msg);
+//       tempElement.remove();
+//     }
+//   }
+// });
 
 // ===== ADD MESSAGE SEND CONFIRMATION HANDLERS =====
 socket.on("agent_message_delivered", (msg) => {
@@ -1114,7 +1140,7 @@ socket.on("agent_message_error", (error) => {
   finishMessageSend();
 });
 
-// ===== MESSAGE SENDING - FIXED FILE UPLOAD =====
+// ===== MESSAGE SENDING - FIXED VERSION =====
 async function sendMessage() {
   if (!sendController.canSend()) {
     return;
@@ -1142,74 +1168,61 @@ async function sendMessage() {
   sendBtn.textContent = '...';
   sendingIndicator.style.display = 'block';
   
-  const tempMsg = {
-    sender: 'agent',
-    text: text || 'Sending file...',
-    timestamp: new Date().toISOString(),
-    id: 'temp_' + Date.now(),
-    isTemporary: true,
-    whatsapp: whatsapp
-  };
+  // Create temporary message with unique ID
+  const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
-  displayMessage(tempMsg);
-  
-  // FIXED: Create proper message data structure
-  const messageData = {
-    whatsapp: whatsapp,
-    message: text,
-    timestamp: tempMsg.timestamp,
-    agentId: agentId,
-    sender: 'agent'  // Explicitly set sender
-  };
-  
+  // ✅ FIXED: Only show a minimal placeholder, not the full message
   if (fileInput.files.length > 0) {
     const file = fileInput.files[0];
     const preview = document.getElementById('filePreview');
     preview.textContent = `📤 Uploading ${file.name}...`;
     preview.style.display = 'block';
     
-    // FIXED: Use proper file handling for server
+    // Show sending indicator in chat
+    const messagesDiv = document.getElementById("messages");
+    const sendingDiv = document.createElement("div");
+    sendingDiv.className = 'message-container agent-message';
+    sendingDiv.dataset.messageId = tempId;
+    sendingDiv.dataset.isTemporary = 'true';
+    sendingDiv.style.opacity = '0.6';
+    sendingDiv.style.fontStyle = 'italic';
+    sendingDiv.innerHTML = `
+      <div class="message-header">
+        <span class="message-sender">You</span>
+        <span class="message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+      <div class="message-content">Sending ${file.type.startsWith('image/') ? 'image' : 'file'}...</div>
+    `;
+    messagesDiv.appendChild(sendingDiv);
+    
+    // Upload file
     const reader = new FileReader();
     
     reader.onload = () => {
-      // FIXED: Send file data in correct format expected by server
-      const base64Data = reader.result.split(',')[1]; // Remove data:image/...;base64, prefix
+      const base64Data = reader.result.split(',')[1];
       
-      messageData.attachment = {
-        originalname: file.name,
-        filename: file.name,
-        mimetype: file.type,
-        size: file.size,
-        data: base64Data,  // Send as base64 without prefix
-        encoding: 'base64'
+      const messageData = {
+        whatsapp: whatsapp,
+        message: text || '',  // Send empty string if no text
+        timestamp: new Date().toISOString(),
+        agentId: agentId,
+        sender: 'agent',
+        tempId: tempId,  // ✅ NEW: Send temp ID to server
+        attachment: {
+          originalname: file.name,
+          filename: file.name,
+          mimetype: file.type,
+          size: file.size,
+          data: base64Data,
+          encoding: 'base64'
+        }
       };
       
-      // Update the temporary message preview
-      const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
-      if (tempElement) {
-        const contentElement = tempElement.querySelector('.message-content');
-        if (contentElement) {
-          // Create preview for the file being sent
-          let previewHtml = text || '';
-          if (file.type.startsWith('image/')) {
-            previewHtml += `<div class="attachment"><img src="${reader.result}" alt="${file.name}" class="attachment-image" style="max-width: 200px;"></div>`;
-          } else {
-            previewHtml += `<div class="attachment"><div class="attachment-file"><span class="attachment-icon">📄</span><div class="attachment-info"><div class="attachment-name">${file.name}</div></div></div></div>`;
-          }
-          contentElement.innerHTML = previewHtml;
-        }
-      }
-      
-      console.log('Sending agent message with attachment:', messageData);
-      
-      // FIXED: Send message with attachment
+      console.log('Sending message with attachment:', messageData);
       socket.emit("agent_message_with_attachment", messageData);
       
-      // Reset input and prepare for next message
-      setTimeout(() => {
-        resetInput();
-        finishMessageSend();
-      }, 500);
+      // Reset input immediately
+      resetInput();
     };
     
     reader.onerror = (error) => {
@@ -1217,23 +1230,46 @@ async function sendMessage() {
       alert('Error reading file. Please try again.');
       finishMessageSend();
       resetInput();
-      const tempElement = document.querySelector(`[data-message-id="${tempMsg.id}"]`);
-      if (tempElement) tempElement.remove();
-      displayedMessageIds.delete(tempMsg.id);
+      sendingDiv.remove();
     };
     
     reader.readAsDataURL(file);
   } else {
-    // Text-only message
-    console.log('Sending agent message:', messageData);
+    // Text-only message - show minimal placeholder
+    const messagesDiv = document.getElementById("messages");
+    const sendingDiv = document.createElement("div");
+    sendingDiv.className = 'message-container agent-message';
+    sendingDiv.dataset.messageId = tempId;
+    sendingDiv.dataset.isTemporary = 'true';
+    sendingDiv.style.opacity = '0.6';
+    sendingDiv.style.fontStyle = 'italic';
+    sendingDiv.innerHTML = `
+      <div class="message-header">
+        <span class="message-sender">You</span>
+        <span class="message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+      <div class="message-content">Sending...</div>
+    `;
+    messagesDiv.appendChild(sendingDiv);
+    
+    const messageData = {
+      whatsapp: whatsapp,
+      message: text,
+      timestamp: new Date().toISOString(),
+      agentId: agentId,
+      sender: 'agent',
+      tempId: tempId  // ✅ NEW: Send temp ID to server
+    };
+    
+    console.log('Sending text message:', messageData);
     socket.emit("agent_message", messageData);
     resetInput();
-    
-    // Timeout fallback
-    setTimeout(() => {
-      finishMessageSend();
-    }, 3000);
   }
+  
+  // Auto-finish after timeout (fallback)
+  setTimeout(() => {
+    finishMessageSend();
+  }, 5000);
 }
 
 function finishMessageSend() {
