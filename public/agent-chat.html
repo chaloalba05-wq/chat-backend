@@ -1209,17 +1209,17 @@ async function sendMessage() {
         sender: 'agent',
         tempId: tempId,  // ✅ NEW: Send temp ID to server
         attachment: {
-          originalname: file.name,
-          filename: file.name,
-          mimetype: file.type,
+          type: file.type.startsWith('image/') ? 'image' : 'file',
+          url: reader.result, // Use data URL
+          name: file.name,
           size: file.size,
-          data: base64Data,
-          encoding: 'base64'
+          mimetype: file.type
         }
       };
       
       console.log('Sending message with attachment:', messageData);
-      socket.emit("agent_message_with_attachment", messageData);
+      // ✅ FIXED: Use the same agent_message event for both text and files
+      socket.emit("agent_message", messageData);
       
       // Reset input immediately
       resetInput();

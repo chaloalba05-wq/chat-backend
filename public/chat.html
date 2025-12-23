@@ -167,7 +167,7 @@
       height: 100vh;
       height: -webkit-fill-available;
       background: #f8f9fa;
-      position: fixed; /* FIXED: Changed to fixed */
+      position: fixed;
       top: 0;
       left: 0;
       right: 0;
@@ -776,6 +776,42 @@
       background: #f44336;
       color: white;
     }
+
+    /* ===== LOADING OVERLAY ===== */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      display: none;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+      margin-top: 16px;
+      color: #333;
+      font-size: 14px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -784,6 +820,12 @@
 <div id="header">
   <div class="logo-text">ALBASTUZ3D</div>
   <div class="logo-subtext">OFFICIAL SUPPORT</div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Restoring chat session...</div>
 </div>
 
 <!-- Registration section -->
@@ -874,6 +916,98 @@
   let selectedFile = null;
   let isScrolledToBottom = true;
   
+  // ===== SESSION PERSISTENCE MANAGER =====
+  const SessionManager = {
+    STORAGE_KEYS: {
+      SESSION: 'chat_session',
+      MESSAGES: 'chat_messages_',
+      OFFLINE_MESSAGES: 'offline_messages_'
+    },
+    
+    SESSION_DURATION: 24 * 60 * 60 * 1000, // 24 hours
+    
+    // Save complete session state
+    saveSession() {
+      if (!whatsapp) return;
+      
+      try {
+        const session = {
+          whatsapp: whatsapp,
+          timestamp: Date.now(),
+          isInChat: document.getElementById("chat").style.display === "flex",
+          inputValue: document.getElementById("messageInput").value || ''
+        };
+        
+        localStorage.setItem(this.STORAGE_KEYS.SESSION, JSON.stringify(session));
+        console.log('💾 Saved session state');
+      } catch (error) {
+        console.error('Error saving session:', error);
+      }
+    },
+    
+    // Restore session on page load
+    restoreSession() {
+      try {
+        const sessionData = localStorage.getItem(this.STORAGE_KEYS.SESSION);
+        if (!sessionData) return null;
+        
+        const session = JSON.parse(sessionData);
+        
+        // Check if session is expired
+        if (Date.now() - session.timestamp > this.SESSION_DURATION) {
+          this.clearSession();
+          return null;
+        }
+        
+        console.log('📂 Restored session:', session);
+        return session;
+      } catch (error) {
+        console.error('Error restoring session:', error);
+        return null;
+      }
+    },
+    
+    // Clear session data
+    clearSession() {
+      try {
+        localStorage.removeItem(this.STORAGE_KEYS.SESSION);
+        console.log('🧹 Cleared session data');
+      } catch (error) {
+        console.error('Error clearing session:', error);
+      }
+    },
+    
+    // Save current view state
+    saveViewState() {
+      if (!whatsapp) return;
+      
+      try {
+        const viewState = {
+          whatsapp: whatsapp,
+          chatVisible: document.getElementById("chat").style.display === "flex",
+          lastScrollPosition: document.getElementById("messages")?.scrollTop || 0
+        };
+        
+        sessionStorage.setItem('chat_view_state', JSON.stringify(viewState));
+      } catch (error) {
+        console.error('Error saving view state:', error);
+      }
+    },
+    
+    // Restore view state
+    restoreViewState() {
+      try {
+        const viewState = sessionStorage.getItem('chat_view_state');
+        if (viewState) {
+          return JSON.parse(viewState);
+        }
+      } catch (error) {
+        console.error('Error restoring view state:', error);
+      }
+      return null;
+    }
+  };
+  
   // ===== ENHANCED LOCAL STORAGE FOR MESSAGE PERSISTENCE =====
   const MessageStorage = {
     storageKey: 'chat_messages_',
@@ -952,18 +1086,6 @@
       } catch (error) {
         console.error('Error clearing old messages:', error);
       }
-    },
-    
-    clearCurrentMessages() {
-      if (!whatsapp) return;
-      
-      try {
-        const key = this.getStorageKey();
-        localStorage.removeItem(key);
-        console.log('🧹 Cleared current messages from localStorage');
-      } catch (error) {
-        console.error('Error clearing current messages:', error);
-      }
     }
   };
   
@@ -971,14 +1093,14 @@
   const PersistentConnection = {
     isConnected: false,
     reconnectAttempts: 0,
-    maxReconnectAttempts: 50, // Increased from 20
+    maxReconnectAttempts: 50,
     reconnectDelay: 1000,
-    maxReconnectDelay: 60000, // Increased from 30000
+    maxReconnectDelay: 60000,
     heartbeatInterval: null,
     connectionCheckInterval: null,
     lastActivityTime: Date.now(),
     connectionState: 'disconnected',
-    offlineMessages: [], // Store messages while offline
+    offlineMessages: [],
     lastSuccessfulConnection: null,
     
     init() {
@@ -1008,7 +1130,6 @@
     },
     
     setupActivityTracking() {
-      // Track user activity to prevent timeout
       const activityEvents = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
       activityEvents.forEach(event => {
         document.addEventListener(event, () => {
@@ -1016,7 +1137,6 @@
         }, { passive: true });
       });
       
-      // Send activity ping every minute if user is active
       setInterval(() => {
         const inactiveTime = Date.now() - this.lastActivityTime;
         if (inactiveTime < 60000 && socket.connected) {
@@ -1026,13 +1146,11 @@
     },
     
     setupVisibilityTracking() {
-      // Handle page visibility changes
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           console.log('👀 Page became visible, checking connection...');
           this.reconnectIfNeeded();
           
-          // Refresh messages if we've been away for a while
           const timeAway = Date.now() - this.lastActivityTime;
           if (timeAway > 30000 && whatsapp && socket.connected) {
             console.log('🔄 Refreshing messages after being away');
@@ -1041,13 +1159,11 @@
         }
       });
       
-      // Handle page focus/blur
       window.addEventListener('focus', () => {
         console.log('🎯 Window focused, checking connection...');
         this.reconnectIfNeeded();
       });
       
-      // Handle online/offline events
       window.addEventListener('online', () => {
         console.log('🌐 Internet connection restored');
         this.showConnectionStatus('connected', 'Back online - Reconnecting...');
@@ -1061,7 +1177,6 @@
     },
     
     setupOfflineStorage() {
-      // Check for unsent messages on startup
       window.addEventListener('load', () => {
         this.checkOfflineMessages();
       });
@@ -1075,7 +1190,6 @@
           console.log('📨 Found offline messages:', messages.length);
           
           if (messages.length > 0 && socket.connected) {
-            // Try to resend offline messages
             this.resendOfflineMessages(messages);
           }
         }
@@ -1099,7 +1213,6 @@
           offlineTimestamp: Date.now()
         });
         
-        // Keep only last 20 offline messages
         if (messages.length > 20) {
           messages = messages.slice(-20);
         }
@@ -1127,10 +1240,9 @@
             });
             console.log('🔄 Resent offline message:', msg);
           }
-        }, index * 1000); // Stagger resends by 1 second
+        }, index * 1000);
       });
       
-      // Clear offline messages after resending
       localStorage.removeItem('offline_messages_' + whatsapp);
     },
     
@@ -1138,7 +1250,6 @@
       if (!socket.connected) {
         this.reconnectWithBackoff();
       } else {
-        // Connection is good, update status
         if (this.connectionState !== 'connected') {
           this.connectionState = 'connected';
           this.lastSuccessfulConnection = Date.now();
@@ -1168,8 +1279,6 @@
         if (!socket.connected) {
           this.reconnectAttempts++;
           console.log(`🔌 Reconnection attempt ${this.reconnectAttempts}`);
-          
-          // Force new connection
           socket.disconnect();
           socket.connect();
         }
@@ -1330,10 +1439,8 @@
       const scrollHeight = messagesDiv.scrollHeight;
       const clientHeight = messagesDiv.clientHeight;
       
-      // Check if we're near the bottom (within 50px)
       isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 50;
       
-      // Show/hide scroll to bottom button
       if (!isScrolledToBottom) {
         scrollToBottomBtn.classList.add('visible');
       } else {
@@ -1341,7 +1448,6 @@
       }
     }, { passive: true });
     
-    // Scroll to bottom button click handler
     scrollToBottomBtn.addEventListener('click', scrollToBottom);
   }
   
@@ -1370,19 +1476,16 @@
     PersistentConnection.showConnectionStatus('connected', 'Connected');
     PersistentConnection.resetReconnection();
     
-    // Re-register if we have a whatsapp number
     if (whatsapp) {
       console.log("🔄 Re-registering after reconnect:", whatsapp);
       socket.emit("register", { whatsapp: whatsapp });
       
-      // Load messages from localStorage first (immediate display)
       const localMessages = MessageStorage.loadMessages();
       if (localMessages.length > 0) {
         console.log("📂 Displaying messages from localStorage:", localMessages.length);
-        displayMessages(localMessages, false); // Don't scroll
+        displayMessages(localMessages, false);
       }
       
-      // Then get fresh messages from server
       socket.emit("get_messages", { whatsapp: whatsapp });
     }
   });
@@ -1392,14 +1495,11 @@
     PersistentConnection.connectionState = 'disconnected';
     
     if (reason === 'io server disconnect') {
-      // Server initiated disconnect, need to manually reconnect
       PersistentConnection.showConnectionStatus('disconnected', 'Server disconnected - Reconnecting...');
       setTimeout(() => socket.connect(), 2000);
     } else if (reason === 'io client disconnect') {
-      // Client initiated disconnect, do nothing
       PersistentConnection.showConnectionStatus('disconnected', 'Disconnected');
     } else {
-      // Network error or other issues
       PersistentConnection.showConnectionStatus('disconnected', 'Connection lost - Reconnecting...');
       PersistentConnection.reconnectWithBackoff();
     }
@@ -1415,7 +1515,6 @@
     PersistentConnection.showConnectionStatus('connected', 'Reconnected');
     PersistentConnection.resetReconnection();
     
-    // Refresh messages after reconnection
     if (whatsapp) {
       setTimeout(() => {
         socket.emit("get_messages", { whatsapp: whatsapp });
@@ -1436,7 +1535,6 @@
     console.log('🛑 Reconnection failed');
     PersistentConnection.showConnectionStatus('disconnected', 'Connection failed. Working offline.');
     
-    // Show offline message
     const messagesDiv = document.getElementById("messages");
     if (messagesDiv) {
       const offlineNotice = document.createElement("div");
@@ -1457,7 +1555,6 @@
   socket.on("registered", (data) => {
     console.log("✅ Registration successful:", data);
     
-    // Save registration info
     try {
       localStorage.setItem('last_whatsapp', whatsapp);
       localStorage.setItem('last_registration', Date.now());
@@ -1466,7 +1563,6 @@
     }
   });
 
-  // ===== WAIT FOR SERVER CONFIRMATION BEFORE DISPLAYING =====
   socket.on("new_message", (msg) => {
     console.log("📨 New message received from server:", {
       id: msg.id,
@@ -1476,11 +1572,8 @@
     });
     
     displayMessage(msg);
-    
-    // Save all messages to localStorage for persistence
     saveAllMessagesToStorage();
     
-    // Clear sending state if this is our own message (FIX: This was missing)
     if (msg.sender === "user") {
       finishMessageSend();
     }
@@ -1489,37 +1582,31 @@
   socket.on("message_history", (messages) => {
     console.log("📜 Message history from server:", messages.length, "messages");
     
-    // Load existing messages from localStorage
     const localMessages = MessageStorage.loadMessages();
-    
-    // Merge server messages with local messages, preferring server data
     const allMessages = mergeMessages(localMessages, messages);
     
-    // Display merged messages
     displayMessages(allMessages);
-    
-    // Save merged messages to localStorage
     MessageStorage.saveMessages(allMessages);
+    
+    // Hide loading overlay when messages are loaded
+    document.getElementById('loadingOverlay').style.display = 'none';
   });
 
   function mergeMessages(localMessages, serverMessages) {
     const messageMap = new Map();
     
-    // Add local messages first
     localMessages.forEach(msg => {
       if (msg.id) {
         messageMap.set(msg.id, msg);
       }
     });
     
-    // Overwrite with server messages (they are more authoritative)
     serverMessages.forEach(msg => {
       if (msg.id) {
         messageMap.set(msg.id, msg);
       }
     });
     
-    // Convert back to array and sort by timestamp
     const merged = Array.from(messageMap.values());
     merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     
@@ -1539,14 +1626,13 @@
       const sender = element.classList.contains('user-message') ? 'user' : 'agent';
       const contentElement = element.querySelector('.message-content');
       const timeElement = element.querySelector('.message-time');
-      const senderElement = element.querySelector('.message-sender');
       
       if (contentElement && timeElement) {
         const message = {
           id: messageId || Date.now().toString(),
           sender: sender,
           text: contentElement.textContent.trim(),
-          timestamp: new Date().toISOString(), // We'd need to parse the time element
+          timestamp: new Date().toISOString(),
           message: contentElement.textContent.trim()
         };
         
@@ -1584,7 +1670,6 @@
       ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
     `;
     
-    // Store the message ID as a data attribute
     messageDiv.dataset.messageId = msg.id || 'no-id';
     
     return messageDiv;
@@ -1593,7 +1678,6 @@
   function displayMessage(msg, scroll = true) {
     const messagesDiv = document.getElementById("messages");
     
-    // Remove empty state if present
     const emptyState = messagesDiv.querySelector('.empty-state');
     if (emptyState) {
       emptyState.remove();
@@ -1602,7 +1686,6 @@
     const messageElement = createMessageElement(msg);
     messagesDiv.appendChild(messageElement);
     
-    // Only auto-scroll if we're at the bottom or this is our own message
     if (scroll && (isScrolledToBottom || msg.sender === "user")) {
       Promise.resolve().then(() => {
         scrollToBottomSmooth();
@@ -1613,7 +1696,6 @@
   function displayMessages(messages, scroll = true) {
     const messagesDiv = document.getElementById("messages");
     
-    // Clear messages div
     messagesDiv.innerHTML = '';
     
     if (messages.length === 0) {
@@ -1624,15 +1706,12 @@
       return;
     }
     
-    // Use DocumentFragment for batch DOM operations
     const fragment = document.createDocumentFragment();
     
-    // Sort messages by timestamp (oldest to newest)
     const sortedMessages = messages.sort((a, b) => 
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
     
-    // Display all messages (no deduplication)
     sortedMessages.forEach(msg => {
       const messageElement = createMessageElement(msg);
       fragment.appendChild(messageElement);
@@ -1640,7 +1719,6 @@
     
     messagesDiv.appendChild(fragment);
     
-    // Scroll to bottom after loading history
     if (scroll) {
       setTimeout(scrollToBottom, 50);
     }
@@ -1681,7 +1759,7 @@
     `;
   }
 
-  // ===== REGISTRATION =====
+  // ===== ENHANCED REGISTRATION WITH SESSION RESTORATION =====
   function register() {
     const input = document.getElementById("whatsapp");
     whatsapp = input.value.trim();
@@ -1699,16 +1777,12 @@
     console.log("Registering:", whatsapp);
     socket.emit("register", { whatsapp: whatsapp });
 
-    document.getElementById("register").style.display = "none";
-    document.getElementById("chat").style.display = "flex";
-    document.getElementById("chatNumber").textContent = whatsapp;
+    showChatInterface();
     
-    sendController.reset();
+    // Save session
+    SessionManager.saveSession();
     
-    // Setup scroll listener after chat is visible
-    setTimeout(setupScrollListener, 100);
-    
-    // Load messages from localStorage first (for immediate display)
+    // Load messages from localStorage first
     const localMessages = MessageStorage.loadMessages();
     if (localMessages.length > 0) {
       console.log("📂 Loading messages from localStorage:", localMessages.length);
@@ -1722,6 +1796,71 @@
     setTimeout(() => {
       document.getElementById("messageInput").focus();
     }, 300);
+  }
+
+  function showChatInterface() {
+    document.getElementById("register").style.display = "none";
+    document.getElementById("chat").style.display = "flex";
+    document.getElementById("chatNumber").textContent = whatsapp;
+    
+    sendController.reset();
+    
+    // Setup scroll listener after chat is visible
+    setTimeout(setupScrollListener, 100);
+  }
+
+  // ===== AUTOMATIC SESSION RESTORATION ON PAGE LOAD =====
+  function restoreChatSession() {
+    const session = SessionManager.restoreSession();
+    
+    if (session && session.isInChat && session.whatsapp) {
+      console.log('🔄 Restoring chat session for:', session.whatsapp);
+      
+      // Show loading overlay
+      document.getElementById('loadingOverlay').style.display = 'flex';
+      document.getElementById('loadingText').textContent = 'Restoring chat session...';
+      
+      // Set the whatsapp number
+      whatsapp = session.whatsapp;
+      
+      // Show chat interface immediately for better UX
+      showChatInterface();
+      
+      // Restore input value if any
+      if (session.inputValue) {
+        document.getElementById('messageInput').value = session.inputValue;
+      }
+      
+      // Connect to socket and re-register
+      if (socket && !socket.connected) {
+        socket.connect();
+      }
+      
+      // Load messages from localStorage immediately
+      const localMessages = MessageStorage.loadMessages();
+      if (localMessages.length > 0) {
+        console.log("📂 Loading messages from localStorage:", localMessages.length);
+        displayMessages(localMessages, false);
+        document.getElementById('loadingText').textContent = 'Loading messages...';
+      }
+      
+      // Register with server and get updated messages
+      setTimeout(() => {
+        if (socket.connected) {
+          socket.emit("register", { whatsapp: whatsapp });
+          socket.emit("get_messages", { whatsapp: whatsapp });
+        } else {
+          // If socket not connected, still hide loading after a timeout
+          setTimeout(() => {
+            document.getElementById('loadingOverlay').style.display = 'none';
+          }, 2000);
+        }
+      }, 1000);
+      
+      return true;
+    }
+    
+    return false;
   }
 
   // ===== FILE HANDLING =====
@@ -1800,7 +1939,7 @@
     xhr.send(formData);
   }
 
-  // ===== WAIT FOR SERVER CONFIRMATION MESSAGE SENDING =====
+  // ===== MESSAGE SENDING =====
   function sendMessage() {
     const canSend = sendController.canSend();
     if (!canSend.canSend) {
@@ -1827,12 +1966,11 @@
     sendingIndicator.style.display = 'block';
     errorMessage.style.display = 'none';
     
-    // Add a timeout fallback in case server doesn't respond (FIX: This was missing)
     const sendTimeout = setTimeout(() => {
       console.log("⚠️ Send timeout - clearing sending state");
       finishMessageSend();
       showError("Message sent but waiting for confirmation. It may appear shortly.");
-    }, 10000); // 10 second timeout
+    }, 10000);
     
     if (fileInput.files.length > 0) {
       uploadFile(function(fileInfo) {
@@ -1847,10 +1985,8 @@
           };
           
           if (socket.connected) {
-            // Send to server - message will display when server confirms with new_message event
             socket.emit("user_message", messageData);
           } else {
-            // Save for offline sending
             console.log("📴 Offline - saving message for later");
             PersistentConnection.saveOfflineMessage(messageData);
             showError("Offline - Message saved locally. Will send when reconnected.");
@@ -1885,7 +2021,6 @@
         document.getElementById("filePreview").innerHTML = "";
         document.getElementById("filePreview").style.display = 'none';
         
-        // Reset input height
         const messageInput = document.getElementById("messageInput");
         messageInput.style.height = 'auto';
         messageInput.style.height = '50px';
@@ -1900,7 +2035,6 @@
       };
       
       if (socket.connected) {
-        // Send to server - message will display when server confirms with new_message event
         socket.emit("user_message", messageData);
       } else {
         console.log("📴 Offline - saving message for later");
@@ -1912,7 +2046,6 @@
       
       document.getElementById("messageInput").value = "";
       
-      // Reset input height
       const messageInput = document.getElementById("messageInput");
       messageInput.style.height = 'auto';
       messageInput.style.height = '50px';
@@ -1929,7 +2062,9 @@
     sendButton.textContent = "Send";
     sendingIndicator.style.display = 'none';
     
-    // Refocus on input after sending
+    // Save session state after sending message
+    SessionManager.saveSession();
+    
     document.getElementById("messageInput").focus();
   }
   
@@ -1962,27 +2097,13 @@
     }
   });
 
-  // Auto-resize message input
   document.getElementById("messageInput").addEventListener("input", function() {
     this.style.height = 'auto';
     const newHeight = Math.min(this.scrollHeight, 120);
     this.style.height = newHeight + 'px';
-  });
-
-  // Handle keyboard show/hide on mobile
-  let viewportHeight = window.innerHeight;
-  
-  window.addEventListener('resize', function() {
-    const newViewportHeight = window.innerHeight;
     
-    // If keyboard is shown/hidden (viewport height changed significantly)
-    if (Math.abs(viewportHeight - newViewportHeight) > 100) {
-      setTimeout(() => {
-        scrollToBottomSmooth();
-      }, 300);
-    }
-    
-    viewportHeight = newViewportHeight;
+    // Auto-save input state
+    SessionManager.saveSession();
   });
 
   // Handle back button on mobile
@@ -1991,17 +2112,17 @@
       document.getElementById("chat").style.display = "none";
       document.getElementById("register").style.display = "flex";
       
-      // Save messages before leaving chat
       saveAllMessagesToStorage();
+      SessionManager.saveSession();
     }
   });
 
   // ===== ENHANCED CLEANUP =====
   window.addEventListener('beforeunload', function() {
-    // Save messages before leaving
+    // Save session state before leaving
     saveAllMessagesToStorage();
+    SessionManager.saveSession();
     
-    // Send disconnect event before leaving
     if (socket && socket.connected) {
       socket.emit('client_disconnecting', { 
         whatsapp: whatsapp,
@@ -2009,10 +2130,8 @@
       });
     }
     
-    // Cleanup persistent connection
     PersistentConnection.cleanup();
     
-    // Disconnect socket
     if (socket) {
       socket.disconnect();
     }
@@ -2020,17 +2139,10 @@
     console.log('🧹 Cleanup completed');
   });
 
-  // Keep connection alive during page hide/show
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && socket && !socket.connected) {
-      console.log('🔄 Page visible again, reconnecting...');
-      socket.connect();
-    }
-  });
-
-  // Auto-save messages every 30 seconds
+  // Auto-save session state periodically
   setInterval(() => {
-    if (whatsapp && document.getElementById("chat").style.display === "flex") {
+    if (whatsapp) {
+      SessionManager.saveSession();
       saveAllMessagesToStorage();
     }
   }, 30000);
@@ -2040,31 +2152,49 @@
     MessageStorage.clearOldMessages();
   }, 5 * 60 * 1000);
   
-  // Focus on WhatsApp input on page load
+  // ===== INITIALIZATION =====
   window.addEventListener('DOMContentLoaded', function() {
-    // Try to restore last WhatsApp number
-    try {
-      const lastWhatsapp = localStorage.getItem('last_whatsapp');
-      const lastRegistration = localStorage.getItem('last_registration');
+    console.log('🚀 Enhanced chat application loading...');
+    
+    // Try to restore previous session
+    const sessionRestored = restoreChatSession();
+    
+    if (!sessionRestored) {
+      // No session to restore, show registration normally
+      console.log('📝 No previous session found, showing registration');
+      document.getElementById('loadingOverlay').style.display = 'none';
       
-      if (lastWhatsapp && lastRegistration) {
-        const registrationTime = parseInt(lastRegistration);
-        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+      // Try to restore last WhatsApp number
+      try {
+        const lastWhatsapp = localStorage.getItem('last_whatsapp');
+        const lastRegistration = localStorage.getItem('last_registration');
         
-        if (registrationTime > oneHourAgo) {
-          document.getElementById("whatsapp").value = lastWhatsapp;
-          console.log('📱 Restored last WhatsApp number:', lastWhatsapp);
+        if (lastWhatsapp && lastRegistration) {
+          const registrationTime = parseInt(lastRegistration);
+          const oneHourAgo = Date.now() - (60 * 60 * 1000);
+          
+          if (registrationTime > oneHourAgo) {
+            document.getElementById("whatsapp").value = lastWhatsapp;
+            console.log('📱 Restored last WhatsApp number:', lastWhatsapp);
+          }
         }
+      } catch (error) {
+        console.error('Error restoring last WhatsApp number:', error);
       }
-    } catch (error) {
-      console.error('Error restoring last WhatsApp number:', error);
+      
+      document.getElementById("whatsapp").focus();
     }
     
-    document.getElementById("whatsapp").focus();
-    console.log('🚀 Enhanced chat application loaded');
-    console.log('💾 Local storage persistence: ACTIVE');
+    console.log('💾 Session persistence: ACTIVE');
     console.log('📡 Enhanced reconnection: ACTIVE');
     console.log('📴 Offline message support: ACTIVE');
+  });
+
+  // Save session state on visibility change
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') {
+      SessionManager.saveSession();
+    }
   });
 </script>
 </body>
