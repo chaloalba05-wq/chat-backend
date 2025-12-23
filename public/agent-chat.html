@@ -588,15 +588,17 @@ body {
 // ===== ESSENTIAL VARIABLES =====
 const params = new URLSearchParams(window.location.search);
 const whatsapp = params.get("whatsapp");
-const agentId = "agent1"; // HARDCODED TO FIX THE ISSUE
-const agentPassword = "agent1"; // HARDCODED TO FIX THE ISSUE
+const agentId = "agent1";
+const agentPassword = "agent1";
 let isScrolledToBottom = true;
 let displayedMessageIds = new Set();
 let connectionTimeout;
 let messageLoadTimeout;
 let isAgentLoggedIn = false;
 let messageCheckInterval;
-let selectedFile = null; // ADDED: Track selected file
+let selectedFile = null;
+
+// Send controller to prevent duplicate sends
 let sendController = {
   isSending: false,
   canSend() {
@@ -641,27 +643,23 @@ document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
 document.getElementById("chatSubtitle").textContent = whatsapp;
 document.getElementById("chatNumber").textContent = whatsapp;
 
-// ===== CONSTANT MESSAGE CHECKING - ADDED =====
+// ===== CONSTANT MESSAGE CHECKING =====
 function startConstantMessageChecking() {
-  // Clear any existing interval
   if (messageCheckInterval) {
     clearInterval(messageCheckInterval);
   }
   
-  // Load messages immediately
   loadMessages();
   
-  // Then check every 5 seconds (less frequent)
   messageCheckInterval = setInterval(() => {
     if (whatsapp && isAgentLoggedIn && socket.connected) {
-      // Just get message history (server handles deduplication)
       socket.emit("get_messages", { 
         whatsapp, 
         agentId,
-        since: Date.now() - 10000 // Last 10 seconds only
+        since: Date.now() - 10000
       });
     }
-  }, 5000); // Increased to 5 seconds
+  }, 5000);
 }
 
 function stopConstantMessageChecking() {
@@ -735,13 +733,11 @@ const socket = io("https://chat-backend-p2b9.onrender.com", {
   transports: ["websocket", "polling"]
 });
 
-// ===== UPLOAD FILE FUNCTION =====
+// ===== UPLOAD FILE FUNCTION - FIXED TO MATCH YOUR SERVER =====
 async function uploadFile(file) {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
-    formData.append("file", file);
-    formData.append("whatsapp", whatsapp);
-    formData.append("agentId", agentId);
+    formData.append('file', file);
     
     const xhr = new XMLHttpRequest();
     const progressDiv = document.getElementById('uploadProgress');
@@ -767,17 +763,18 @@ async function uploadFile(file) {
           if (response.success) {
             console.log('✅ File uploaded successfully:', response);
             
-            // Use only the metadata provided by server
-            const attachmentData = {
-              filename: response.originalName || file.name,
+            // Create attachment object based on your server response
+            const attachment = {
+              url: response.url || response.fileUrl, // Server returns 'url' field
               mimetype: response.mimetype || file.type,
-              url: response.fileUrl,
-              path: response.fileUrl,
+              originalname: response.originalname || file.name,
+              filename: response.filename || file.name,
               size: response.size || file.size,
-              originalname: response.originalName || file.name
+              // Add any other fields your server returns
+              ...response
             };
             
-            resolve(attachmentData);
+            resolve(attachment);
           } else {
             reject(new Error(response.message || 'Upload failed'));
           }
@@ -929,25 +926,28 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// ===== FILE ATTACHMENT DISPLAY - FIXED FOR NEW TAB FUNCTIONALITY =====
+// ===== FILE ATTACHMENT DISPLAY - FIXED FOR INLINE IMAGES =====
 function renderAttachment(attachment) {
   if (!attachment) return '';
   
-  const fileUrl = normalizeFileUrl(attachment.url || attachment.path);
+  const fileUrl = normalizeFileUrl(attachment.url);
   if (!fileUrl) return '';
   
   const fileName = attachment.originalname || attachment.filename || 'File';
+  const mimeType = attachment.mimetype || attachment.type || '';
+  
   let html = '<div class="attachment">';
   
-  if (attachment.mimetype?.startsWith("image/")) {
-    // Images are displayed inline and open in new tab when clicked
+  if (mimeType.startsWith("image/")) {
+    // Display image inline with link to open in new tab
     html += `
       <a href="${fileUrl}" target="_blank" rel="noopener">
-        <img src="${fileUrl}" class="chat-image" alt="${fileName}" />
+        <img src="${fileUrl}" class="chat-image" alt="${fileName}" 
+             style="max-width: 300px; max-height: 200px; display: block;" />
       </a>
     `;
   } else {
-    // Other file types are links that open in new tab
+    // Other file types as clickable links
     const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
     const icon = '📄';
     html += `
@@ -1047,7 +1047,7 @@ socket.on("message_history", (messages) => {
   setTimeout(scrollToBottom, 100);
 });
 
-// ===== MESSAGE SENDING =====
+// ===== MESSAGE SENDING - FIXED TO USE YOUR SERVER STRUCTURE =====
 async function sendMessage() {
   if (!sendController.canSend()) {
     return;
@@ -1075,68 +1075,58 @@ async function sendMessage() {
   sendBtn.textContent = '...';
   sendingIndicator.style.display = 'block';
   
-  // NEVER display before server echo
-  // We will NOT create temporary messages here
-  
-  if (fileInput.files.length > 0) {
-    const file = fileInput.files[0];
-    const preview = document.getElementById('filePreview');
-    preview.textContent = `📤 Uploading ${file.name}...`;
-    preview.style.display = 'block';
-    
-    try {
-      // Upload file to server
-      const attachmentData = await uploadFile(file);
+  try {
+    if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const preview = document.getElementById('filePreview');
+      preview.textContent = `📤 Uploading ${file.name}...`;
+      preview.style.display = 'block';
       
-      // Pass only the read-only metadata object
+      // Upload file to server
+      const attachment = await uploadFile(file);
+      
+      // Create message data matching your server's expected structure
       const messageData = {
         whatsapp: whatsapp,
-        sender: "agent",
         message: text || "",
-        timestamp: new Date().toISOString(),
+        attachment: attachment, // Pass the attachment object
+        type: attachment.mimetype.startsWith('image/') ? 'image' : 'file',
+        sender: "agent",
         agentId: agentId,
-        attachment: attachmentData
+        timestamp: new Date().toISOString()
       };
       
       console.log('📤 Sending message with attachment:', messageData);
       
-      // Emit and wait for server echo
+      // Emit the message - server will echo it back
       socket.emit("agent_message", messageData);
       
-    } catch (error) {
-      console.error('❌ Upload error:', error);
-      alert(`Failed to upload file: ${error.message}`);
+    } else {
+      // Text-only message
+      const messageData = {
+        whatsapp: whatsapp,
+        message: text,
+        sender: "agent",
+        agentId: agentId,
+        timestamp: new Date().toISOString()
+      };
       
-      // Reset input
-      resetInput();
-      finishMessageSend();
-      return;
+      console.log('Sending text message:', messageData);
+      socket.emit("agent_message", messageData);
     }
     
     // Reset input
     resetInput();
     
-  } else {
-    // Text-only message
-    const messageData = {
-      whatsapp: whatsapp,
-      message: text,
-      timestamp: new Date().toISOString(),
-      agentId: agentId,
-      sender: 'agent'
-    };
-    
-    console.log('Sending text message:', messageData);
-    
-    // Emit and wait for server echo
-    socket.emit("agent_message", messageData);
-    resetInput();
+  } catch (error) {
+    console.error('❌ Error sending message:', error);
+    alert(`Failed to send: ${error.message}`);
+  } finally {
+    // Auto-finish after timeout (fallback)
+    setTimeout(() => {
+      finishMessageSend();
+    }, 5000);
   }
-  
-  // Auto-finish after timeout (fallback)
-  setTimeout(() => {
-    finishMessageSend();
-  }, 5000);
 }
 
 function finishMessageSend() {
