@@ -897,7 +897,7 @@ function scrollToBottomSmooth() {
   }
 }
 
-// ===== FILE ATTACHMENT DISPLAY - MODIFIED: Added image clickability =====
+// ===== FILE ATTACHMENT DISPLAY - FIXED VERSION (guarantees inline images) =====
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -920,7 +920,21 @@ function renderAttachment(attachment) {
     fileUrl = `data:${mimeType};base64,${fileUrl}`;
   }
   
-  if (attachment.mimetype && attachment.mimetype.startsWith('image/')) {
+  // ✅ FIXED: Enhanced mimetype detection for images
+  let mimetype = attachment.mimetype || attachment.type || '';
+  
+  // If no mimetype, try to guess from file name extension
+  if (!mimetype && attachment.name) {
+    const name = attachment.name.toLowerCase();
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) mimetype = 'image/jpeg';
+    else if (name.endsWith('.png')) mimetype = 'image/png';
+    else if (name.endsWith('.gif')) mimetype = 'image/gif';
+    else if (name.endsWith('.webp')) mimetype = 'image/webp';
+    else if (name.endsWith('.svg')) mimetype = 'image/svg+xml';
+  }
+  
+  // ✅ FIXED: Force inline display for images
+  if (mimetype.startsWith('image/')) {
     html += `<img src="${fileUrl}" alt="${attachment.name || 'Image'}" class="attachment-image" onclick="showFullscreenImage('${fileUrl}')">`;
   } else {
     const fileName = attachment.name || attachment.originalname || attachment.filename || 'File';
@@ -1079,39 +1093,7 @@ socket.on("message_history", (messages) => {
   setTimeout(scrollToBottom, 100);
 });
 
-// ❌ REMOVED: These handlers cause duplication
-// socket.on("new_message", (msg) => {
-//   if (msg.whatsapp !== whatsapp) return;
-//   displayMessage(msg);
-// });
-
-// socket.on("broadcast_message", (msg) => {
-//   // Listen for broadcast messages that might be from this agent
-//   if (msg.whatsapp === whatsapp) {
-//     displayMessage(msg);
-//   }
-// });
-
-// ❌ REMOVED: These handlers cause duplication
-// socket.on("user_message_update", (msg) => {
-//   if (msg.whatsapp === whatsapp) {
-//     displayMessage(msg);
-//   }
-// });
-
-// ❌ REMOVED: These handlers cause duplication
-// socket.on("agent_message_success", (msg) => {
-//   if (msg.whatsapp === whatsapp) {
-//     // Update temporary message to permanent
-//     const tempElement = document.querySelector(`[data-message-id="temp_"]`);
-//     if (tempElement) {
-//       displayMessage(msg);
-//       tempElement.remove();
-//     }
-//   }
-// });
-
-// ===== ADD MESSAGE SEND CONFIRMATION HANDLERS =====
+// ✅ FIXED: Add message send confirmation handlers
 socket.on("agent_message_delivered", (msg) => {
   console.log('Message delivered:', msg);
   
@@ -1140,7 +1122,7 @@ socket.on("agent_message_error", (error) => {
   finishMessageSend();
 });
 
-// ===== MESSAGE SENDING - FIXED VERSION =====
+// ===== MESSAGE SENDING - FIXED VERSION (with guaranteed inline images) =====
 async function sendMessage() {
   if (!sendController.canSend()) {
     return;
@@ -1217,7 +1199,10 @@ async function sendMessage() {
         throw new Error(data.message || 'Upload failed');
       }
       
-      // ✅ FIXED: Send message with REAL file URL from server
+      // ✅ CRITICAL FIX: Ensure mimetype is properly set for images
+      const mimetype = data.mimetype || file.type;
+      
+      // ✅ CRITICAL FIX: Send the attachment data in the correct format
       socket.emit("agent_message", {
         whatsapp: whatsapp,
         sender: "agent",
@@ -1226,10 +1211,14 @@ async function sendMessage() {
         agentId: agentId,
         tempId: tempId,
         attachment: {
-          url: data.fileUrl,       // ✅ REAL FILE URL from server
-          name: data.originalName,
-          size: data.size,
-          mimetype: data.mimetype
+          url: data.fileUrl,           // ✅ REAL FILE URL from server
+          data: data.fileUrl,          // ✅ ALSO include as data for compatibility
+          name: data.originalName || file.name,
+          filename: data.originalName || file.name,
+          originalname: data.originalName || file.name,
+          size: data.size || file.size,
+          mimetype: mimetype,          // ✅ CRITICAL: Must include correct mimetype
+          type: mimetype               // ✅ Also include as 'type' for compatibility
         }
       });
       
