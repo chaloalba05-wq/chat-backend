@@ -21,13 +21,18 @@ header { padding: 10px; background: #222; color: #fff; display: flex; justify-co
 <body>
 <header>
   <h2>Agent Dashboard</h2>
-  <div>Connection: <span id="connectionStatus" class="status">Connecting...</span></div>
+  <div>
+    Connection: <span id="connectionStatus" class="status">Connecting...</span> | 
+    Unread: <span id="unreadCount">0</span>
+  </div>
 </header>
 
 <div id="dashboard">
   <div id="activeMessages"><div class="empty-message">No active users</div></div>
   <div id="main">Select a user to open chat</div>
 </div>
+
+<audio id="notificationSound" src="notification.mp3" preload="auto"></audio>
 
 <script>
 const agentId = "agent1";
@@ -86,16 +91,34 @@ socket.on("existing_users", (users) => {
   updateUserList(users.map(u => ({ whatsapp: u.whatsapp })));
 });
 
+// ===== PER-MESSAGE UNREAD TRACKING =====
+let unreadMessages = JSON.parse(localStorage.getItem("unreadMessages")) || {}; 
+// Structure: { "whatsappNumber": { "msgId1": true, "msgId2": true } }
+
+function saveUnreadMessages() {
+  localStorage.setItem("unreadMessages", JSON.stringify(unreadMessages));
+}
+
+function updateUnreadCount() {
+  let count = 0;
+  for (const user in unreadMessages) {
+    count += Object.keys(unreadMessages[user]).length;
+  }
+  document.getElementById("unreadCount").textContent = count;
+}
+
 // ===== UPDATE USER LIST =====
 function updateUserList(users){
   allUsers = users;
   const container = document.getElementById("activeMessages");
   container.innerHTML = "";
+
   if(users.length === 0){
     const empty = document.createElement("div");
     empty.textContent = "No active users";
     empty.className = "empty-message";
     container.appendChild(empty);
+    updateUnreadCount();
     return;
   }
 
@@ -104,13 +127,25 @@ function updateUserList(users){
     div.textContent = u.whatsapp;
     div.className = "user-item";
 
+    // Highlight if user has any unread messages
+    if(unreadMessages[u.whatsapp] && Object.keys(unreadMessages[u.whatsapp]).length > 0){
+      div.classList.add("highlight");
+    }
+
     div.addEventListener("click", () => {
       window.open(`agent-chat.html?whatsapp=${u.whatsapp}`, "_blank");
       div.classList.remove("highlight");
+      if(unreadMessages[u.whatsapp]){
+        delete unreadMessages[u.whatsapp];
+        saveUnreadMessages();
+      }
+      updateUnreadCount();
     });
 
     container.appendChild(div);
   });
+
+  updateUnreadCount();
 }
 
 // ===== REAL-TIME EVENTS =====
@@ -121,20 +156,49 @@ socket.on("chat_archived", handleMessageEvent);
 socket.on("broadcast_message", handleMessageEvent);
 
 function handleMessageEvent(msg){
-  if(msg.whatsapp) highlightUser(msg.whatsapp);
+  if(msg.whatsapp && msg.id){
+    highlightMessage(msg.whatsapp, msg.id);
+  }
 }
 
-function highlightUser(whatsapp){
-  const items = document.getElementsByClassName("user-item");
-  for(let i of items){
-    if(i.textContent === whatsapp){
-      i.classList.add("highlight");
+// Highlight user for unread message, per message
+function highlightMessage(whatsapp, msgId){
+  if(!unreadMessages[whatsapp]) unreadMessages[whatsapp] = {};
+
+  // Only mark if message not already read
+  if(!unreadMessages[whatsapp][msgId]){
+    unreadMessages[whatsapp][msgId] = true;
+    saveUnreadMessages();
+    updateUnreadCount();
+
+    // Play sound
+    document.getElementById("notificationSound").play();
+
+    // Highlight user in sidebar
+    const items = document.getElementsByClassName("user-item");
+    for(let i of items){
+      if(i.textContent === whatsapp){
+        i.classList.add("highlight");
+      }
     }
   }
 }
 
 // ===== INITIAL FETCH =====
 fetchActiveUsers();
+
+// Restore highlights for persisted unread messages on page load
+window.addEventListener("DOMContentLoaded", () => {
+  for(const whatsapp in unreadMessages){
+    const items = document.getElementsByClassName("user-item");
+    for(let i of items){
+      if(i.textContent === whatsapp && Object.keys(unreadMessages[whatsapp]).length > 0){
+        i.classList.add("highlight");
+      }
+    }
+  }
+  updateUnreadCount();
+});
 </script>
 </body>
 </html>
