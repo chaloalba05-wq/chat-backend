@@ -249,15 +249,15 @@ body {
   overflow: hidden;
 }
 
-.attachment-image {
+.chat-image {
   max-width: 100%;
   max-height: 200px;
   border-radius: 8px;
   display: block;
-  cursor: pointer; /* Added for clickable images */
+  cursor: pointer;
 }
 
-.attachment-image:hover {
+.chat-image:hover {
   opacity: 0.9;
 }
 
@@ -459,7 +459,7 @@ body {
     height: 32px;
   }
   
-  .attachment-image {
+  .chat-image {
     max-height: 150px;
   }
   
@@ -790,7 +790,7 @@ const socket = io("https://chat-backend-p2b9.onrender.com", {
   transports: ["websocket", "polling"]
 });
 
-// ===== UPLOAD FILE FUNCTION - FIXED FOR USER COMPATIBILITY =====
+// ===== UPLOAD FILE FUNCTION - FIXED TO OBEY RULE 1 =====
 async function uploadFile(file, tempId) {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
@@ -822,21 +822,14 @@ async function uploadFile(file, tempId) {
           if (response.success) {
             console.log('✅ File uploaded successfully:', response);
             
-            // FORMAT FOR USER COMPATIBILITY - CRITICAL FIX
+            // OBEY RULE 1: Use only the metadata provided by server
             const attachmentData = {
-              url: response.fileUrl,            // Public URL
-              data: response.fileUrl,           // For backward compatibility
-              path: response.fileUrl,           // Some systems expect 'path'
-              name: response.originalName || file.name,
               filename: response.originalName || file.name,
-              originalname: response.originalName || file.name,
+              mimetype: response.mimetype || file.type,
+              url: response.fileUrl,
+              path: response.fileUrl,
               size: response.size || file.size,
-              mimetype: response.mimetype || file.type, // MUST INCLUDE THIS
-              type: response.mimetype || file.type,     // Alternative
-              // Additional fields for user chat compatibility
-              fileUrl: response.fileUrl,        // Explicit fileUrl
-              filePath: response.fileUrl,       // Alternative
-              publicUrl: response.fileUrl       // Clear public URL
+              originalname: response.originalName || file.name
             };
             
             resolve(attachmentData);
@@ -941,24 +934,13 @@ socket.on("user_room_joined", (data) => {
   console.log(`✅ Ready to send/receive messages for ${data.whatsapp}`);
 });
 
-// ✅ NEW: Handler for server-confirmed messages (SINGLE SOURCE OF TRUTH)
-socket.on("server_message_confirmed", (msg) => {
-  console.log('Server confirmed message:', msg);
+// OBEY RULE 5: Only display messages from server echo
+socket.on("new_message", (msg) => {
+  console.log('New message received from server:', msg);
   
   if (msg.whatsapp !== whatsapp) return;
   
-  // Remove ALL temporary messages from this agent
-  const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
-  tempMessages.forEach(tempElement => {
-    // Only remove our own temp messages
-    const messageSender = tempElement.querySelector('.message-sender');
-    if (messageSender && messageSender.textContent === 'You') {
-      tempElement.remove();
-      displayedMessageIds.delete(tempElement.dataset.messageId);
-    }
-  });
-  
-  // Display the server-confirmed message
+  // OBEY RULE 5: Display only server-confirmed messages
   displayMessage(msg);
 });
 
@@ -1002,50 +984,35 @@ function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// ===== FILE ATTACHMENT DISPLAY - ENHANCED FOR USER COMPATIBILITY =====
+// ===== FILE ATTACHMENT DISPLAY - FIXED TO OBEY RULES 2, 3, AND 4 =====
 function renderAttachment(attachment) {
   if (!attachment) return '';
   
+  // OBEY RULE 2: Canonical URL resolution (copy exactly)
+  const fileUrl = attachment.url || attachment.path;
+  if (!fileUrl) return '';
+  
+  // Get the filename
+  const fileName = attachment.originalname || attachment.filename || 'File';
+  
   let html = '<div class="attachment">';
   
-  // GET FILE URL - HANDLE MULTIPLE POSSIBLE FIELDS
-  let fileUrl = attachment.url || attachment.data || attachment.fileUrl || 
-                attachment.path || attachment.filePath || attachment.publicUrl;
-  
-  // If it's base64 data without prefix, add the data URL prefix
-  if (fileUrl && !fileUrl.startsWith('http') && !fileUrl.startsWith('data:')) {
-    const mimeType = attachment.mimetype || attachment.type || 'application/octet-stream';
-    fileUrl = `data:${mimeType};base64,${fileUrl}`;
-  }
-  
-  // Enhanced mimetype detection for images
-  let mimetype = attachment.mimetype || attachment.type || '';
-  
-  // If no mimetype, try to guess from file name extension
-  if (!mimetype && (attachment.name || attachment.originalname || attachment.filename)) {
-    const name = (attachment.name || attachment.originalname || attachment.filename).toLowerCase();
-    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) mimetype = 'image/jpeg';
-    else if (name.endsWith('.png')) mimetype = 'image/png';
-    else if (name.endsWith('.gif')) mimetype = 'image/gigif';
-    else if (name.endsWith('.webp')) mimetype = 'image/webp';
-    else if (name.endsWith('.svg')) mimetype = 'image/svg+xml';
-    else if (name.endsWith('.pdf')) mimetype = 'application/pdf';
-    else if (name.endsWith('.doc') || name.endsWith('.docx')) mimetype = 'application/msword';
-  }
-  
-  // Always display images inline if we can detect they're images
-  if (mimetype.startsWith('image/') || 
-      (fileUrl && (fileUrl.includes('.jpg') || fileUrl.includes('.jpeg') || 
-                   fileUrl.includes('.png') || fileUrl.includes('.gif') || 
-                   fileUrl.includes('.webp')))) {
-    html += `<img src="${fileUrl}" alt="${attachment.name || 'Image'}" class="attachment-image" onclick="showFullscreenImage('${fileUrl}')">`;
+  // OBEY RULE 3: Image rendering must be inline
+  if (attachment.mimetype?.startsWith("image/")) {
+    html += `
+      <img
+        src="${fileUrl}"
+        class="chat-image"
+        onclick="window.open('${fileUrl}', '_blank')"
+      />
+    `;
   } else {
-    const fileName = attachment.name || attachment.originalname || attachment.filename || 'File';
+    // OBEY RULE 4: Other files use links
     const fileSize = attachment.size ? formatFileSize(attachment.size) : '';
     const icon = '📄';
     
     html += `
-      <a href="${fileUrl}" target="_blank" download="${fileName}" class="attachment-file">
+      <a href="${fileUrl}" target="_blank" rel="noopener" class="attachment-file">
         <span class="attachment-icon">${icon}</span>
         <div class="attachment-info">
           <div class="attachment-name">${fileName}</div>
@@ -1059,38 +1026,25 @@ function renderAttachment(attachment) {
   return html;
 }
 
-// ===== MESSAGE DISPLAY - ENHANCED VERSION =====
+// ===== MESSAGE DISPLAY - FIXED TO OBEY RULE 5 =====
 function displayMessage(msg) {
-  // Use server-provided ID as primary, fallback to composite
+  // Use server-provided ID as primary
   const messageId = msg.id || `msg_${msg.timestamp}_${msg.sender}`;
   
-  // Skip if we've already displayed this message (except for temp messages)
-  if (displayedMessageIds.has(messageId) && !msg.isTemporary) {
+  // Skip if we've already displayed this message
+  if (displayedMessageIds.has(messageId)) {
     return;
   }
   
-  // Add to displayed IDs if it's a real message
-  if (!msg.isTemporary) {
-    displayedMessageIds.add(messageId);
-  }
+  displayedMessageIds.add(messageId);
   
   const messagesDiv = document.getElementById("messages");
   const emptyState = messagesDiv.querySelector('.empty-state');
   if (emptyState) emptyState.remove();
   
-  // Check if this is an update to a temporary message
-  if (msg.tempId) {
-    const tempElement = document.querySelector(`[data-message-id="${msg.tempId}"]`);
-    if (tempElement) {
-      tempElement.remove();
-      displayedMessageIds.delete(msg.tempId);
-    }
-  }
-  
   const existingMessage = document.querySelector(`[data-message-id="${messageId}"]`);
-  if (existingMessage && existingMessage.dataset.isTemporary !== 'true') {
-    updateMessageElement(existingMessage, msg);
-    return;
+  if (existingMessage) {
+    return; // Already displayed
   }
   
   const div = document.createElement("div");
@@ -1098,7 +1052,6 @@ function displayMessage(msg) {
   
   div.className = `message-container ${isAgent ? 'agent-message' : 'user-message'}`;
   div.dataset.messageId = messageId;
-  div.dataset.isTemporary = msg.isTemporary ? 'true' : 'false';
   
   const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { 
     hour: '2-digit', minute: '2-digit' 
@@ -1119,14 +1072,10 @@ function displayMessage(msg) {
     <div class="message-content">${content}</div>
   `;
   
-  if (msg.isTemporary) {
-    div.style.opacity = '0.7';
-  }
-  
   messagesDiv.appendChild(div);
   
   // Make images in this message clickable for fullscreen
-  const images = div.querySelectorAll('.attachment-image');
+  const images = div.querySelectorAll('.chat-image');
   images.forEach(img => {
     img.style.cursor = 'pointer';
     img.onclick = function() {
@@ -1137,40 +1086,6 @@ function displayMessage(msg) {
   if (isScrolledToBottom || isAgent) {
     setTimeout(scrollToBottomSmooth, 50);
   }
-}
-
-function updateMessageElement(element, msg) {
-  const isAgent = msg.sender === "agent";
-  const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { 
-    hour: '2-digit', minute: '2-digit' 
-  }) : new Date().toLocaleTimeString([], { 
-    hour: '2-digit', minute: '2-digit' 
-  });
-  
-  let content = msg.text || msg.message || '';
-  if (msg.attachment) {
-    content += renderAttachment(msg.attachment);
-  }
-  
-  element.innerHTML = `
-    <div class="message-header">
-      <span class="message-sender">${isAgent ? 'You' : 'User'}</span>
-      <span class="message-time">${time}</span>
-    </div>
-    <div class="message-content">${content}</div>
-  `;
-  
-  element.style.opacity = '1';
-  element.dataset.isTemporary = 'false';
-  
-  // Make images in this updated message clickable for fullscreen
-  const images = element.querySelectorAll('.attachment-image');
-  images.forEach(img => {
-    img.style.cursor = 'pointer';
-    img.onclick = function() {
-      showFullscreenImage(this.src);
-    };
-  });
 }
 
 // Socket message handlers
@@ -1202,44 +1117,7 @@ socket.on("message_history", (messages) => {
   setTimeout(scrollToBottom, 100);
 });
 
-// FIXED: Handle both old and new message delivery events
-socket.on("agent_message_delivered", (msg) => {
-  console.log('Message delivered to user:', msg);
-  
-  if (msg.whatsapp !== whatsapp) return;
-  
-  // Remove temporary messages
-  const tempElements = document.querySelectorAll('[data-is-temporary="true"]');
-  tempElements.forEach(element => {
-    const messageId = element.dataset.messageId;
-    if (messageId && messageId.startsWith('temp_')) {
-      element.remove();
-      displayedMessageIds.delete(messageId);
-    }
-  });
-  
-  // Display the confirmed message
-  displayMessage(msg);
-  finishMessageSend();
-});
-
-// NEW: Handle new_message events (for user messages)
-socket.on("new_message", (msg) => {
-  console.log('New message received from user:', msg);
-  
-  if (msg.whatsapp !== whatsapp) return;
-  
-  // Display the message
-  displayMessage(msg);
-});
-
-socket.on("agent_message_error", (error) => {
-  console.error('Message send error:', error);
-  alert(`Failed to send message: ${error.message || 'Unknown error'}`);
-  finishMessageSend();
-});
-
-// ===== MESSAGE SENDING - ENHANCED VERSION =====
+// ===== MESSAGE SENDING - FIXED TO OBEY RULE 5 =====
 async function sendMessage() {
   if (!sendController.canSend()) {
     return;
@@ -1267,8 +1145,8 @@ async function sendMessage() {
   sendBtn.textContent = '...';
   sendingIndicator.style.display = 'block';
   
-  // Create temporary message with unique ID
-  const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // OBEY RULE 5: NEVER display before server echo
+  // We will NOT create temporary messages here
   
   if (fileInput.files.length > 0) {
     const file = fileInput.files[0];
@@ -1276,51 +1154,28 @@ async function sendMessage() {
     preview.textContent = `📤 Uploading ${file.name}...`;
     preview.style.display = 'block';
     
-    // Show sending indicator in chat
-    const messagesDiv = document.getElementById("messages");
-    const sendingDiv = document.createElement("div");
-    sendingDiv.className = 'message-container agent-message';
-    sendingDiv.dataset.messageId = tempId;
-    sendingDiv.dataset.isTemporary = 'true';
-    sendingDiv.style.opacity = '0.6';
-    sendingDiv.style.fontStyle = 'italic';
-    sendingDiv.innerHTML = `
-      <div class="message-header">
-        <span class="message-sender">You</span>
-        <span class="message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-      <div class="message-content">Sending ${file.type.startsWith('image/') ? 'image' : 'file'}...</div>
-    `;
-    messagesDiv.appendChild(sendingDiv);
-    
     try {
       // Upload file to server
-      const attachmentData = await uploadFile(file, tempId);
+      const attachmentData = await uploadFile(file);
       
-      // CRITICAL: Send in format compatible with USER chat
+      // OBEY RULE 1: Pass only the read-only metadata object
       const messageData = {
         whatsapp: whatsapp,
         sender: "agent",
         message: text || "",
         timestamp: new Date().toISOString(),
         agentId: agentId,
-        tempId: tempId,
-        attachment: attachmentData, // Use the properly formatted attachment
-        // Add user-compatible fields
-        userId: whatsapp, // For user chat compatibility
-        text: text || "", // Some systems expect 'text'
-        fileUrl: attachmentData.url // Explicit fileUrl for user
+        attachment: attachmentData // This follows RULE 1 format
       };
       
       console.log('📤 Sending message with attachment:', messageData);
+      
+      // OBEY RULE 5: Emit and wait for server echo
       socket.emit("agent_message", messageData);
       
     } catch (error) {
       console.error('❌ Upload error:', error);
       alert(`Failed to upload file: ${error.message}`);
-      
-      // Remove temporary message
-      sendingDiv.remove();
       
       // Reset input
       resetInput();
@@ -1333,35 +1188,17 @@ async function sendMessage() {
     
   } else {
     // Text-only message
-    const messagesDiv = document.getElementById("messages");
-    const sendingDiv = document.createElement("div");
-    sendingDiv.className = 'message-container agent-message';
-    sendingDiv.dataset.messageId = tempId;
-    sendingDiv.dataset.isTemporary = 'true';
-    sendingDiv.style.opacity = '0.6';
-    sendingDiv.style.fontStyle = 'italic';
-    sendingDiv.innerHTML = `
-      <div class="message-header">
-        <span class="message-sender">You</span>
-        <span class="message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-      <div class="message-content">Sending...</div>
-    `;
-    messagesDiv.appendChild(sendingDiv);
-    
     const messageData = {
       whatsapp: whatsapp,
       message: text,
       timestamp: new Date().toISOString(),
       agentId: agentId,
-      sender: 'agent',
-      tempId: tempId,
-      // Add user-compatible fields
-      userId: whatsapp,
-      text: text
+      sender: 'agent'
     };
     
     console.log('Sending text message:', messageData);
+    
+    // OBEY RULE 5: Emit and wait for server echo
     socket.emit("agent_message", messageData);
     resetInput();
   }
@@ -1477,20 +1314,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Connect socket
   socket.connect();
 });
-
-// Clean up old temporary messages
-setInterval(() => {
-  const tempMessages = document.querySelectorAll('[data-is-temporary="true"]');
-  const now = Date.now();
-  
-  tempMessages.forEach(msg => {
-    const tempTime = parseInt(msg.dataset.messageId.replace('temp_', ''));
-    if (now - tempTime > 30000) {
-      msg.remove();
-      displayedMessageIds.delete(msg.dataset.messageId);
-    }
-  });
-}, 10000);
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
