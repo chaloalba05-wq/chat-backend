@@ -669,6 +669,24 @@ let sendController = {
   }
 };
 
+// ===== NORMALIZE FILE URL FUNCTION =====
+function normalizeFileUrl(url) {
+  if (!url) return null;
+
+  // force leading slash
+  if (!url.startsWith('/')) {
+    url = '/' + url;
+  }
+
+  // must be under /uploads
+  if (!url.startsWith('/uploads/')) {
+    console.warn('Blocked non-static attachment URL:', url);
+    return null;
+  }
+
+  return url;
+}
+
 // Initialize
 document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
 document.getElementById("chatSubtitle").textContent = whatsapp;
@@ -988,8 +1006,8 @@ function formatFileSize(bytes) {
 function renderAttachment(attachment) {
   if (!attachment) return '';
   
-  // OBEY RULE 2: Canonical URL resolution (copy exactly)
-  const fileUrl = attachment.url || attachment.path;
+  // FIX: Use normalizeFileUrl function
+  const fileUrl = normalizeFileUrl(attachment.url || attachment.path);
   if (!fileUrl) return '';
   
   // Get the filename
@@ -999,11 +1017,12 @@ function renderAttachment(attachment) {
   
   // OBEY RULE 3: Image rendering must be inline
   if (attachment.mimetype?.startsWith("image/")) {
+    // FIXED: Remove onclick attribute entirely
     html += `
       <img
         src="${fileUrl}"
         class="chat-image"
-        onclick="window.open('${fileUrl}', '_blank')"
+        alt="${fileName}"
       />
     `;
   } else {
