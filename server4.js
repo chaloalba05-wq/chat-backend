@@ -86,29 +86,6 @@ function logActivity(type, details) {
   return log;
 }
 
-// ===== GET UNREAD MESSAGE COUNT FOR USER =====
-function getUnreadMessageCount(whatsapp) {
-  try {
-    const conversation = conversations.get(whatsapp);
-    if (!conversation || !conversation.messages) {
-      return 0;
-    }
-    
-    // Count only user messages that are not marked as read
-    let unreadCount = 0;
-    conversation.messages.forEach(msg => {
-      if (msg.sender === "user" && !msg.read) {
-        unreadCount++;
-      }
-    });
-    
-    return unreadCount;
-  } catch (error) {
-    console.error("Error getting unread message count:", error);
-    return 0;
-  }
-}
-
 // ===== SAVE MESSAGE TO BROADCAST ROOM =====
 function saveMessageToBroadcastRoom(message) {
   try {
@@ -398,7 +375,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.send("Chat backend running - IN-MEMORY MODE"));
 app.get("/chat", (req, res) => res.sendFile(path.join(__dirname, "public", "chat.html")));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("/superadmin", (req, res) res.sendFile(path.join(__dirname, "public", "superadmin.html")));
+app.get("/superadmin", (req, res) => res.sendFile(path.join(__dirname, "public", "superadmin.html")));
 app.get("/agent", (req, res) => res.sendFile(path.join(__dirname, "public", "agent.html")));
 
 // Agent files
@@ -1210,7 +1187,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ===== UPDATED: Get existing users for agent interface WITH UNREAD COUNT =====
+  // Get existing users for agent interface
   socket.on("get_existing_users", () => {
     try {
       const usersList = Array.from(conversations.values())
@@ -1220,8 +1197,7 @@ io.on("connection", (socket) => {
           lastMessage: conv.lastMessage,
           lastMessageTime: conv.lastUpdated,
           messageCount: conv.messages?.length || 0,
-          archived: conv.archived || false,
-          unreadCount: getUnreadMessageCount(conv.whatsapp) // ADDED: Include unread count
+          archived: conv.archived || false
         }))
         .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
       
@@ -1491,10 +1467,6 @@ function startServer() {
     console.log(`   - Agents send "message_read" events`);
     console.log(`   - Server updates "read: true" on messages`);
     console.log(`   - Read status broadcast to all relevant parties`);
-    console.log(`✅ NEW: User list includes accurate unread message count!`);
-    console.log(`   - Server calculates unread count for each user`);
-    console.log(`   - Dashboard can verify read status from server data`);
-    console.log(`   - Only truly unread messages get highlighted`);
     console.log(`⚠️  WARNING: Data is ephemeral - will be lost on server restart`);
   });
 }
