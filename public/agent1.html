@@ -93,8 +93,6 @@ socket.on("existing_users", (users) => {
 
 // ===== PER-MESSAGE UNREAD TRACKING =====
 let unreadMessages = JSON.parse(localStorage.getItem("unreadMessages")) || {}; 
-// Structure: { "whatsappNumber": { "msgId1": true, "msgId2": true } }
-
 function saveUnreadMessages() {
   localStorage.setItem("unreadMessages", JSON.stringify(unreadMessages));
 }
@@ -127,7 +125,6 @@ function updateUserList(users){
     div.textContent = u.whatsapp;
     div.className = "user-item";
 
-    // Highlight if user has any unread messages
     if(unreadMessages[u.whatsapp] && Object.keys(unreadMessages[u.whatsapp]).length > 0){
       div.classList.add("highlight");
     }
@@ -161,18 +158,36 @@ function handleMessageEvent(msg){
   }
 }
 
+// ===== NOTIFICATION FUNCTIONS =====
+function requestNotificationPermission() {
+  if("Notification" in window && Notification.permission !== "granted"){
+    Notification.requestPermission();
+  }
+}
+
+function notifyUser(title, body) {
+  if("Notification" in window && Notification.permission === "granted"){
+    const notification = new Notification(title, { body, icon: "notification.png" });
+    notification.onclick = () => window.focus();
+  }
+}
+
 // Highlight user for unread message, per message
 function highlightMessage(whatsapp, msgId){
   if(!unreadMessages[whatsapp]) unreadMessages[whatsapp] = {};
 
-  // Only mark if message not already read
   if(!unreadMessages[whatsapp][msgId]){
     unreadMessages[whatsapp][msgId] = true;
     saveUnreadMessages();
     updateUnreadCount();
 
-    // Play sound
-    document.getElementById("notificationSound").play();
+    // Play sound repeatedly until window focused
+    const audio = document.getElementById("notificationSound");
+    let interval = setInterval(() => audio.play(), 1500);
+    window.addEventListener("focus", () => clearInterval(interval), { once: true });
+
+    // Browser notification
+    notifyUser("New message from " + whatsapp, "You have a new message waiting in the dashboard");
 
     // Highlight user in sidebar
     const items = document.getElementsByClassName("user-item");
@@ -189,6 +204,7 @@ fetchActiveUsers();
 
 // Restore highlights for persisted unread messages on page load
 window.addEventListener("DOMContentLoaded", () => {
+  requestNotificationPermission();
   for(const whatsapp in unreadMessages){
     const items = document.getElementsByClassName("user-item");
     for(let i of items){
