@@ -14,6 +14,8 @@ header { padding: 10px; background: #222; color: #fff; display: flex; justify-co
 .user-item:hover { background: #f0f0f0; }
 .user-item.highlight { background: #ffd27f !important; }
 .message-item { font-size: 0.9em; margin-left: 10px; color: #333; }
+.read-indicator { font-size: 0.8em; color: #4CAF50; font-weight: bold; margin-left: 5px; }
+.unread-indicator { font-size: 0.8em; color: #FF5722; font-weight: bold; margin-left: 5px; }
 #main { flex: 1; padding: 10px; }
 .status { font-weight: bold; }
 .empty-message { font-style: italic; color: #888; }
@@ -83,10 +85,26 @@ function fetchActiveUsers() {
 }
 
 socket.on("existing_users", (users) => {
-  // Merge users without overwriting unread messages
-  users.forEach(u => {
-    if(!allUsers.find(x => x.whatsapp === u.whatsapp)) allUsers.push({ whatsapp: u.whatsapp });
-  });
+  // Get current whatsapp numbers from the server
+  const currentWhatsapps = users.map(u => u.whatsapp);
+  
+  // Clear allUsers and rebuild from server data
+  allUsers = users.map(u => ({ whatsapp: u.whatsapp }));
+  
+  // Clean up unreadMessages - remove entries for users not in current list
+  const unreadMessages = JSON.parse(localStorage.getItem("unreadMessages")) || {};
+  let cleanedUnreadMessages = {};
+  
+  // Only keep unread messages for users that are still in the active list
+  for (const whatsapp in unreadMessages) {
+    if (currentWhatsapps.includes(whatsapp)) {
+      cleanedUnreadMessages[whatsapp] = unreadMessages[whatsapp];
+    }
+  }
+  
+  // Save cleaned unread messages
+  localStorage.setItem("unreadMessages", JSON.stringify(cleanedUnreadMessages));
+  
   updateUserList(allUsers);
 });
 
@@ -97,9 +115,17 @@ function saveUnreadMessages() {
 
 function updateUnreadCount() {
   let count = 0;
+  
+  // Only count unread messages for users that are currently in allUsers
+  const currentWhatsapps = allUsers.map(u => u.whatsapp);
+  
   for (const user in unreadMessages) {
-    count += Object.keys(unreadMessages[user]).length;
+    // Only count if user is in current user list
+    if (currentWhatsapps.includes(user)) {
+      count += Object.keys(unreadMessages[user]).length;
+    }
   }
+  
   document.getElementById("unreadCount").textContent = count;
 }
 
@@ -117,18 +143,23 @@ function updateUserList(users){
     return;
   }
 
+  // Sort users: those with unread messages first
   users.sort((a,b)=>{
-    const aUnread = unreadMessages[a.whatsapp] ? 1 : 0;
-    const bUnread = unreadMessages[b.whatsapp] ? 1 : 0;
+    const aUnread = unreadMessages[a.whatsapp] ? Object.keys(unreadMessages[a.whatsapp]).length : 0;
+    const bUnread = unreadMessages[b.whatsapp] ? Object.keys(unreadMessages[b.whatsapp]).length : 0;
     return bUnread - aUnread;
   });
 
   users.forEach(u => {
     const div = document.createElement("div");
     div.className = "user-item";
-    if(unreadMessages[u.whatsapp] && Object.keys(unreadMessages[u.whatsapp]).length > 0){
+    
+    // Check if this user has any unread messages
+    const userUnreadCount = unreadMessages[u.whatsapp] ? Object.keys(unreadMessages[u.whatsapp]).length : 0;
+    if(userUnreadCount > 0){
       div.classList.add("highlight");
     }
+    
     const title = document.createElement("div");
     title.textContent = u.whatsapp;
     div.appendChild(title);
@@ -198,6 +229,33 @@ socket.on("chat_deleted", handleMessageEvent);
 socket.on("chat_archived", handleMessageEvent);
 socket.on("broadcast_message", handleMessageEvent);
 
+// ===== ADD: HANDLE READ STATUS UPDATES =====
+socket.on("messages_read_update", handleMessagesReadUpdate);
+
+function handleMessagesReadUpdate(updateData) {
+  const { whatsapp, messageIds } = updateData;
+  
+  if (whatsapp && messageIds && messageIds.length > 0) {
+    // Remove messages that have been marked as read
+    if (unreadMessages[whatsapp]) {
+      messageIds.forEach(messageId => {
+        if (unreadMessages[whatsapp][messageId]) {
+          delete unreadMessages[whatsapp][messageId];
+        }
+      });
+      
+      // If no more unread messages for this user, remove the user entry
+      if (Object.keys(unreadMessages[whatsapp]).length === 0) {
+        delete unreadMessages[whatsapp];
+      }
+      
+      saveUnreadMessages();
+      updateUnreadCount();
+      updateUserList(allUsers);
+    }
+  }
+}
+
 socket.on("new_user", (newUser) => {
   if(newUser && !allUsers.find(u => u.whatsapp === newUser.whatsapp)){
     allUsers.push({ whatsapp: newUser.whatsapp });
@@ -205,9 +263,15 @@ socket.on("new_user", (newUser) => {
   }
 });
 
-// ===== HANDLE MESSAGE =====
+// ===== UPDATED: HANDLE MESSAGE =====
 function handleMessageEvent(msg){
-  if(msg.whatsapp && msg.id){
+  // Ignore agent messages
+  if (msg.sender === "agent") {
+    return;
+  }
+  
+  // Only flag messages that are from users AND not marked as read
+  if (msg.whatsapp && msg.id && msg.sender === "user" && !msg.read) {
     // Ensure user exists in allUsers
     if(!allUsers.find(u => u.whatsapp === msg.whatsapp)){
       allUsers.push({ whatsapp: msg.whatsapp });
@@ -220,6 +284,28 @@ function handleMessageEvent(msg){
     updateUserList(allUsers);
     playNotificationSound();
     notifyUser("New message from " + msg.whatsapp, msg.text || "You have a new message waiting in the dashboard");
+  }
+}
+
+// ===== ADD: HANDLE CHAT DELETION/ARCHIVAL =====
+socket.on("chat_deleted", handleChatRemoval);
+socket.on("chat_archived", handleChatRemoval);
+
+function handleChatRemoval(data) {
+  const { whatsapp } = data;
+  
+  if (whatsapp) {
+    // Remove user from allUsers list
+    allUsers = allUsers.filter(u => u.whatsapp !== whatsapp);
+    
+    // Remove unread messages for this user
+    if (unreadMessages[whatsapp]) {
+      delete unreadMessages[whatsapp];
+      saveUnreadMessages();
+    }
+    
+    updateUserList(allUsers);
+    updateUnreadCount();
   }
 }
 

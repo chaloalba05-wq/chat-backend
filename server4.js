@@ -259,6 +259,97 @@ function archiveChat(whatsapp) {
   return false;
 }
 
+// ===== MARK MESSAGES AS READ =====
+function markMessagesAsRead(whatsapp, messageIds) {
+  try {
+    const conversation = conversations.get(whatsapp);
+    if (!conversation) {
+      console.error(`Conversation not found for ${whatsapp}`);
+      return { success: false, message: "Conversation not found" };
+    }
+    
+    const updatedMessages = [];
+    
+    // Mark each message as read
+    messageIds.forEach(messageId => {
+      const message = conversation.messages.find(msg => msg.id === messageId);
+      if (message && !message.read) {
+        message.read = true;
+        updatedMessages.push(messageId);
+        console.log(`✅ Message ${messageId} marked as read`);
+      }
+    });
+    
+    // Also update broadcast messages
+    updatedMessages.forEach(messageId => {
+      const broadcastMessage = broadcastMessages.find(msg => msg.id === messageId);
+      if (broadcastMessage && !broadcastMessage.read) {
+        broadcastMessage.read = true;
+      }
+    });
+    
+    if (updatedMessages.length > 0) {
+      // Broadcast the read status update
+      broadcastReadStatusUpdate(whatsapp, updatedMessages);
+      
+      return { 
+        success: true, 
+        messageIds: updatedMessages,
+        message: `Marked ${updatedMessages.length} message(s) as read`
+      };
+    }
+    
+    return { 
+      success: true, 
+      messageIds: [],
+      message: "No new messages to mark as read"
+    };
+    
+  } catch (error) {
+    console.error("Error marking messages as read:", error);
+    return { success: false, message: error.message };
+  }
+}
+
+// ===== BROADCAST READ STATUS UPDATE =====
+function broadcastReadStatusUpdate(whatsapp, messageIds) {
+  try {
+    const updateData = {
+      whatsapp,
+      messageIds,
+      timestamp: new Date().toISOString(),
+      read: true
+    };
+    
+    // 1. Send to the specific user room
+    io.to(whatsapp).emit("messages_read_update", updateData);
+    
+    // 2. Send to all agents in the broadcast room
+    io.to(BROADCAST_ROOM).emit("broadcast_messages_read_update", updateData);
+    
+    // 3. Send to super admin and admin
+    io.to("super_admin").to("admin").emit("messages_read_update", updateData);
+    
+    // 4. Send to individual agent rooms (for agents monitoring this user)
+    agents.forEach((agent, agentId) => {
+      if (agent.socketId && agent.monitoringUser === whatsapp) {
+        io.to(agent.socketId).emit("messages_read_update", updateData);
+      }
+    });
+    
+    console.log(`📨 Broadcast read status update for ${messageIds.length} message(s) in ${whatsapp}`);
+    
+    logActivity('messages_marked_read', {
+      whatsapp,
+      messageCount: messageIds.length,
+      messageIds
+    });
+    
+  } catch (error) {
+    console.error("Error broadcasting read status update:", error);
+  }
+}
+
 // ---- Setup server ----
 const app = express();
 const server = http.createServer(app);
@@ -873,7 +964,7 @@ io.on("connection", (socket) => {
       agentName: agent.name,
       text: data.message || '',
       timestamp: timestamp, // Same as ID
-      read: true,
+      read: true, // Agent messages are always read
       id: messageId, // Use timestamp as ID
       whatsapp: whatsapp,
       messageType: 'agent_message'
@@ -952,8 +1043,7 @@ io.on("connection", (socket) => {
       id: messageId, // Use timestamp as ID
       sender: "user",
       type: data.type || "text",
-      read: false,
-      readBy: [],
+      read: false, // User messages start as unread
       messageType: 'user_message'
     };
     
@@ -1008,6 +1098,45 @@ io.on("connection", (socket) => {
     });
   });
 
+  // ===== MESSAGE READ RECEIPTS =====
+  socket.on("message_read", (data) => {
+    try {
+      const userData = users.get(socket.id);
+      
+      // Only agents can send read receipts
+      if (userData?.type !== 'agent') {
+        console.log(`❌ Unauthorized read receipt attempt from ${socket.id} (type: ${userData?.type})`);
+        return;
+      }
+      
+      const { whatsapp, messageIds, timestamp } = data;
+      
+      // Validate data
+      if (!whatsapp || !messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+        console.error("Invalid read receipt data:", data);
+        return;
+      }
+      
+      console.log(`📖 Read receipt received for ${messageIds.length} messages in ${whatsapp}`);
+      
+      // Mark messages as read
+      const result = markMessagesAsRead(whatsapp, messageIds);
+      
+      // Send confirmation back
+      socket.emit("message_read_confirmation", {
+        ...result,
+        timestamp: timestamp || new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("Error processing read receipt:", error);
+      socket.emit("message_read_confirmation", {
+        success: false,
+        message: error.message
+      });
+    }
+  });
+
   // ===== ADMIN CONNECT =====
   socket.on("admin_connect", () => {
     console.log("✓ Admin connected:", socket.id);
@@ -1042,14 +1171,10 @@ io.on("connection", (socket) => {
         return;
       }
       
-      // Mark unread messages as read by this agent
-      if (markAsRead && agentId) {
+      // Mark unread messages as read
+      if (markAsRead) {
         conversation.messages.forEach((msg) => {
-          if (msg.sender === "user") {
-            if (!msg.readBy) msg.readBy = [];
-            if (!msg.readBy.includes(agentId)) {
-              msg.readBy.push(agentId);
-            }
+          if (msg.sender === "user" && !msg.read) {
             msg.read = true;
           }
         });
@@ -1338,6 +1463,10 @@ function startServer() {
     console.log(`💾 USER ROOMS: Each user's messages saved under their WhatsApp ID`);
     console.log(`🔧 Agents automatically get broadcast history on login`);
     console.log(`👤 Agents can join individual user rooms to see their history`);
+    console.log(`✅ NEW: Simplified read receipt system enabled!`);
+    console.log(`   - Agents send "message_read" events`);
+    console.log(`   - Server updates "read: true" on messages`);
+    console.log(`   - Read status broadcast to all relevant parties`);
     console.log(`⚠️  WARNING: Data is ephemeral - will be lost on server restart`);
   });
 }

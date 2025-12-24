@@ -698,6 +698,46 @@ function normalizeFileUrl(url) {
   return url;
 }
 
+// ===== READ RECEIPT FUNCTIONALITY =====
+function markMessagesAsRead() {
+  if (!whatsapp || !isAgentLoggedIn || !socket.connected) return;
+  
+  // Get all unread message IDs (user messages that haven't been marked as read)
+  const unreadMessages = [];
+  const messageElements = document.querySelectorAll('.message-container.user-message');
+  
+  messageElements.forEach(el => {
+    const messageId = el.dataset.messageId;
+    if (messageId && !el.dataset.read) {
+      unreadMessages.push(messageId);
+      el.dataset.read = 'true';
+      
+      // Add visual indicator (double tick) to the message
+      const timeElement = el.querySelector('.message-time');
+      if (timeElement && !timeElement.querySelector('.read-indicator')) {
+        const readIndicator = document.createElement('span');
+        readIndicator.className = 'read-indicator';
+        readIndicator.textContent = ' ✓✓';
+        readIndicator.style.color = '#667eea';
+        readIndicator.style.fontSize = '0.9em';
+        timeElement.appendChild(readIndicator);
+      }
+    }
+  });
+  
+  // If there are unread messages, send read receipt
+  if (unreadMessages.length > 0) {
+    console.log(`📨 Marking ${unreadMessages.length} messages as read:`, unreadMessages);
+    
+    socket.emit("message_read", {
+      whatsapp: whatsapp,
+      messageIds: unreadMessages,
+      agentId: agentId,
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
 // Initialize
 document.getElementById("chatTitle").textContent = `Chat with ${whatsapp}`;
 document.getElementById("chatSubtitle").textContent = whatsapp;
@@ -950,6 +990,11 @@ socket.on("agent_login_response", (response) => {
     // START CONSTANT MESSAGE CHECKING
     startConstantMessageChecking();
     
+    // Mark all existing messages as read
+    setTimeout(() => {
+      markMessagesAsRead();
+    }, 1000);
+    
     // Clear any loading messages
     const messagesDiv = document.getElementById("messages");
     if (messagesDiv.innerHTML.includes('Connecting...')) {
@@ -980,6 +1025,28 @@ socket.on("new_message", (msg) => {
   
   // Display only server-confirmed messages
   displayMessage(msg);
+  
+  // Mark new user message as read if agent is viewing
+  if (msg.sender !== "agent" && isAgentLoggedIn) {
+    setTimeout(() => {
+      markMessagesAsRead();
+    }, 500);
+  }
+});
+
+// Socket handler for read receipt confirmation
+socket.on("message_read_confirmation", (response) => {
+  console.log('✅ Read receipt confirmed:', response);
+  
+  if (response.success && response.messageIds) {
+    // Mark messages as read on the server side
+    response.messageIds.forEach(messageId => {
+      const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+      if (messageEl) {
+        messageEl.dataset.read = 'confirmed';
+      }
+    });
+  }
 });
 
 // ===== SCROLL MANAGEMENT =====
@@ -991,6 +1058,15 @@ function setupScrollListener() {
     const { scrollTop, scrollHeight, clientHeight } = messagesDiv;
     isScrolledToBottom = (scrollHeight - scrollTop - clientHeight) < 100;
     scrollBtn.classList.toggle('visible', !isScrolledToBottom);
+    
+    // Mark messages as read when scrolling near bottom
+    const isNearBottom = (scrollHeight - scrollTop - clientHeight) < 300;
+    if (isNearBottom) {
+      clearTimeout(window.scrollReadReceiptTimeout);
+      window.scrollReadReceiptTimeout = setTimeout(() => {
+        markMessagesAsRead();
+      }, 1000);
+    }
   }, { passive: true });
 }
 
@@ -1000,6 +1076,9 @@ function scrollToBottom() {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
     isScrolledToBottom = true;
     document.getElementById("scrollToBottomBtn").classList.remove('visible');
+    
+    // Mark messages as read when scrolling to bottom
+    markMessagesAsRead();
   }
 }
 
@@ -1010,6 +1089,9 @@ function scrollToBottomSmooth() {
       top: messagesDiv.scrollHeight,
       behavior: 'smooth'
     });
+    
+    // Mark messages as read when scrolling to bottom
+    markMessagesAsRead();
   }
 }
 
@@ -1155,10 +1237,17 @@ function displayMessage(msg) {
     content += renderAttachment(msg.file);
   }
   
+  // Add read indicator if message is already marked as read
+  let readIndicator = '';
+  if (!isAgent && msg.readBy && msg.readBy.includes(agentId)) {
+    readIndicator = ' <span class="read-indicator" style="color:#667eea;font-size:0.9em;">✓✓</span>';
+    div.dataset.read = 'true';
+  }
+  
   div.innerHTML = `
     <div class="message-header">
       <span class="message-sender">${isAgent ? 'You' : 'User'}</span>
-      <span class="message-time">${time}</span>
+      <span class="message-time">${time}${readIndicator}</span>
     </div>
     <div class="message-content">${content}</div>
   `;
@@ -1197,6 +1286,11 @@ socket.on("message_history", (messages) => {
   
   uniqueMessages.forEach(msg => displayMessage(msg));
   setTimeout(scrollToBottom, 100);
+  
+  // Mark all loaded messages as read
+  setTimeout(() => {
+    markMessagesAsRead();
+  }, 500);
 });
 
 // ===== MESSAGE SENDING =====
@@ -1359,6 +1453,69 @@ window.addEventListener('resize', function() {
   viewportHeight = newViewportHeight;
 });
 
+// ===== READ RECEIPT OBSERVER =====
+function setupReadReceiptObserver() {
+  // Create intersection observer to detect when messages become visible
+  const observer = new IntersectionObserver((entries) => {
+    let shouldMarkAsRead = false;
+    
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const messageEl = entry.target;
+        if (messageEl.classList.contains('user-message') && !messageEl.dataset.read) {
+          shouldMarkAsRead = true;
+        }
+      }
+    });
+    
+    if (shouldMarkAsRead) {
+      // Debounce the mark as read function
+      clearTimeout(window.readReceiptTimeout);
+      window.readReceiptTimeout = setTimeout(() => {
+        markMessagesAsRead();
+      }, 500);
+    }
+  }, {
+    threshold: 0.5,
+    rootMargin: '0px 0px -50px 0px'
+  });
+  
+  // Observe all user messages
+  const observeMessages = () => {
+    document.querySelectorAll('.message-container.user-message').forEach(el => {
+      if (!el.dataset.observed) {
+        observer.observe(el);
+        el.dataset.observed = 'true';
+      }
+    });
+  };
+  
+  // Initial observation
+  observeMessages();
+  
+  // Re-observe when new messages are added
+  const originalDisplayMessage = window.displayMessage;
+  window.displayMessage = function(msg) {
+    originalDisplayMessage(msg);
+    setTimeout(observeMessages, 100);
+  };
+  
+  return observer;
+}
+
+// ===== SETUP READ RECEIPT TRIGGERS =====
+function setupReadReceiptTriggers() {
+  // Mark as read when page becomes visible
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      markMessagesAsRead();
+    }
+  });
+  
+  // Mark all as read when chat is opened
+  setTimeout(markMessagesAsRead, 1000);
+}
+
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
   if (!whatsapp) {
@@ -1382,6 +1539,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 15000);
   
   setupScrollListener();
+  setupReadReceiptObserver();
+  setupReadReceiptTriggers();
   
   // Connect socket
   socket.connect();
