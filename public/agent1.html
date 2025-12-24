@@ -32,6 +32,9 @@ header { padding: 10px; background: #222; color: #fff; display: flex; justify-co
   <div id="main">Select a user to open chat</div>
 </div>
 
+<!-- Silent audio to unlock autoplay -->
+<audio id="silentAudio" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=" autoplay></audio>
+
 <audio id="notificationSound" src="notification.mp3" preload="auto"></audio>
 
 <script>
@@ -145,20 +148,9 @@ function updateUserList(users){
   updateUnreadCount();
 }
 
-// ===== REAL-TIME EVENTS =====
-socket.on("new_message", handleMessageEvent);
-socket.on("message_update", handleMessageEvent);
-socket.on("chat_deleted", handleMessageEvent);
-socket.on("chat_archived", handleMessageEvent);
-socket.on("broadcast_message", handleMessageEvent);
-
-function handleMessageEvent(msg){
-  if(msg.whatsapp && msg.id){
-    highlightMessage(msg.whatsapp, msg.id);
-  }
-}
-
 // ===== NOTIFICATION FUNCTIONS =====
+const audio = document.getElementById("notificationSound");
+
 function requestNotificationPermission() {
   if("Notification" in window && Notification.permission !== "granted"){
     Notification.requestPermission();
@@ -172,6 +164,24 @@ function notifyUser(title, body) {
   }
 }
 
+// ===== REAL-TIME EVENTS =====
+socket.on("new_message", handleMessageEvent);
+socket.on("message_update", handleMessageEvent);
+socket.on("chat_deleted", handleMessageEvent);
+socket.on("chat_archived", handleMessageEvent);
+socket.on("broadcast_message", handleMessageEvent);
+
+// Instant user list update when new messages or new users arrive
+socket.on("new_user", () => fetchActiveUsers());
+
+// ===== HANDLE MESSAGE =====
+function handleMessageEvent(msg){
+  if(msg.whatsapp && msg.id){
+    highlightMessage(msg.whatsapp, msg.id);
+    fetchActiveUsers(); // update user list instantly
+  }
+}
+
 // Highlight user for unread message, per message
 function highlightMessage(whatsapp, msgId){
   if(!unreadMessages[whatsapp]) unreadMessages[whatsapp] = {};
@@ -181,12 +191,12 @@ function highlightMessage(whatsapp, msgId){
     saveUnreadMessages();
     updateUnreadCount();
 
-    // Play sound repeatedly until window focused
-    const audio = document.getElementById("notificationSound");
-    let interval = setInterval(() => audio.play(), 1500);
-    window.addEventListener("focus", () => clearInterval(interval), { once: true });
+    // Play notification sound automatically
+    audio.play().catch(()=>{});
+    const interval = setInterval(()=>audio.play().catch(()=>{}), 2000);
+    setTimeout(()=>clearInterval(interval), 3000);
 
-    // Browser notification
+    // Show browser notification
     notifyUser("New message from " + whatsapp, "You have a new message waiting in the dashboard");
 
     // Highlight user in sidebar
