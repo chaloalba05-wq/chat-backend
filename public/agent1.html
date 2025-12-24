@@ -13,6 +13,7 @@ header { padding: 10px; background: #222; color: #fff; display: flex; justify-co
 .user-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; border-radius: 4px; margin-bottom: 5px; }
 .user-item:hover { background: #f0f0f0; }
 .user-item.highlight { background: #ffd27f !important; }
+.message-item { font-size: 0.9em; margin-left: 10px; color: #333; }
 #main { flex: 1; padding: 10px; }
 .status { font-weight: bold; }
 .empty-message { font-style: italic; color: #888; }
@@ -31,11 +32,6 @@ header { padding: 10px; background: #222; color: #fff; display: flex; justify-co
   <div id="activeMessages"><div class="empty-message">No active users</div></div>
   <div id="main">Select a user to open chat</div>
 </div>
-
-<!-- Silent audio to unlock autoplay -->
-<audio id="silentAudio" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=" autoplay></audio>
-
-<audio id="notificationSound" src="notification.mp3" preload="auto"></audio>
 
 <script>
 const agentId = "agent1";
@@ -87,7 +83,7 @@ socket.on("agent_login_response", (res) => {
 // ===== FETCH ACTIVE USERS =====
 let allUsers = [];
 function fetchActiveUsers() {
-  socket.emit("get_existing_users"); // server emits "existing_users"
+  socket.emit("get_existing_users");
 }
 
 socket.on("existing_users", (users) => {
@@ -95,7 +91,7 @@ socket.on("existing_users", (users) => {
 });
 
 // ===== PER-MESSAGE UNREAD TRACKING =====
-let unreadMessages = JSON.parse(localStorage.getItem("unreadMessages")) || {}; 
+let unreadMessages = JSON.parse(localStorage.getItem("unreadMessages")) || {};
 function saveUnreadMessages() {
   localStorage.setItem("unreadMessages", JSON.stringify(unreadMessages));
 }
@@ -123,22 +119,40 @@ function updateUserList(users){
     return;
   }
 
+  // Sort users: unread messages on top
+  users.sort((a,b)=>{
+    const aUnread = unreadMessages[a.whatsapp] ? 1 : 0;
+    const bUnread = unreadMessages[b.whatsapp] ? 1 : 0;
+    return bUnread - aUnread;
+  });
+
   users.forEach(u => {
     const div = document.createElement("div");
-    div.textContent = u.whatsapp;
     div.className = "user-item";
-
     if(unreadMessages[u.whatsapp] && Object.keys(unreadMessages[u.whatsapp]).length > 0){
       div.classList.add("highlight");
+    }
+    const title = document.createElement("div");
+    title.textContent = u.whatsapp;
+    div.appendChild(title);
+
+    // show latest unread messages under user id
+    if(unreadMessages[u.whatsapp]){
+      for(const msgId in unreadMessages[u.whatsapp]){
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message-item";
+        msgDiv.textContent = unreadMessages[u.whatsapp][msgId];
+        div.appendChild(msgDiv);
+      }
     }
 
     div.addEventListener("click", () => {
       window.open(`agent-chat.html?whatsapp=${u.whatsapp}`, "_blank");
-      div.classList.remove("highlight");
       if(unreadMessages[u.whatsapp]){
         delete unreadMessages[u.whatsapp];
         saveUnreadMessages();
       }
+      updateUserList(allUsers); // refresh list after reading
       updateUnreadCount();
     });
 
@@ -149,7 +163,25 @@ function updateUserList(users){
 }
 
 // ===== NOTIFICATION FUNCTIONS =====
-const audio = document.getElementById("notificationSound");
+function playNotificationSound(){
+  try{
+    const context = new (window.AudioContext||window.webkitAudioContext)();
+    let count = 0;
+    const interval = setInterval(()=>{
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gainNode.gain.value = 0.5;
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime+0.2);
+      count++;
+      if(count>=15) clearInterval(interval); // ~3 seconds total
+    }, 200);
+  }catch(e){console.error(e);}
+}
 
 function requestNotificationPermission() {
   if("Notification" in window && Notification.permission !== "granted"){
@@ -171,58 +203,27 @@ socket.on("chat_deleted", handleMessageEvent);
 socket.on("chat_archived", handleMessageEvent);
 socket.on("broadcast_message", handleMessageEvent);
 
-// Instant user list update when new messages or new users arrive
 socket.on("new_user", () => fetchActiveUsers());
 
 // ===== HANDLE MESSAGE =====
 function handleMessageEvent(msg){
   if(msg.whatsapp && msg.id){
-    highlightMessage(msg.whatsapp, msg.id);
-    fetchActiveUsers(); // update user list instantly
-  }
-}
-
-// Highlight user for unread message, per message
-function highlightMessage(whatsapp, msgId){
-  if(!unreadMessages[whatsapp]) unreadMessages[whatsapp] = {};
-
-  if(!unreadMessages[whatsapp][msgId]){
-    unreadMessages[whatsapp][msgId] = true;
+    if(!unreadMessages[msg.whatsapp]) unreadMessages[msg.whatsapp] = {};
+    unreadMessages[msg.whatsapp][msg.id] = msg.text || "New message";
     saveUnreadMessages();
     updateUnreadCount();
-
-    // Play notification sound automatically
-    audio.play().catch(()=>{});
-    const interval = setInterval(()=>audio.play().catch(()=>{}), 2000);
-    setTimeout(()=>clearInterval(interval), 3000);
-
-    // Show browser notification
-    notifyUser("New message from " + whatsapp, "You have a new message waiting in the dashboard");
-
-    // Highlight user in sidebar
-    const items = document.getElementsByClassName("user-item");
-    for(let i of items){
-      if(i.textContent === whatsapp){
-        i.classList.add("highlight");
-      }
-    }
+    updateUserList(allUsers);
+    playNotificationSound();
+    notifyUser("New message from " + msg.whatsapp, msg.text || "You have a new message waiting in the dashboard");
   }
 }
 
 // ===== INITIAL FETCH =====
 fetchActiveUsers();
 
-// Restore highlights for persisted unread messages on page load
 window.addEventListener("DOMContentLoaded", () => {
   requestNotificationPermission();
-  for(const whatsapp in unreadMessages){
-    const items = document.getElementsByClassName("user-item");
-    for(let i of items){
-      if(i.textContent === whatsapp && Object.keys(unreadMessages[whatsapp]).length > 0){
-        i.classList.add("highlight");
-      }
-    }
-  }
+  updateUserList(allUsers);
   updateUnreadCount();
 });
 </script>
