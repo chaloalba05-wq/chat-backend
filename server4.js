@@ -350,6 +350,51 @@ function broadcastReadStatusUpdate(whatsapp, messageIds) {
   }
 }
 
+// ===== GET USER LIST WITH READ RECEIPTS =====
+function getUserListWithReadReceipts() {
+  try {
+    const userList = [];
+    
+    conversations.forEach((conversation, whatsapp) => {
+      if (conversation.archived) return;
+      
+      const messages = conversation.messages || [];
+      
+      // Count unread messages (user messages that aren't read)
+      const unreadCount = messages.filter(msg => 
+        msg.sender === "user" && !msg.read
+      ).length;
+      
+      // Get last message info
+      const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+      
+      userList.push({
+        whatsapp: whatsapp,
+        lastMessage: conversation.lastMessage || null,
+        lastMessageTime: conversation.lastUpdated || conversation.createdAt,
+        messageCount: messages.length,
+        unreadCount: unreadCount,
+        lastMessageDetails: lastMessage ? {
+          id: lastMessage.id,
+          text: lastMessage.text || (lastMessage.attachment ? `[${lastMessage.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
+          sender: lastMessage.sender,
+          timestamp: lastMessage.timestamp,
+          read: lastMessage.read || false
+        } : null,
+        createdAt: conversation.createdAt
+      });
+    });
+    
+    // Sort by last message time (most recent first)
+    userList.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+    
+    return userList;
+  } catch (error) {
+    console.error("Error getting user list with read receipts:", error);
+    return [];
+  }
+}
+
 // ---- Setup server ----
 const app = express();
 const server = http.createServer(app);
@@ -386,6 +431,17 @@ app.get("/agent:num.html", (req, res) => {
     res.sendFile(filePath);
   } else {
     res.status(404).send("Agent file not found");
+  }
+});
+
+// New route: Get user list with read receipts
+app.get("/agent/users", (req, res) => {
+  try {
+    const userList = getUserListWithReadReceipts();
+    res.json({ success: true, users: userList });
+  } catch (error) {
+    console.error("Error fetching user list:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
@@ -881,6 +937,10 @@ io.on("connection", (socket) => {
     // ===== SEND BROADCAST ROOM HISTORY TO AGENT =====
     sendBroadcastRoomToAgent(socket.id);
     
+    // ===== SEND USER LIST WITH READ RECEIPTS TO AGENT =====
+    const userList = getUserListWithReadReceipts();
+    socket.emit("user_list_with_read_receipts", userList);
+    
     socket.emit("agent_login_response", {
       success: true,
       name: agent.name,
@@ -1008,6 +1068,9 @@ io.on("connection", (socket) => {
       lastAgent: userData.agentId
     });
     
+    // ===== UPDATE USER LIST FOR ALL AGENTS =====
+    updateUserListForAllAgents();
+    
     logActivity('agent_message_sent', {
       agentId: userData.agentId,
       agentName: agent.name,
@@ -1088,6 +1151,9 @@ io.on("connection", (socket) => {
       unread: true
     });
     
+    // ===== UPDATE USER LIST FOR ALL AGENTS =====
+    updateUserListForAllAgents();
+    
     logActivity('user_message_received', {
       from: whatsapp,
       messageId: messageId,
@@ -1122,6 +1188,9 @@ io.on("connection", (socket) => {
       // Mark messages as read
       const result = markMessagesAsRead(whatsapp, messageIds);
       
+      // ===== UPDATE USER LIST FOR ALL AGENTS =====
+      updateUserListForAllAgents();
+      
       // Send confirmation back
       socket.emit("message_read_confirmation", {
         ...result,
@@ -1134,6 +1203,45 @@ io.on("connection", (socket) => {
         success: false,
         message: error.message
       });
+    }
+  });
+
+  // ===== UPDATE USER LIST FOR ALL AGENTS =====
+  function updateUserListForAllAgents() {
+    try {
+      const userList = getUserListWithReadReceipts();
+      
+      // Send to all online agents
+      agents.forEach((agent, agentId) => {
+        if (agent.socketId) {
+          io.to(agent.socketId).emit("user_list_with_read_receipts", userList);
+        }
+      });
+      
+      // Also send to super admin and admin
+      io.to("super_admin").to("admin").emit("user_list_with_read_receipts", userList);
+      
+    } catch (error) {
+      console.error("Error updating user list for agents:", error);
+    }
+  }
+
+  // ===== AGENT REQUESTS USER LIST =====
+  socket.on("get_user_list_with_read_receipts", () => {
+    try {
+      const userData = users.get(socket.id);
+      
+      // Only agents, super admin, and admin can request user list
+      if (!userData || (userData.type !== 'agent' && userData.type !== 'super_admin' && userData.type !== 'admin')) {
+        return;
+      }
+      
+      const userList = getUserListWithReadReceipts();
+      socket.emit("user_list_with_read_receipts", userList);
+      
+    } catch (error) {
+      console.error("Error getting user list:", error);
+      socket.emit("user_list_with_read_receipts", []);
     }
   });
 
@@ -1151,6 +1259,10 @@ io.on("connection", (socket) => {
         });
       }
     });
+    
+    // Send user list with read receipts to admin
+    const userList = getUserListWithReadReceipts();
+    socket.emit("user_list_with_read_receipts", userList);
   });
 
   // User register (with whatsapp)
@@ -1160,6 +1272,9 @@ io.on("connection", (socket) => {
     socket.join(whatsapp);
     socket.emit("registered", { success: true });
     console.log(`✓ Registered: ${whatsapp} with socket ${socket.id}`);
+    
+    // Update user list for all agents when a new user registers
+    updateUserListForAllAgents();
   });
 
   // Get messages for a specific whatsapp
@@ -1248,6 +1363,9 @@ io.on("connection", (socket) => {
           message: archiveOnly ? "Chat archived successfully" : "Chat deleted permanently" 
         });
         
+        // Update user list for all agents
+        updateUserListForAllAgents();
+        
         logActivity('chat_deletion', {
           whatsapp,
           by: userData.type === 'agent' ? userData.agentId : userData.type,
@@ -1320,6 +1438,9 @@ io.on("connection", (socket) => {
           broadcastMessages.splice(broadcastIndex, 1);
         }
         
+        // Update user list for all agents
+        updateUserListForAllAgents();
+        
         // Notify all connected clients about the deletion
         io.to(whatsapp).emit("message_deleted", { whatsapp, messageId });
         io.to("super_admin").to("admin").emit("message_deleted", { whatsapp, messageId });
@@ -1360,6 +1481,9 @@ io.on("connection", (socket) => {
         conversation.lastMessageTime = null;
         
         activeChats.delete(whatsapp);
+        
+        // Update user list for all agents
+        updateUserListForAllAgents();
         
         socket.emit("clear_chat_response", { success: true });
         io.to(whatsapp).emit("chat_cleared", { whatsapp });
@@ -1451,6 +1575,7 @@ function startServer() {
     console.log(`   /admin - Original admin panel`);
     console.log(`   /superadmin - Super admin panel`);
     console.log(`   /agent - Agent panel`);
+    console.log(`   /agent/users - NEW: Get user list with read receipts`);
     console.log(`   /agent/conversations - Get all conversations`);
     console.log(`   /agent/:id/info - Get agent info (for debugging)`);
     console.log(`   DELETE /chat/:whatsapp - Delete a chat`);
@@ -1463,10 +1588,11 @@ function startServer() {
     console.log(`💾 USER ROOMS: Each user's messages saved under their WhatsApp ID`);
     console.log(`🔧 Agents automatically get broadcast history on login`);
     console.log(`👤 Agents can join individual user rooms to see their history`);
-    console.log(`✅ NEW: Simplified read receipt system enabled!`);
-    console.log(`   - Agents send "message_read" events`);
-    console.log(`   - Server updates "read: true" on messages`);
-    console.log(`   - Read status broadcast to all relevant parties`);
+    console.log(`✅ NEW: User list with read receipts enabled!`);
+    console.log(`   - GET /agent/users endpoint for API access`);
+    console.log(`   - Socket event: get_user_list_with_read_receipts`);
+    console.log(`   - Real-time updates when messages are sent/read`);
+    console.log(`   - Shows unread count per user`);
     console.log(`⚠️  WARNING: Data is ephemeral - will be lost on server restart`);
   });
 }
