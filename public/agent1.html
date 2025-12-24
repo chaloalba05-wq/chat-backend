@@ -37,12 +37,10 @@ header { padding: 10px; background: #222; color: #fff; display: flex; justify-co
 const agentId = "agent1";
 const agentPassword = "agent1";
 
-// Redirect to login page if not verified
 if (!localStorage.getItem("agentVerified")) window.location.href = "login.html";
 
 const socket = io({ reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1000, reconnectionDelayMax: 5000 });
 
-// ===== CONNECTION STATUS =====
 const connectionStatus = document.getElementById("connectionStatus");
 
 socket.on("connect", () => { 
@@ -61,7 +59,6 @@ socket.on("reconnect_attempt", () => {
   connectionStatus.style.color = "orange"; 
 });
 
-// ===== REGISTER AND LOGIN AGENT =====
 function registerAgent() {
   socket.emit("register_permanent_agent", { id: agentId, name: agentId, password: agentPassword });
   loginAgent();
@@ -80,17 +77,19 @@ socket.on("agent_login_response", (res) => {
   }
 });
 
-// ===== FETCH ACTIVE USERS =====
 let allUsers = [];
 function fetchActiveUsers() {
   socket.emit("get_existing_users");
 }
 
 socket.on("existing_users", (users) => {
-  updateUserList(users.map(u => ({ whatsapp: u.whatsapp })));
+  // Merge users without overwriting unread messages
+  users.forEach(u => {
+    if(!allUsers.find(x => x.whatsapp === u.whatsapp)) allUsers.push({ whatsapp: u.whatsapp });
+  });
+  updateUserList(allUsers);
 });
 
-// ===== PER-MESSAGE UNREAD TRACKING =====
 let unreadMessages = JSON.parse(localStorage.getItem("unreadMessages")) || {};
 function saveUnreadMessages() {
   localStorage.setItem("unreadMessages", JSON.stringify(unreadMessages));
@@ -104,7 +103,6 @@ function updateUnreadCount() {
   document.getElementById("unreadCount").textContent = count;
 }
 
-// ===== UPDATE USER LIST =====
 function updateUserList(users){
   allUsers = users;
   const container = document.getElementById("activeMessages");
@@ -119,7 +117,6 @@ function updateUserList(users){
     return;
   }
 
-  // Sort users: unread messages on top
   users.sort((a,b)=>{
     const aUnread = unreadMessages[a.whatsapp] ? 1 : 0;
     const bUnread = unreadMessages[b.whatsapp] ? 1 : 0;
@@ -136,7 +133,6 @@ function updateUserList(users){
     title.textContent = u.whatsapp;
     div.appendChild(title);
 
-    // show latest unread messages under user id
     if(unreadMessages[u.whatsapp]){
       for(const msgId in unreadMessages[u.whatsapp]){
         const msgDiv = document.createElement("div");
@@ -152,7 +148,7 @@ function updateUserList(users){
         delete unreadMessages[u.whatsapp];
         saveUnreadMessages();
       }
-      updateUserList(allUsers); // refresh list after reading
+      updateUserList(allUsers);
       updateUnreadCount();
     });
 
@@ -162,7 +158,6 @@ function updateUserList(users){
   updateUnreadCount();
 }
 
-// ===== NOTIFICATION FUNCTIONS =====
 function playNotificationSound(){
   try{
     const context = new (window.AudioContext||window.webkitAudioContext)();
@@ -178,7 +173,7 @@ function playNotificationSound(){
       oscillator.start();
       oscillator.stop(context.currentTime+0.2);
       count++;
-      if(count>=15) clearInterval(interval); // ~3 seconds total
+      if(count>=15) clearInterval(interval);
     }, 200);
   }catch(e){console.error(e);}
 }
@@ -203,11 +198,21 @@ socket.on("chat_deleted", handleMessageEvent);
 socket.on("chat_archived", handleMessageEvent);
 socket.on("broadcast_message", handleMessageEvent);
 
-socket.on("new_user", () => fetchActiveUsers());
+socket.on("new_user", (newUser) => {
+  if(newUser && !allUsers.find(u => u.whatsapp === newUser.whatsapp)){
+    allUsers.push({ whatsapp: newUser.whatsapp });
+    updateUserList(allUsers);
+  }
+});
 
 // ===== HANDLE MESSAGE =====
 function handleMessageEvent(msg){
   if(msg.whatsapp && msg.id){
+    // Ensure user exists in allUsers
+    if(!allUsers.find(u => u.whatsapp === msg.whatsapp)){
+      allUsers.push({ whatsapp: msg.whatsapp });
+    }
+
     if(!unreadMessages[msg.whatsapp]) unreadMessages[msg.whatsapp] = {};
     unreadMessages[msg.whatsapp][msg.id] = msg.text || "New message";
     saveUnreadMessages();
@@ -218,7 +223,6 @@ function handleMessageEvent(msg){
   }
 }
 
-// ===== INITIAL FETCH =====
 fetchActiveUsers();
 
 window.addEventListener("DOMContentLoaded", () => {
