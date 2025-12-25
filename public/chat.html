@@ -812,6 +812,27 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    
+    /* ===== LINK STYLES ===== */
+    .message-content a {
+      color: #2196F3;
+      text-decoration: none;
+      font-weight: 500;
+      word-break: break-all;
+    }
+    
+    .message-content a:hover {
+      text-decoration: underline;
+    }
+    
+    .user-message .message-content a {
+      color: rgba(255, 255, 255, 0.9);
+      text-decoration: underline;
+    }
+    
+    .user-message .message-content a:hover {
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -876,7 +897,7 @@
         <div class="error-message" id="errorMessage">Please wait before sending another message</div>
         
         <div class="input-area">
-          <input id="messageInput" placeholder="Type your message here...">
+          <textarea id="messageInput" placeholder="Type your message here..." rows="1"></textarea>
           <div class="action-buttons">
             <div class="file-upload-container">
               <button class="file-upload-btn" onclick="document.getElementById('fileInput').click()" title="Attach file">
@@ -1429,6 +1450,36 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
   
+  // ===== LINK DETECTION AND FORMATTING =====
+  function createClickableLinks(text) {
+    // Regular expression to find URLs
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+    
+    // Replace URLs with anchor tags
+    return text.replace(urlRegex, function(url) {
+      // Add http:// if starts with www
+      let href = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        href = 'http://' + url;
+      }
+      
+      // Create a clean display URL (remove protocol for display)
+      let displayUrl = url;
+      if (displayUrl.startsWith('http://')) {
+        displayUrl = displayUrl.substring(7);
+      } else if (displayUrl.startsWith('https://')) {
+        displayUrl = displayUrl.substring(8);
+      }
+      
+      // Shorten long URLs for display
+      if (displayUrl.length > 30) {
+        displayUrl = displayUrl.substring(0, 27) + '...';
+      }
+      
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${displayUrl}</a>`;
+    });
+  }
+  
   // ===== SCROLL MANAGEMENT =====
   function setupScrollListener() {
     const messagesDiv = document.getElementById("messages");
@@ -1657,6 +1708,7 @@
     }
     
     const senderName = msg.sender === "user" ? "You" : (msg.agentName || "Support");
+    const messageText = msg.text || msg.message || '';
     
     messageDiv.innerHTML = `
       <div class="message-header">
@@ -1665,7 +1717,7 @@
           ${formatTime(msg.timestamp)}
         </span>
       </div>
-      <div class="message-content">${msg.text || msg.message || ''}</div>
+      <div class="message-content">${createClickableLinks(messageText)}</div>
       ${content}
       ${msg.read ? `<div class="read-status">✓ Read ${formatTime(msg.readAt)}</div>` : ''}
     `;
@@ -2079,22 +2131,13 @@
   }
 
   // ===== EVENT LISTENERS =====
-  document.getElementById("messageInput").addEventListener("keypress", function(e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      
-      if (sendController.enterKeyCooldown) {
-        console.log("Enter key cooldown active");
-        return;
-      }
-      
-      sendController.enterKeyCooldown = true;
+  document.getElementById("messageInput").addEventListener("keydown", function(e) {
+    // Check if Enter is pressed WITHOUT Shift
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault(); // Prevent default behavior (new line)
       sendMessage();
-      
-      setTimeout(() => {
-        sendController.enterKeyCooldown = false;
-      }, 1000);
     }
+    // If Shift+Enter is pressed, allow default behavior (new line)
   });
 
   document.getElementById("messageInput").addEventListener("input", function() {

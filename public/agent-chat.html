@@ -242,6 +242,26 @@ body {
   font-size: 15px;
 }
 
+/* Style links in messages */
+.message-content a {
+  color: #667eea;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.message-content a:hover {
+  text-decoration: none;
+}
+
+.agent-message .message-content a {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: underline;
+}
+
+.agent-message .message-content a:hover {
+  text-decoration: none;
+}
+
 /* Attachment Styles - MODIFIED: Images as links to new tabs */
 .attachment {
   margin-top: 8px;
@@ -389,6 +409,12 @@ body {
   min-height: 44px;
   max-height: 120px;
   overflow-y: auto;
+  font-family: inherit;
+}
+
+#messageInput:focus {
+  outline: none;
+  border-color: #667eea;
 }
 
 .send-btn {
@@ -401,11 +427,16 @@ body {
   cursor: pointer;
   min-width: 70px;
   min-height: 44px;
+  transition: opacity 0.2s;
 }
 
 .send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.send-btn:not(:disabled):hover {
+  opacity: 0.9;
 }
 
 /* File Upload */
@@ -422,10 +453,15 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.file-upload-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
 }
 
 .file-upload-btn:active {
-  background: rgba(102, 126, 234, 0.1);
+  background: rgba(102, 126, 234, 0.2);
 }
 
 /* Scroll to Bottom Button - ADJUSTED POSITION */
@@ -1119,6 +1155,25 @@ function getFileIcon(mimeType) {
   return '📄';
 }
 
+// ===== URL LINKIFY FUNCTION =====
+function linkify(text) {
+  if (!text) return '';
+  
+  // URL pattern for matching
+  const urlPattern = /(https?:\/\/[^\s]+)/g;
+  
+  return text.replace(urlPattern, function(url) {
+    // Clean up URL (remove trailing punctuation)
+    let cleanUrl = url;
+    const punctuation = /[.,!?;:]$/;
+    if (punctuation.test(url)) {
+      cleanUrl = url.slice(0, -1);
+    }
+    
+    return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${url.slice(cleanUrl.length)}`;
+  });
+}
+
 // ===== FILE ATTACHMENT DISPLAY =====
 function renderAttachment(attachment) {
   if (!attachment) return '';
@@ -1226,6 +1281,9 @@ function displayMessage(msg) {
   });
   
   let content = msg.text || msg.message || '';
+  
+  // Convert URLs to clickable links
+  content = linkify(content);
   
   // Handle attachment
   if (msg.attachment) {
@@ -1428,10 +1486,30 @@ document.getElementById("messageInput").addEventListener("input", function() {
   this.style.height = Math.min(this.scrollHeight, 120) + 'px';
 });
 
-document.getElementById("messageInput").addEventListener("keypress", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
+// FIXED: Changed keypress to keydown to handle Enter key properly
+document.getElementById("messageInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    if (e.shiftKey) {
+      // Shift+Enter: Insert new line
+      e.preventDefault();
+      const start = this.selectionStart;
+      const end = this.selectionEnd;
+      
+      // Insert newline at cursor position
+      this.value = this.value.substring(0, start) + "\n" + this.value.substring(end);
+      
+      // Move cursor to after the newline
+      this.selectionStart = this.selectionEnd = start + 1;
+      
+      // Auto-expand textarea
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    } else if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+      // Enter without modifiers: Send message
+      e.preventDefault();
+      sendMessage();
+    }
+    // Ctrl+Enter or Cmd+Enter: Allow default behavior (submit form if any)
   }
 });
 

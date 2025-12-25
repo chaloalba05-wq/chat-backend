@@ -263,10 +263,10 @@ socket.on("new_user", (newUser) => {
   }
 });
 
-// ===== UPDATED: HANDLE MESSAGE =====
+// ===== UPDATED: HANDLE MESSAGE WITH READ RECEIPTS CHECK =====
 function handleMessageEvent(msg){
-  // Ignore agent messages
-  if (msg.sender === "agent") {
+  // Check if message should be ignored
+  if (shouldIgnoreMessage(msg)) {
     return;
   }
   
@@ -277,6 +277,24 @@ function handleMessageEvent(msg){
       allUsers.push({ whatsapp: msg.whatsapp });
     }
 
+    // Check if message is already marked as read (double-check)
+    if (msg.read || (msg.readAt && Date.now() - new Date(msg.readAt).getTime() > 0)) {
+      // Message is already read, don't flag it
+      if (unreadMessages[msg.whatsapp] && unreadMessages[msg.whatsapp][msg.id]) {
+        delete unreadMessages[msg.whatsapp][msg.id];
+        
+        // If no more unread messages for this user, remove the user entry
+        if (Object.keys(unreadMessages[msg.whatsapp]).length === 0) {
+          delete unreadMessages[msg.whatsapp];
+        }
+        
+        saveUnreadMessages();
+        updateUnreadCount();
+        updateUserList(allUsers);
+      }
+      return;
+    }
+
     if(!unreadMessages[msg.whatsapp]) unreadMessages[msg.whatsapp] = {};
     unreadMessages[msg.whatsapp][msg.id] = msg.text || "New message";
     saveUnreadMessages();
@@ -285,6 +303,31 @@ function handleMessageEvent(msg){
     playNotificationSound();
     notifyUser("New message from " + msg.whatsapp, msg.text || "You have a new message waiting in the dashboard");
   }
+}
+
+// ===== NEW FUNCTION: CHECK IF MESSAGE SHOULD BE IGNORED =====
+function shouldIgnoreMessage(msg) {
+  // Always ignore agent messages
+  if (msg.sender === "agent") {
+    return true;
+  }
+  
+  // Ignore messages that are already marked as read
+  if (msg.read) {
+    return true;
+  }
+  
+  // Ignore if there's a readAt timestamp that's in the past
+  if (msg.readAt && new Date(msg.readAt).getTime() < Date.now()) {
+    return true;
+  }
+  
+  // Additional safety check: ignore if this is an update that makes a message read
+  if (msg.eventType === 'read_update') {
+    return true;
+  }
+  
+  return false;
 }
 
 // ===== ADD: HANDLE CHAT DELETION/ARCHIVAL =====
