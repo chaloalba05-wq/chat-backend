@@ -6,6 +6,7 @@ const path = require("path");
 const multer = require("multer");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
+const pool = require("./db");
 
 // ===== SUPER ADMIN CONFIGURATION =====
 const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
@@ -37,57 +38,160 @@ const upload = multer({
 });
 // =====================================
 
-// ===== SIMPLE IN-MEMORY STORAGE =====
+// ===== IN-MEMORY STORAGE FOR ACTIVE CONNECTIONS =====
 const users = new Map();           // socketId -> { type, agentId, whatsapp }
 const agents = new Map();          // agentId -> { name, password, muted, socketId, filename? }
-const conversations = new Map();   // whatsapp -> { messages: [], lastUpdated, createdAt }
-const activeChats = new Map();     // whatsapp -> { lastMessage, lastMessageTime }
 const activityLog = [];            // Activity log
-const broadcastMessages = [];      // All messages in broadcast room
-// =====================================
+// ====================================================
 
-// ===== PRE-REGISTER AGENTS (so they always exist) =====
-// This ensures agents are always available even on server restart
-function preRegisterDefaultAgents() {
-  const defaultAgents = [
-    { id: "agent1", name: "agent1", password: "agent1", filename: "agent1.html" },
-    { id: "agent2", name: "Agent 2", password: "agent2", filename: "agent2.html" },
-    { id: "agent3", name: "Agent 3", password: "agent3", filename: "agent3.html" }
-  ];
-  
-  defaultAgents.forEach(agent => {
-    if (!agents.has(agent.id)) {
-      agents.set(agent.id, {
-        name: agent.name,
-        password: agent.password,
-        muted: false,
-        socketId: null,
-        filename: agent.filename,
-        createdAt: new Date(),
-        lastSeen: null,
-        permanent: true
-      });
-      console.log(`✅ Pre-registered agent: ${agent.id} (${agent.name})`);
-    }
-  });
+// ===== DATABASE HELPER FUNCTIONS =====
+
+// Initialize database tables
+async function initializeDatabase() {
+  try {
+    // Create chats table if not exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chats (
+        id SERIAL PRIMARY KEY,
+        whatsapp VARCHAR(255) UNIQUE NOT NULL,
+        last_message TEXT,
+        last_message_time TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        archived BOOLEAN DEFAULT FALSE,
+        archived_at TIMESTAMP
+      )
+    `);
+
+    // Create messages table if not exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id VARCHAR(255) PRIMARY KEY,
+        chat_whatsapp VARCHAR(255) REFERENCES chats(whatsapp) ON DELETE CASCADE,
+        sender_type VARCHAR(50) NOT NULL,
+        agent_id VARCHAR(255),
+        agent_name VARCHAR(255),
+        content TEXT,
+        message_type VARCHAR(50) DEFAULT 'text',
+        attachment_url TEXT,
+        attachment_type VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        read BOOLEAN DEFAULT FALSE,
+        broadcast_id VARCHAR(255),
+        is_broadcast BOOLEAN DEFAULT FALSE
+      )
+    `);
+
+    // Create message_reads table if not exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS message_reads (
+        id SERIAL PRIMARY KEY,
+        message_id VARCHAR(255) REFERENCES messages(id) ON DELETE CASCADE,
+        agent_id VARCHAR(255),
+        read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create chat_participants table if not exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_participants (
+        id SERIAL PRIMARY KEY,
+        chat_whatsapp VARCHAR(255) REFERENCES chats(whatsapp) ON DELETE CASCADE,
+        agent_id VARCHAR(255),
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_monitoring BOOLEAN DEFAULT FALSE
+      )
+    `);
+
+    // Create agents table if not exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        muted BOOLEAN DEFAULT FALSE,
+        filename VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_seen TIMESTAMP,
+        socket_id VARCHAR(255),
+        permanent BOOLEAN DEFAULT TRUE
+      )
+    `);
+
+    console.log("✅ Database tables initialized");
+  } catch (error) {
+    console.error("❌ Error initializing database:", error);
+  }
 }
-// =====================================================
 
-// ===== SIMPLE HELPER FUNCTIONS =====
-function logActivity(type, details) {
-  const log = {
-    type,
-    details,
-    timestamp: new Date().toISOString()
-  };
-  activityLog.push(log);
-  if (activityLog.length > 1000) activityLog.shift();
-  console.log(`[Activity] ${type}:`, details);
-  return log;
+// ===== SAVE MESSAGE TO DATABASE =====
+async function saveMessageToDatabase(message) {
+  try {
+    const {
+      id,
+      whatsapp,
+      sender,
+      agentId,
+      agentName,
+      text,
+      messageType = 'text',
+      attachment,
+      timestamp,
+      read = false,
+      broadcastId = uuidv4(),
+      isBroadcast = false
+    } = message;
+
+    // First, ensure chat exists
+    await pool.query(`
+      INSERT INTO chats (whatsapp, last_message, last_message_time, last_updated)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (whatsapp) 
+      DO UPDATE SET 
+        last_message = EXCLUDED.last_message,
+        last_message_time = EXCLUDED.last_message_time,
+        last_updated = EXCLUDED.last_updated
+    `, [
+      whatsapp,
+      text || (attachment ? `[${attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
+      timestamp || new Date(),
+      new Date()
+    ]);
+
+    // Save the message
+    await pool.query(`
+      INSERT INTO messages (
+        id, chat_whatsapp, sender_type, agent_id, agent_name, 
+        content, message_type, attachment_url, attachment_type,
+        created_at, read, broadcast_id, is_broadcast
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ON CONFLICT (id) DO NOTHING
+    `, [
+      id,
+      whatsapp,
+      sender,
+      agentId,
+      agentName,
+      text || '',
+      messageType,
+      attachment?.url,
+      attachment?.mimetype,
+      timestamp || new Date(),
+      read,
+      broadcastId,
+      isBroadcast
+    ]);
+
+    console.log(`💾 Saved message to database: ${id}`);
+    return true;
+  } catch (error) {
+    console.error("Error saving message to database:", error);
+    return false;
+  }
 }
 
-// ===== SAVE MESSAGE TO BROADCAST ROOM =====
-function saveMessageToBroadcastRoom(message) {
+// ===== SAVE MESSAGE TO BROADCAST ROOM (DATABASE VERSION) =====
+async function saveMessageToBroadcastRoom(message) {
   try {
     const broadcastMessage = {
       ...message,
@@ -96,14 +200,10 @@ function saveMessageToBroadcastRoom(message) {
       broadcastId: uuidv4()
     };
     
-    broadcastMessages.push(broadcastMessage);
+    // Save to database
+    await saveMessageToDatabase(broadcastMessage);
     
-    // Keep only last 1000 broadcast messages to prevent memory issues
-    if (broadcastMessages.length > 1000) {
-      broadcastMessages.shift();
-    }
-    
-    console.log(`📡 Saved to broadcast room: ${broadcastMessage.broadcastId} (Total: ${broadcastMessages.length} broadcast messages)`);
+    console.log(`📡 Saved to broadcast room in database: ${broadcastMessage.broadcastId}`);
     return broadcastMessage;
   } catch (error) {
     console.error("Error saving to broadcast room:", error);
@@ -111,30 +211,16 @@ function saveMessageToBroadcastRoom(message) {
   }
 }
 
-// ===== SAVE MESSAGE TO USER'S CHAT HISTORY =====
-function saveMessageToUserHistory(whatsapp, message) {
+// ===== SAVE MESSAGE TO USER'S CHAT HISTORY (DATABASE VERSION) =====
+async function saveMessageToUserHistory(whatsapp, message) {
   try {
-    if (!conversations.has(whatsapp)) {
-      // Create new conversation
-      conversations.set(whatsapp, {
-        whatsapp: whatsapp,
-        messages: [message],
-        createdAt: new Date(),
-        lastUpdated: new Date(),
-        lastMessage: message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
-        lastMessageTime: message.timestamp,
-        archived: false
-      });
-    } else {
-      // Update existing conversation
-      const conversation = conversations.get(whatsapp);
-      conversation.messages.push(message);
-      conversation.lastUpdated = new Date();
-      conversation.lastMessage = message.text || (message.attachment ? `[${message.attachment.mimetype?.split('/')[0] || 'File'}]` : '');
-      conversation.lastMessageTime = message.timestamp;
-    }
+    // Save to database (which handles both creation and updates)
+    await saveMessageToDatabase({
+      ...message,
+      whatsapp: whatsapp
+    });
     
-    console.log(`💾 Saved message for ${whatsapp} (Total: ${conversations.get(whatsapp)?.messages.length} messages)`);
+    console.log(`💾 Saved message for ${whatsapp} to database`);
     return true;
   } catch (error) {
     console.error("Error saving message to user history:", error);
@@ -142,30 +228,87 @@ function saveMessageToUserHistory(whatsapp, message) {
   }
 }
 
-// ===== SEND BROADCAST ROOM MESSAGES TO AGENT =====
-function sendBroadcastRoomToAgent(agentSocketId) {
+// ===== SEND BROADCAST ROOM MESSAGES TO AGENT (DATABASE VERSION) =====
+async function sendBroadcastRoomToAgent(agentSocketId) {
   try {
+    // Get broadcast messages from database
+    const result = await pool.query(`
+      SELECT 
+        m.id,
+        m.chat_whatsapp as whatsapp,
+        m.sender_type as sender,
+        m.agent_id,
+        m.agent_name,
+        m.content as text,
+        m.message_type as type,
+        m.attachment_url,
+        m.attachment_type,
+        m.created_at as timestamp,
+        m.read,
+        m.broadcast_id,
+        m.is_broadcast,
+        true as isHistorical
+      FROM messages m
+      WHERE m.is_broadcast = TRUE
+      ORDER BY m.created_at ASC
+      LIMIT 1000
+    `);
+
+    const broadcastMessages = result.rows.map(row => ({
+      ...row,
+      attachment: row.attachment_url ? {
+        url: row.attachment_url,
+        mimetype: row.attachment_type
+      } : null
+    }));
+
     // Send all broadcast messages to the agent
     broadcastMessages.forEach(message => {
-      io.to(agentSocketId).emit("broadcast_message", {
-        ...message,
-        isHistorical: true
-      });
+      io.to(agentSocketId).emit("broadcast_message", message);
     });
     
-    console.log(`📨 Sent ${broadcastMessages.length} broadcast messages to agent`);
+    console.log(`📨 Sent ${broadcastMessages.length} broadcast messages from database to agent`);
   } catch (error) {
     console.error("Error sending broadcast room to agent:", error);
   }
 }
 
-// ===== SEND USER CHAT HISTORY TO AGENT =====
-function sendUserChatHistoryToAgent(agentSocketId, whatsapp) {
+// ===== SEND USER CHAT HISTORY TO AGENT (DATABASE VERSION) =====
+async function sendUserChatHistoryToAgent(agentSocketId, whatsapp) {
   try {
-    const conversation = conversations.get(whatsapp);
-    if (conversation && conversation.messages && conversation.messages.length > 0) {
+    // Get user's messages from database
+    const result = await pool.query(`
+      SELECT 
+        m.id,
+        m.chat_whatsapp as whatsapp,
+        m.sender_type as sender,
+        m.agent_id,
+        m.agent_name,
+        m.content as text,
+        m.message_type as type,
+        m.attachment_url,
+        m.attachment_type,
+        m.created_at as timestamp,
+        m.read,
+        m.broadcast_id,
+        m.is_broadcast,
+        true as isHistorical
+      FROM messages m
+      WHERE m.chat_whatsapp = $1
+      ORDER BY m.created_at ASC
+    `, [whatsapp]);
+
+    const messages = result.rows.map(row => ({
+      ...row,
+      attachment: row.attachment_url ? {
+        url: row.attachment_url,
+        mimetype: row.attachment_type
+      } : null
+    }));
+
+    if (messages.length > 0) {
       // Send each message from this user's history
-      conversation.messages.forEach(message => {
+      messages.forEach(message => {
         io.to(agentSocketId).emit("user_chat_history", {
           ...message,
           whatsapp: whatsapp,
@@ -173,18 +316,20 @@ function sendUserChatHistoryToAgent(agentSocketId, whatsapp) {
         });
       });
       
-      console.log(`📨 Sent ${conversation.messages.length} messages from ${whatsapp} to agent`);
+      console.log(`📨 Sent ${messages.length} messages from ${whatsapp} to agent from database`);
     }
   } catch (error) {
     console.error(`Error sending ${whatsapp} chat history to agent:`, error);
   }
 }
 
-// ===== BROADCAST MESSAGE TO ALL AGENTS =====
-function broadcastMessageToAllAgents(messageData, excludeSocketId = null) {
+// ===== BROADCAST MESSAGE TO ALL AGENTS (DATABASE VERSION) =====
+async function broadcastMessageToAllAgents(messageData, excludeSocketId = null) {
   try {
     // Save to broadcast room first
-    const broadcastMessage = saveMessageToBroadcastRoom(messageData);
+    const broadcastMessage = await saveMessageToBroadcastRoom(messageData);
+    
+    if (!broadcastMessage) return false;
     
     // Send to all non-muted agents
     agents.forEach((agent, agentId) => {
@@ -203,11 +348,11 @@ function broadcastMessageToAllAgents(messageData, excludeSocketId = null) {
   }
 }
 
-// ===== SEND MESSAGE TO SPECIFIC USER ROOM =====
-function sendMessageToUserRoom(whatsapp, message) {
+// ===== SEND MESSAGE TO SPECIFIC USER ROOM (DATABASE VERSION) =====
+async function sendMessageToUserRoom(whatsapp, message) {
   try {
     // Save to user's chat history
-    saveMessageToUserHistory(whatsapp, message);
+    await saveMessageToUserHistory(whatsapp, message);
     
     // Send to the specific user's room
     io.to(whatsapp).emit("new_message", {
@@ -233,64 +378,29 @@ function sendMessageToUserRoom(whatsapp, message) {
   }
 }
 
-// ===== DELETE CHAT =====
-function deleteChat(whatsapp) {
-  if (conversations.delete(whatsapp)) {
-    activeChats.delete(whatsapp);
-    io.emit("chat_deleted", { whatsapp });
-    logActivity('chat_deleted', { whatsapp });
-    console.log(`🗑️  Deleted chat: ${whatsapp}`);
-    return true;
-  }
-  return false;
-}
-
-// ===== ARCHIVE CHAT =====
-function archiveChat(whatsapp) {
-  const conversation = conversations.get(whatsapp);
-  if (conversation) {
-    conversation.archived = true;
-    conversation.archivedAt = new Date();
-    io.emit("chat_archived", { whatsapp });
-    logActivity('chat_archived', { whatsapp });
-    console.log(`📁 Archived chat: ${whatsapp}`);
-    return true;
-  }
-  return false;
-}
-
-// ===== MARK MESSAGES AS READ =====
-function markMessagesAsRead(whatsapp, messageIds) {
+// ===== MARK MESSAGES AS READ (DATABASE VERSION) =====
+async function markMessagesAsRead(whatsapp, messageIds) {
   try {
-    const conversation = conversations.get(whatsapp);
-    if (!conversation) {
-      console.error(`Conversation not found for ${whatsapp}`);
-      return { success: false, message: "Conversation not found" };
-    }
-    
     const updatedMessages = [];
     
-    // Mark each message as read
-    messageIds.forEach(messageId => {
-      const message = conversation.messages.find(msg => msg.id === messageId);
-      if (message && !message.read) {
-        message.read = true;
+    for (const messageId of messageIds) {
+      // Update message read status in database
+      const result = await pool.query(`
+        UPDATE messages 
+        SET read = TRUE 
+        WHERE id = $1 AND chat_whatsapp = $2 AND read = FALSE
+        RETURNING id
+      `, [messageId, whatsapp]);
+
+      if (result.rows.length > 0) {
         updatedMessages.push(messageId);
-        console.log(`✅ Message ${messageId} marked as read`);
+        console.log(`✅ Message ${messageId} marked as read in database`);
       }
-    });
-    
-    // Also update broadcast messages
-    updatedMessages.forEach(messageId => {
-      const broadcastMessage = broadcastMessages.find(msg => msg.id === messageId);
-      if (broadcastMessage && !broadcastMessage.read) {
-        broadcastMessage.read = true;
-      }
-    });
+    }
     
     if (updatedMessages.length > 0) {
       // Broadcast the read status update
-      broadcastReadStatusUpdate(whatsapp, updatedMessages);
+      await broadcastReadStatusUpdate(whatsapp, updatedMessages);
       
       return { 
         success: true, 
@@ -311,8 +421,8 @@ function markMessagesAsRead(whatsapp, messageIds) {
   }
 }
 
-// ===== BROADCAST READ STATUS UPDATE =====
-function broadcastReadStatusUpdate(whatsapp, messageIds) {
+// ===== BROADCAST READ STATUS UPDATE (DATABASE VERSION) =====
+async function broadcastReadStatusUpdate(whatsapp, messageIds) {
   try {
     const updateData = {
       whatsapp,
@@ -350,49 +460,129 @@ function broadcastReadStatusUpdate(whatsapp, messageIds) {
   }
 }
 
-// ===== GET USER LIST WITH READ RECEIPTS =====
-function getUserListWithReadReceipts() {
+// ===== GET USER LIST WITH READ RECEIPTS (DATABASE VERSION) =====
+async function getUserListWithReadReceipts() {
   try {
-    const userList = [];
-    
-    conversations.forEach((conversation, whatsapp) => {
-      if (conversation.archived) return;
-      
-      const messages = conversation.messages || [];
-      
-      // Count unread messages (user messages that aren't read)
-      const unreadCount = messages.filter(msg => 
-        msg.sender === "user" && !msg.read
-      ).length;
-      
-      // Get last message info
-      const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-      
-      userList.push({
-        whatsapp: whatsapp,
-        lastMessage: conversation.lastMessage || null,
-        lastMessageTime: conversation.lastUpdated || conversation.createdAt,
-        messageCount: messages.length,
-        unreadCount: unreadCount,
-        lastMessageDetails: lastMessage ? {
-          id: lastMessage.id,
-          text: lastMessage.text || (lastMessage.attachment ? `[${lastMessage.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
-          sender: lastMessage.sender,
-          timestamp: lastMessage.timestamp,
-          read: lastMessage.read || false
-        } : null,
-        createdAt: conversation.createdAt
-      });
-    });
-    
-    // Sort by last message time (most recent first)
-    userList.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
-    
-    return userList;
+    const result = await pool.query(`
+      SELECT 
+        c.whatsapp,
+        c.last_message,
+        c.last_message_time,
+        c.created_at,
+        c.last_updated,
+        COUNT(m.id) as message_count,
+        COUNT(CASE WHEN m.sender_type = 'user' AND NOT m.read THEN 1 END) as unread_count,
+        ARRAY_AGG(
+          json_build_object(
+            'id', m.id,
+            'text', m.content,
+            'sender', m.sender_type,
+            'timestamp', m.created_at,
+            'read', m.read,
+            'agent_name', m.agent_name
+          ) ORDER BY m.created_at DESC LIMIT 1
+        ) as last_message_details
+      FROM chats c
+      LEFT JOIN messages m ON c.whatsapp = m.chat_whatsapp
+      WHERE c.archived = FALSE
+      GROUP BY c.whatsapp, c.last_message, c.last_message_time, c.created_at, c.last_updated
+      ORDER BY c.last_updated DESC
+    `);
+
+    return result.rows.map(row => ({
+      whatsapp: row.whatsapp,
+      lastMessage: row.last_message,
+      lastMessageTime: row.last_message_time,
+      createdAt: row.created_at,
+      lastUpdated: row.last_updated,
+      messageCount: parseInt(row.message_count) || 0,
+      unreadCount: parseInt(row.unread_count) || 0,
+      lastMessageDetails: row.last_message_details?.[0] || null
+    }));
   } catch (error) {
     console.error("Error getting user list with read receipts:", error);
     return [];
   }
+}
+
+// ===== DELETE CHAT (DATABASE VERSION) =====
+async function deleteChat(whatsapp) {
+  try {
+    // Delete from database
+    await pool.query("DELETE FROM chats WHERE whatsapp = $1", [whatsapp]);
+    
+    io.emit("chat_deleted", { whatsapp });
+    logActivity('chat_deleted', { whatsapp });
+    console.log(`🗑️  Deleted chat from database: ${whatsapp}`);
+    return true;
+  } catch (error) {
+    console.error("Error deleting chat from database:", error);
+    return false;
+  }
+}
+
+// ===== ARCHIVE CHAT (DATABASE VERSION) =====
+async function archiveChat(whatsapp) {
+  try {
+    await pool.query(`
+      UPDATE chats 
+      SET archived = TRUE, archived_at = NOW() 
+      WHERE whatsapp = $1
+    `, [whatsapp]);
+    
+    io.emit("chat_archived", { whatsapp });
+    logActivity('chat_archived', { whatsapp });
+    console.log(`📁 Archived chat in database: ${whatsapp}`);
+    return true;
+  } catch (error) {
+    console.error("Error archiving chat in database:", error);
+    return false;
+  }
+}
+
+// ===== PRE-REGISTER AGENTS (DATABASE VERSION) =====
+async function preRegisterDefaultAgents() {
+  const defaultAgents = [
+    { id: "agent1", name: "agent1", password: "agent1", filename: "agent1.html" },
+    { id: "agent2", name: "Agent 2", password: "agent2", filename: "agent2.html" },
+    { id: "agent3", name: "Agent 3", password: "agent3", filename: "agent3.html" }
+  ];
+  
+  for (const agent of defaultAgents) {
+    try {
+      // Check if agent exists in database
+      const existingAgent = await pool.query(
+        "SELECT id FROM agents WHERE id = $1",
+        [agent.id]
+      );
+      
+      if (existingAgent.rows.length === 0) {
+        // Insert agent into database
+        await pool.query(`
+          INSERT INTO agents (id, name, password, filename, permanent)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (id) DO NOTHING
+        `, [agent.id, agent.name, agent.password, agent.filename, true]);
+        
+        console.log(`✅ Pre-registered agent in database: ${agent.id} (${agent.name})`);
+      }
+    } catch (error) {
+      console.error(`Error pre-registering agent ${agent.id}:`, error);
+    }
+  }
+}
+
+// ===== SIMPLE HELPER FUNCTIONS =====
+function logActivity(type, details) {
+  const log = {
+    type,
+    details,
+    timestamp: new Date().toISOString()
+  };
+  activityLog.push(log);
+  if (activityLog.length > 1000) activityLog.shift();
+  console.log(`[Activity] ${type}:`, details);
+  return log;
 }
 
 // ---- Setup server ----
@@ -417,7 +607,7 @@ app.use("/uploads", express.static(UPLOADS_DIR));
 app.use(express.static(path.join(__dirname, "public")));
 
 // ---- Routes ----
-app.get("/", (req, res) => res.send("Chat backend running - IN-MEMORY MODE"));
+app.get("/", (req, res) => res.send("Chat backend running - POSTGRESQL MODE"));
 app.get("/chat", (req, res) => res.sendFile(path.join(__dirname, "public", "chat.html")));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 app.get("/superadmin", (req, res) => res.sendFile(path.join(__dirname, "public", "superadmin.html")));
@@ -435,9 +625,9 @@ app.get("/agent:num.html", (req, res) => {
 });
 
 // New route: Get user list with read receipts
-app.get("/agent/users", (req, res) => {
+app.get("/agent/users", async (req, res) => {
   try {
-    const userList = getUserListWithReadReceipts();
+    const userList = await getUserListWithReadReceipts();
     res.json({ success: true, users: userList });
   } catch (error) {
     console.error("Error fetching user list:", error);
@@ -446,19 +636,29 @@ app.get("/agent/users", (req, res) => {
 });
 
 // New route: Fetch all conversations for agent dashboard
-app.get("/agent/conversations", (req, res) => {
+app.get("/agent/conversations", async (req, res) => {
   try {
-    const conversationsList = Array.from(conversations.values())
-      .filter(conv => !conv.archived)
-      .map(conv => ({
-        whatsapp: conv.whatsapp,
-        lastMessage: conv.lastMessage,
-        lastMessageTime: conv.lastUpdated,
-        createdAt: conv.createdAt,
-        lastUpdated: conv.lastUpdated,
-        messageCount: conv.messages?.length || 0
-      }))
-      .sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+    const result = await pool.query(`
+      SELECT 
+        whatsapp,
+        last_message,
+        last_message_time,
+        created_at,
+        last_updated,
+        (SELECT COUNT(*) FROM messages WHERE chat_whatsapp = chats.whatsapp) as message_count
+      FROM chats
+      WHERE archived = FALSE
+      ORDER BY last_updated DESC
+    `);
+    
+    const conversationsList = result.rows.map(row => ({
+      whatsapp: row.whatsapp,
+      lastMessage: row.last_message,
+      lastMessageTime: row.last_message_time,
+      createdAt: row.created_at,
+      lastUpdated: row.last_updated,
+      messageCount: parseInt(row.message_count) || 0
+    }));
     
     res.json({ success: true, conversations: conversationsList });
   } catch (error) {
@@ -468,16 +668,16 @@ app.get("/agent/conversations", (req, res) => {
 });
 
 // Delete chat route
-app.delete("/chat/:whatsapp", (req, res) => {
+app.delete("/chat/:whatsapp", async (req, res) => {
   try {
     const { whatsapp } = req.params;
     const { archive } = req.query;
     
     let success;
     if (archive === 'true') {
-      success = archiveChat(whatsapp);
+      success = await archiveChat(whatsapp);
     } else {
-      success = deleteChat(whatsapp);
+      success = await deleteChat(whatsapp);
     }
     
     if (success) {
@@ -498,18 +698,27 @@ app.delete("/chat/:whatsapp", (req, res) => {
 });
 
 // Get archived chats
-app.get("/chats/archived", (req, res) => {
+app.get("/chats/archived", async (req, res) => {
   try {
-    const archivedChats = Array.from(conversations.values())
-      .filter(conv => conv.archived)
-      .map(conv => ({
-        whatsapp: conv.whatsapp,
-        lastMessage: conv.lastMessage,
-        lastMessageTime: conv.lastMessageTime,
-        archivedAt: conv.archivedAt,
-        messageCount: conv.messages?.length || 0
-      }))
-      .sort((a, b) => new Date(b.archivedAt) - new Date(a.archivedAt));
+    const result = await pool.query(`
+      SELECT 
+        whatsapp,
+        last_message,
+        last_message_time,
+        archived_at,
+        (SELECT COUNT(*) FROM messages WHERE chat_whatsapp = chats.whatsapp) as message_count
+      FROM chats
+      WHERE archived = TRUE
+      ORDER BY archived_at DESC
+    `);
+    
+    const archivedChats = result.rows.map(row => ({
+      whatsapp: row.whatsapp,
+      lastMessage: row.last_message,
+      lastMessageTime: row.last_message_time,
+      archivedAt: row.archived_at,
+      messageCount: parseInt(row.message_count) || 0
+    }));
     
     res.json({ success: true, chats: archivedChats });
   } catch (error) {
@@ -519,14 +728,18 @@ app.get("/chats/archived", (req, res) => {
 });
 
 // Restore archived chat
-app.post("/chat/:whatsapp/restore", (req, res) => {
+app.post("/chat/:whatsapp/restore", async (req, res) => {
   try {
     const { whatsapp } = req.params;
-    const conversation = conversations.get(whatsapp);
     
-    if (conversation) {
-      conversation.archived = false;
-      conversation.archivedAt = undefined;
+    const result = await pool.query(`
+      UPDATE chats 
+      SET archived = FALSE, archived_at = NULL 
+      WHERE whatsapp = $1
+      RETURNING whatsapp
+    `, [whatsapp]);
+    
+    if (result.rows.length > 0) {
       res.json({ success: true, message: "Chat restored" });
     } else {
       res.status(404).json({ success: false, message: "Chat not found" });
@@ -562,39 +775,57 @@ app.post("/upload", upload.single("file"), (req, res) => {
 });
 
 // Test route
-app.get("/test", (req, res) => {
-  res.json({
-    status: "IN-MEMORY MODE ACTIVE",
-    totalConversations: conversations.size,
-    totalAgents: agents.size,
-    activeChats: activeChats.size,
-    broadcastMessages: broadcastMessages.length,
-    storageInfo: "All messages stored in memory only"
-  });
+app.get("/test", async (req, res) => {
+  try {
+    const chatsCount = await pool.query("SELECT COUNT(*) FROM chats");
+    const messagesCount = await pool.query("SELECT COUNT(*) FROM messages");
+    const agentsCount = await pool.query("SELECT COUNT(*) FROM agents");
+    
+    res.json({
+      status: "POSTGRESQL MODE ACTIVE",
+      database: "albastxz_db1",
+      totalConversations: parseInt(chatsCount.rows[0].count),
+      totalAgents: parseInt(agentsCount.rows[0].count),
+      totalMessages: parseInt(messagesCount.rows[0].count),
+      storageInfo: "All messages stored in PostgreSQL database"
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ===== ADD THIS NEW ROUTE =====
 // Get agent info for debugging
-app.get("/agent/:id/info", (req, res) => {
-  const agent = agents.get(req.params.id);
-  if (agent) {
-    res.json({
-      success: true,
-      agent: {
-        id: req.params.id,
-        name: agent.name,
-        muted: agent.muted || false,
-        isOnline: agent.socketId ? true : false,
-        filename: agent.filename || null,
-        createdAt: agent.createdAt,
-        lastSeen: agent.lastSeen
-      }
-    });
-  } else {
-    res.status(404).json({
-      success: false,
-      message: "Agent not found"
-    });
+app.get("/agent/:id/info", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM agents WHERE id = $1",
+      [req.params.id]
+    );
+    
+    if (result.rows.length > 0) {
+      const agent = result.rows[0];
+      res.json({
+        success: true,
+        agent: {
+          id: agent.id,
+          name: agent.name,
+          muted: agent.muted || false,
+          isOnline: agent.socket_id ? true : false,
+          filename: agent.filename || null,
+          createdAt: agent.created_at,
+          lastSeen: agent.last_seen
+        }
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: "Agent not found"
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching agent info:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 // ================================
@@ -605,7 +836,7 @@ io.on("connection", (socket) => {
   users.set(socket.id, { type: 'unknown' });
 
   // ===== SUPER ADMIN EVENTS =====
-  socket.on("super_admin_login", ({ password }) => {
+  socket.on("super_admin_login", async ({ password }) => {
     if (password === SUPER_ADMIN_PASSWORD) {
       users.set(socket.id, { type: 'super_admin' });
       socket.join("super_admin");
@@ -613,19 +844,43 @@ io.on("connection", (socket) => {
       logActivity('super_admin_login', { socketId: socket.id });
       console.log("✓ Super Admin connected:", socket.id);
       
-      // Send agents list to Super Admin
-      const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
-        id,
-        name: agent.name,
-        muted: agent.muted || false,
-        isOnline: agent.socketId ? true : false,
-        socketId: agent.socketId,
-        filename: agent.filename || null
-      }));
-      
-      socket.emit("super_admin_login_response", { success: true });
-      socket.emit("agents_list", agentsList);
-      socket.emit("activity_update", activityLog.slice(-50));
+      try {
+        // Get agents from database
+        const result = await pool.query("SELECT * FROM agents");
+        const agentsList = result.rows.map(agent => ({
+          id: agent.id,
+          name: agent.name,
+          muted: agent.muted || false,
+          isOnline: agent.socket_id ? true : false,
+          socketId: agent.socket_id,
+          filename: agent.filename || null
+        }));
+        
+        // Also update in-memory agents map for compatibility
+        result.rows.forEach(agent => {
+          agents.set(agent.id, {
+            name: agent.name,
+            password: agent.password,
+            muted: agent.muted || false,
+            socketId: agent.socket_id,
+            filename: agent.filename,
+            createdAt: agent.created_at,
+            lastSeen: agent.last_seen,
+            permanent: agent.permanent
+          });
+        });
+        
+        socket.emit("super_admin_login_response", { success: true });
+        socket.emit("agents_list", agentsList);
+        socket.emit("activity_update", activityLog.slice(-50));
+        
+      } catch (error) {
+        console.error("Error getting agents list:", error);
+        socket.emit("super_admin_login_response", { 
+          success: false, 
+          message: "Database error" 
+        });
+      }
       
     } else {
       socket.emit("super_admin_login_response", { 
@@ -644,7 +899,7 @@ io.on("connection", (socket) => {
     handleAgentRegistration(socket, data);
   });
   
-  function handleAgentRegistration(socket, data) {
+  async function handleAgentRegistration(socket, data) {
     const { id, name, password, filename, agentId } = data;
     const agentIdToUse = id || agentId;
     
@@ -657,13 +912,19 @@ io.on("connection", (socket) => {
     }
     
     try {
-      // Check if agent already exists
-      const existingAgent = agents.get(agentIdToUse);
+      // Check if agent already exists in database
+      const existingResult = await pool.query(
+        "SELECT id FROM agents WHERE id = $1",
+        [agentIdToUse]
+      );
       
-      if (existingAgent) {
+      if (existingResult.rows.length > 0) {
         // Update existing agent if needed
-        if (filename && !existingAgent.filename) {
-          existingAgent.filename = filename;
+        if (filename) {
+          await pool.query(
+            "UPDATE agents SET filename = $1 WHERE id = $2",
+            [filename, agentIdToUse]
+          );
         }
         
         socket.emit("agent_registration_response", { 
@@ -675,20 +936,14 @@ io.on("connection", (socket) => {
         logActivity('agent_auto_registered', { 
           agentId: agentIdToUse, 
           name: name,
-          filename: filename || existingAgent.filename 
+          filename: filename || 'existing file' 
         });
       } else {
-        // Create new agent
-        agents.set(agentIdToUse, {
-          name: name || `Agent ${agentIdToUse}`,
-          password,
-          muted: false,
-          socketId: null,
-          filename: filename || null,
-          createdAt: new Date(),
-          lastSeen: null,
-          permanent: true
-        });
+        // Create new agent in database
+        await pool.query(`
+          INSERT INTO agents (id, name, password, filename, permanent)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [agentIdToUse, name, password, filename || null, true]);
         
         socket.emit("agent_registration_response", { 
           success: true, 
@@ -702,6 +957,18 @@ io.on("connection", (socket) => {
           filename: filename || 'no file'
         });
       }
+      
+      // Update in-memory map for compatibility
+      agents.set(agentIdToUse, {
+        name: name,
+        password: password,
+        muted: false,
+        socketId: null,
+        filename: filename || null,
+        createdAt: new Date(),
+        lastSeen: null,
+        permanent: true
+      });
       
       // Notify Super Admin if connected
       const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
@@ -725,9 +992,67 @@ io.on("connection", (socket) => {
   }
 
   // Get agents list
-  socket.on("get_agents", () => {
+  socket.on("get_agents", async () => {
     const userData = users.get(socket.id);
     if (userData?.type === 'super_admin') {
+      try {
+        const result = await pool.query("SELECT * FROM agents");
+        const agentsList = result.rows.map(agent => ({
+          id: agent.id,
+          name: agent.name,
+          muted: agent.muted || false,
+          isOnline: agent.socket_id ? true : false,
+          socketId: agent.socket_id,
+          filename: agent.filename || null
+        }));
+        socket.emit("agents_list", agentsList);
+      } catch (error) {
+        console.error("Error getting agents list:", error);
+      }
+    }
+  });
+
+  // Save/Update agent credentials
+  socket.on("save_agent", async ({ name, id, password }) => {
+    const userData = users.get(socket.id);
+    if (userData?.type !== 'super_admin') return;
+    
+    let agentId = id;
+    
+    try {
+      // Check if agent exists in database
+      const existingResult = await pool.query(
+        "SELECT id FROM agents WHERE id = $1",
+        [id]
+      );
+      
+      if (existingResult.rows.length > 0) {
+        // Update existing agent in database
+        await pool.query(
+          "UPDATE agents SET name = $1, password = $2 WHERE id = $3",
+          [name, password, id]
+        );
+      } else {
+        // Create new agent in database
+        agentId = id || `agent_${Date.now()}`;
+        await pool.query(`
+          INSERT INTO agents (id, name, password, created_at)
+          VALUES ($1, $2, $3, NOW())
+        `, [agentId, name, password]);
+      }
+      
+      // Update in-memory map
+      agents.set(agentId, {
+        name,
+        password,
+        muted: false,
+        socketId: null,
+        createdAt: new Date()
+      });
+      
+      logActivity('agent_saved', { agentId, name, by: socket.id });
+      
+      // Send updated list to Super Admin
       const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
         id,
         name: agent.name,
@@ -736,88 +1061,70 @@ io.on("connection", (socket) => {
         socketId: agent.socketId,
         filename: agent.filename || null
       }));
-      socket.emit("agents_list", agentsList);
+      
+      io.to("super_admin").emit("agents_list", agentsList);
+      socket.emit("agent_updated", { success: true });
+      
+    } catch (error) {
+      console.error("Error saving agent:", error);
     }
-  });
-
-  // Save/Update agent credentials
-  socket.on("save_agent", ({ name, id, password }) => {
-    const userData = users.get(socket.id);
-    if (userData?.type !== 'super_admin') return;
-    
-    let agentId = id;
-    const existingAgent = agents.get(id);
-    
-    if (existingAgent) {
-      // Update existing agent
-      existingAgent.name = name;
-      existingAgent.password = password;
-    } else {
-      // Create new agent
-      agentId = id || `agent_${Date.now()}`;
-      agents.set(agentId, {
-        name,
-        password,
-        muted: false,
-        socketId: null,
-        createdAt: new Date()
-      });
-    }
-    
-    logActivity('agent_saved', { agentId, name, by: socket.id });
-    
-    // Send updated list to Super Admin
-    const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
-      id,
-      name: agent.name,
-      muted: agent.muted || false,
-      isOnline: agent.socketId ? true : false,
-      socketId: agent.socketId,
-      filename: agent.filename || null
-    }));
-    
-    io.to("super_admin").emit("agents_list", agentsList);
-    socket.emit("agent_updated", { success: true });
   });
 
   // Toggle agent mute status
-  socket.on("toggle_agent_mute", ({ agentId }) => {
+  socket.on("toggle_agent_mute", async ({ agentId }) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'super_admin') return;
     
-    const agent = agents.get(agentId);
-    if (!agent) return;
-    
-    // Toggle mute status
-    agent.muted = !agent.muted;
-    
-    logActivity('agent_mute_toggled', { 
-      agentId, 
-      name: agent.name, 
-      muted: agent.muted,
-      by: socket.id 
-    });
-    
-    // Send mute status to agent if online
-    if (agent.socketId) {
-      io.to(agent.socketId).emit("mute_status", {
-        agentId,
-        muted: agent.muted
+    try {
+      // Update agent mute status in database
+      const result = await pool.query(`
+        UPDATE agents 
+        SET muted = NOT muted 
+        WHERE id = $1
+        RETURNING name, muted
+      `, [agentId]);
+      
+      if (result.rows.length === 0) return;
+      
+      const agent = result.rows[0];
+      
+      // Update in-memory map
+      if (agents.has(agentId)) {
+        agents.get(agentId).muted = agent.muted;
+      }
+      
+      logActivity('agent_mute_toggled', { 
+        agentId, 
+        name: agent.name, 
+        muted: agent.muted,
+        by: socket.id 
       });
+      
+      // Send mute status to agent if online
+      const agentInMemory = agents.get(agentId);
+      if (agentInMemory && agentInMemory.socketId) {
+        io.to(agentInMemory.socketId).emit("mute_status", {
+          agentId,
+          muted: agent.muted
+        });
+      }
+      
+      // Send updated list to Super Admin
+      const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
+        id,
+        name: agent.name,
+        muted: agent.muted || false,
+        isOnline: agent.socketId ? true : false,
+        socketId: agent.socketId,
+        filename: agent.filename || null
+      }));
+      
+      io.to("super_admin").emit("agents_list", agentsList);
+      io.to("super_admin").emit("agent_updated", { agentId });
+      
+    } catch (error) {
+      console.error("Error toggling agent mute status:", error);
     }
-    
-    // Send updated list to Super Admin
-    const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
-      id,
-      name: agent.name,
-      muted: agent.muted || false,
-      isOnline: agent.socketId ? true : false,
-      socketId: agent.socketId,
-      filename: agent.filename || null
-    }));
-    
-    io.to("super_admin").emit("agents_list", agentsList);
-    io.to("super_admin").emit("agent_updated", { agentId });
   });
 
   // Forward messages to agents
@@ -843,7 +1150,7 @@ io.on("connection", (socket) => {
   });
 
   // Get super admin data
-  socket.on("get_super_admin_data", () => {
+  socket.on("get_super_admin_data", async () => {
     const userData = users.get(socket.id);
     if (userData?.type === 'super_admin') {
       try {
@@ -856,19 +1163,24 @@ io.on("connection", (socket) => {
           filename: agent.filename || null
         }));
         
-        const activeChatsList = Array.from(activeChats.values());
+        // Get chat stats from database
+        const chatsResult = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = FALSE");
+        const archivedResult = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = TRUE");
+        const messagesResult = await pool.query("SELECT COUNT(*) as total FROM messages");
+        const broadcastResult = await pool.query("SELECT COUNT(*) as total FROM messages WHERE is_broadcast = TRUE");
         
         socket.emit("super_admin_data", {
           agents: agentsList,
-          activeChats: activeChatsList,
+          activeChats: [], // Empty for now, can be populated if needed
           activity: activityLog.slice(-100),
           stats: {
             totalAgents: agents.size,
             onlineAgents: Array.from(agents.values()).filter(a => a.socketId).length,
-            activeChats: activeChatsList.length,
+            activeChats: parseInt(chatsResult.rows[0].total),
             mutedAgents: Array.from(agents.values()).filter(a => a.muted).length,
-            totalConversations: conversations.size,
-            broadcastMessages: broadcastMessages.length
+            totalConversations: parseInt(chatsResult.rows[0].total) + parseInt(archivedResult.rows[0].total),
+            broadcastMessages: parseInt(broadcastResult.rows[0].total),
+            totalMessages: parseInt(messagesResult.rows[0].total)
           }
         });
       } catch (error) {
@@ -878,95 +1190,116 @@ io.on("connection", (socket) => {
   });
 
   // ===== AGENT LOGIN =====
-  socket.on("agent_login", ({ agentId, password, persistent }) => {
+  socket.on("agent_login", async ({ agentId, password, persistent }) => {
     console.log(`Agent login attempt: ${agentId} (persistent: ${persistent})`);
     
-    // Check if agent exists
-    if (!agents.has(agentId)) {
-      console.log(`❌ Agent not found: ${agentId}. Available agents:`, Array.from(agents.keys()));
+    try {
+      // Check if agent exists in database
+      const result = await pool.query(
+        "SELECT * FROM agents WHERE id = $1",
+        [agentId]
+      );
+      
+      if (result.rows.length === 0) {
+        console.log(`❌ Agent not found in database: ${agentId}`);
+        
+        socket.emit("agent_login_response", {
+          success: false,
+          message: `Agent "${agentId}" not found. Please register first.`
+        });
+        return;
+      }
+      
+      const agent = result.rows[0];
+      
+      if (agent.password !== password) {
+        socket.emit("agent_login_response", {
+          success: false,
+          message: "Invalid password"
+        });
+        return;
+      }
+      
+      // Check if agent is muted
+      if (agent.muted) {
+        socket.emit("agent_login_response", {
+          success: false,
+          message: "Agent account is muted. Contact super admin."
+        });
+        return;
+      }
+      
+      // Update agent status in database
+      await pool.query(
+        "UPDATE agents SET socket_id = $1, last_seen = NOW() WHERE id = $2",
+        [socket.id, agentId]
+      );
+      
+      // Update in-memory map
+      agents.set(agentId, {
+        name: agent.name,
+        password: agent.password,
+        muted: agent.muted || false,
+        socketId: socket.id,
+        filename: agent.filename,
+        createdAt: agent.created_at,
+        lastSeen: new Date(),
+        permanent: agent.permanent
+      });
+      
+      users.set(socket.id, { type: 'agent', agentId });
+      
+      // Join the broadcast room
+      socket.join(BROADCAST_ROOM);
+      
+      logActivity('agent_login', { 
+        agentId, 
+        name: agent.name, 
+        socketId: socket.id,
+        filename: agent.filename || 'no file'
+      });
+      
+      // ===== SEND BROADCAST ROOM HISTORY TO AGENT =====
+      await sendBroadcastRoomToAgent(socket.id);
+      
+      // ===== SEND USER LIST WITH READ RECEIPTS TO AGENT =====
+      const userList = await getUserListWithReadReceipts();
+      socket.emit("user_list_with_read_receipts", userList);
       
       socket.emit("agent_login_response", {
-        success: false,
-        message: `Agent "${agentId}" not found. Available agents: ${Array.from(agents.keys()).join(', ')}`
+        success: true,
+        name: agent.name,
+        muted: agent.muted || false,
+        agentId: agentId,
+        message: "Login successful"
       });
-      return;
-    }
-    
-    const agent = agents.get(agentId);
-    
-    if (!agent) {
+      
+      console.log(`✅ Agent logged in: ${agentId} (${agent.name})`);
+      
+      // Notify Super Admin
+      const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
+        id,
+        name: agent.name,
+        muted: agent.muted || false,
+        isOnline: agent.socketId ? true : false,
+        socketId: agent.socketId,
+        filename: agent.filename || null
+      }));
+      
+      io.to("super_admin").emit("agents_list", agentsList);
+      io.to("super_admin").emit("agent_updated", { agentId });
+      
+    } catch (error) {
+      console.error("Error during agent login:", error);
       socket.emit("agent_login_response", {
         success: false,
-        message: "Agent not found. Please refresh the agent page to auto-register."
+        message: "Login failed: " + error.message
       });
-      return;
     }
-    
-    if (agent.password !== password) {
-      socket.emit("agent_login_response", {
-        success: false,
-        message: "Invalid password"
-      });
-      return;
-    }
-    
-    // Check if agent is muted
-    if (agent.muted) {
-      socket.emit("agent_login_response", {
-        success: false,
-        message: "Agent account is muted. Contact super admin."
-      });
-      return;
-    }
-    
-    // Update agent status
-    agent.socketId = socket.id;
-    agent.lastSeen = new Date();
-    users.set(socket.id, { type: 'agent', agentId });
-    
-    // Join the broadcast room
-    socket.join(BROADCAST_ROOM);
-    
-    logActivity('agent_login', { 
-      agentId, 
-      name: agent.name, 
-      socketId: socket.id,
-      filename: agent.filename || 'no file'
-    });
-    
-    // ===== SEND BROADCAST ROOM HISTORY TO AGENT =====
-    sendBroadcastRoomToAgent(socket.id);
-    
-    // ===== SEND USER LIST WITH READ RECEIPTS TO AGENT =====
-    const userList = getUserListWithReadReceipts();
-    socket.emit("user_list_with_read_receipts", userList);
-    
-    socket.emit("agent_login_response", {
-      success: true,
-      name: agent.name,
-      muted: agent.muted || false,
-      agentId: agentId,
-      message: "Login successful"
-    });
-    
-    console.log(`✅ Agent logged in: ${agentId} (${agent.name})`);
-    
-    // Notify Super Admin
-    const agentsList = Array.from(agents.entries()).map(([id, agent]) => ({
-      id,
-      name: agent.name,
-      muted: agent.muted || false,
-      isOnline: agent.socketId ? true : false,
-      socketId: agent.socketId,
-      filename: agent.filename || null
-    }));
-    
-    io.to("super_admin").emit("agents_list", agentsList);
-    io.to("super_admin").emit("agent_updated", { agentId });
   });
 
   // ===== AGENT JOINS USER ROOM =====
-  socket.on("join_user_room", ({ whatsapp }) => {
+  socket.on("join_user_room", async ({ whatsapp }) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'agent') return;
     
@@ -976,11 +1309,11 @@ io.on("connection", (socket) => {
     // Agent joins the user's specific room
     socket.join(whatsapp);
     
-    // Update agent's monitoring status
+    // Update agent's monitoring status in memory
     agent.monitoringUser = whatsapp;
     
     // Send this user's chat history to the agent
-    sendUserChatHistoryToAgent(socket.id, whatsapp);
+    await sendUserChatHistoryToAgent(socket.id, whatsapp);
     
     logActivity('agent_joined_user_room', {
       agentId: userData.agentId,
@@ -996,7 +1329,7 @@ io.on("connection", (socket) => {
   });
 
   // ===== AGENT SENDS MESSAGE =====
-  socket.on("agent_message", (data) => {
+  socket.on("agent_message", async (data) => {
     const userData = users.get(socket.id);
     if (userData?.type !== 'agent') return;
     
@@ -1019,13 +1352,13 @@ io.on("connection", (socket) => {
     
     // Create message object with timestamp ID
     const message = {
+      id: messageId,
       sender: 'agent',
       agentId: userData.agentId,
       agentName: agent.name,
       text: data.message || '',
       timestamp: timestamp, // Same as ID
       read: true, // Agent messages are always read
-      id: messageId, // Use timestamp as ID
       whatsapp: whatsapp,
       messageType: 'agent_message'
     };
@@ -1035,55 +1368,50 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // ===== REMOVED: DEDUPLICATION CHECK =====
-    // Server no longer checks for duplicates - client handles this
-    
-    // ===== SAVE TO BOTH PLACES =====
-    
-    // 1. Save to broadcast room (all agents can see)
-    saveMessageToBroadcastRoom(message);
-    
-    // 2. Save to user's specific chat history
-    saveMessageToUserHistory(whatsapp, message);
-    
-    console.log(`✓ Agent message saved to both broadcast room and ${whatsapp}'s history`);
-    
-    // ===== SEND TO BOTH ROOMS =====
-    
-    // 1. Send to broadcast room (all agents)
-    broadcastMessageToAllAgents(message, socket.id);
-    
-    // 2. Send to user's specific room
-    sendMessageToUserRoom(whatsapp, message);
-    
-    // 3. Send to super_admin and admin
-    io.to("super_admin").to("admin").emit("new_message", message);
-    
-    // Update active chats
-    activeChats.set(whatsapp, {
-      whatsapp: whatsapp,
-      lastMessage: data.message || (data.attachment ? `[${data.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
-      lastMessageTime: message.timestamp,
-      unread: false,
-      lastAgent: userData.agentId
-    });
-    
-    // ===== UPDATE USER LIST FOR ALL AGENTS =====
-    updateUserListForAllAgents();
-    
-    logActivity('agent_message_sent', {
-      agentId: userData.agentId,
-      agentName: agent.name,
-      messageId: messageId,
-      message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
-      to: whatsapp,
-      savedToBroadcast: true,
-      savedToUserHistory: true
-    });
+    try {
+      // ===== SAVE TO BOTH PLACES =====
+      
+      // 1. Save to broadcast room (all agents can see)
+      await saveMessageToBroadcastRoom(message);
+      
+      // 2. Save to user's specific chat history
+      await saveMessageToUserHistory(whatsapp, message);
+      
+      console.log(`✓ Agent message saved to database for ${whatsapp}`);
+      
+      // ===== SEND TO BOTH ROOMS =====
+      
+      // 1. Send to broadcast room (all agents)
+      await broadcastMessageToAllAgents(message, socket.id);
+      
+      // 2. Send to user's specific room
+      await sendMessageToUserRoom(whatsapp, message);
+      
+      // 3. Send to super_admin and admin
+      io.to("super_admin").to("admin").emit("new_message", message);
+      
+      // ===== UPDATE USER LIST FOR ALL AGENTS =====
+      await updateUserListForAllAgents();
+      
+      logActivity('agent_message_sent', {
+        agentId: userData.agentId,
+        agentName: agent.name,
+        messageId: messageId,
+        message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
+        to: whatsapp,
+        savedToDatabase: true
+      });
+      
+    } catch (error) {
+      console.error("Error sending agent message:", error);
+      socket.emit("agent_message_error", {
+        message: "Failed to send message"
+      });
+    }
   });
 
   // ===== USER MESSAGES =====
-  socket.on("user_message", (data) => {
+  socket.on("user_message", async (data) => {
     console.log("📨 Received user_message event:", data);
     
     // Ensure we have whatsapp/userId
@@ -1099,11 +1427,11 @@ io.on("connection", (socket) => {
     
     // Create a clean message object with timestamp ID
     const message = {
+      id: messageId,
       whatsapp: whatsapp,
       userId: data.userId || whatsapp,
-      message: data.message || '',
+      text: data.message || '',
       timestamp: timestamp, // Use same timestamp
-      id: messageId, // Use timestamp as ID
       sender: "user",
       type: data.type || "text",
       read: false, // User messages start as unread
@@ -1116,56 +1444,49 @@ io.on("connection", (socket) => {
       message.type = data.attachment.mimetype?.startsWith('image/') ? 'image' : 'file';
     }
     
-    // ===== REMOVED: DEDUPLICATION CHECK =====
-    // Server no longer checks for duplicates - client handles this
-    
-    // ===== SAVE TO BOTH PLACES =====
-    
-    // 1. Save to broadcast room (all agents can see)
-    saveMessageToBroadcastRoom(message);
-    
-    // 2. Save to user's specific chat history
-    saveMessageToUserHistory(whatsapp, message);
-    
-    console.log(`✓ User message saved to both broadcast room and ${whatsapp}'s history`);
-    
-    // ===== SEND TO BOTH ROOMS =====
-    
-    // 1. Send to broadcast room (all agents)
-    broadcastMessageToAllAgents(message);
-    
-    // 2. Send to user's specific room
-    sendMessageToUserRoom(whatsapp, message);
-    
-    // 3. Send to super_admin and admin
-    io.to("super_admin").to("admin").emit("new_message", {
-      ...message,
-      sender: "user"
-    });
-    
-    // Update active chats
-    activeChats.set(whatsapp, {
-      whatsapp: whatsapp,
-      lastMessage: data.message || (data.attachment ? `[${data.attachment.mimetype?.split('/')[0] || 'File'}]` : ''),
-      lastMessageTime: message.timestamp,
-      unread: true
-    });
-    
-    // ===== UPDATE USER LIST FOR ALL AGENTS =====
-    updateUserListForAllAgents();
-    
-    logActivity('user_message_received', {
-      from: whatsapp,
-      messageId: messageId,
-      message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
-      hasAttachment: !!data.attachment,
-      savedToBroadcast: true,
-      savedToUserHistory: true
-    });
+    try {
+      // ===== SAVE TO BOTH PLACES =====
+      
+      // 1. Save to broadcast room (all agents can see)
+      await saveMessageToBroadcastRoom(message);
+      
+      // 2. Save to user's specific chat history
+      await saveMessageToUserHistory(whatsapp, message);
+      
+      console.log(`✓ User message saved to database for ${whatsapp}`);
+      
+      // ===== SEND TO BOTH ROOMS =====
+      
+      // 1. Send to broadcast room (all agents)
+      await broadcastMessageToAllAgents(message);
+      
+      // 2. Send to user's specific room
+      await sendMessageToUserRoom(whatsapp, message);
+      
+      // 3. Send to super_admin and admin
+      io.to("super_admin").to("admin").emit("new_message", {
+        ...message,
+        sender: "user"
+      });
+      
+      // ===== UPDATE USER LIST FOR ALL AGENTS =====
+      await updateUserListForAllAgents();
+      
+      logActivity('user_message_received', {
+        from: whatsapp,
+        messageId: messageId,
+        message: data.message ? data.message.substring(0, 50) + '...' : '[Attachment]',
+        hasAttachment: !!data.attachment,
+        savedToDatabase: true
+      });
+      
+    } catch (error) {
+      console.error("Error processing user message:", error);
+    }
   });
 
   // ===== MESSAGE READ RECEIPTS =====
-  socket.on("message_read", (data) => {
+  socket.on("message_read", async (data) => {
     try {
       const userData = users.get(socket.id);
       
@@ -1186,10 +1507,10 @@ io.on("connection", (socket) => {
       console.log(`📖 Read receipt received for ${messageIds.length} messages in ${whatsapp}`);
       
       // Mark messages as read
-      const result = markMessagesAsRead(whatsapp, messageIds);
+      const result = await markMessagesAsRead(whatsapp, messageIds);
       
       // ===== UPDATE USER LIST FOR ALL AGENTS =====
-      updateUserListForAllAgents();
+      await updateUserListForAllAgents();
       
       // Send confirmation back
       socket.emit("message_read_confirmation", {
@@ -1207,9 +1528,9 @@ io.on("connection", (socket) => {
   });
 
   // ===== UPDATE USER LIST FOR ALL AGENTS =====
-  function updateUserListForAllAgents() {
+  async function updateUserListForAllAgents() {
     try {
-      const userList = getUserListWithReadReceipts();
+      const userList = await getUserListWithReadReceipts();
       
       // Send to all online agents
       agents.forEach((agent, agentId) => {
@@ -1227,7 +1548,7 @@ io.on("connection", (socket) => {
   }
 
   // ===== AGENT REQUESTS USER LIST =====
-  socket.on("get_user_list_with_read_receipts", () => {
+  socket.on("get_user_list_with_read_receipts", async () => {
     try {
       const userData = users.get(socket.id);
       
@@ -1236,7 +1557,7 @@ io.on("connection", (socket) => {
         return;
       }
       
-      const userList = getUserListWithReadReceipts();
+      const userList = await getUserListWithReadReceipts();
       socket.emit("user_list_with_read_receipts", userList);
       
     } catch (error) {
@@ -1246,27 +1567,55 @@ io.on("connection", (socket) => {
   });
 
   // ===== ADMIN CONNECT =====
-  socket.on("admin_connect", () => {
+  socket.on("admin_connect", async () => {
     console.log("✓ Admin connected:", socket.id);
     users.set(socket.id, { type: 'admin' });
     socket.join("admin");
 
-    // Send all existing messages to admin
-    conversations.forEach((conv, whatsapp) => {
-      if (conv.messages && conv.messages.length > 0) {
-        conv.messages.forEach(msg => {
-          socket.emit("new_message", msg);
-        });
-      }
-    });
-    
-    // Send user list with read receipts to admin
-    const userList = getUserListWithReadReceipts();
-    socket.emit("user_list_with_read_receipts", userList);
+    try {
+      // Send all existing messages to admin from database
+      const result = await pool.query(`
+        SELECT 
+          m.id,
+          m.chat_whatsapp as whatsapp,
+          m.sender_type as sender,
+          m.agent_id,
+          m.agent_name,
+          m.content as text,
+          m.message_type as type,
+          m.attachment_url,
+          m.attachment_type,
+          m.created_at as timestamp,
+          m.read,
+          m.broadcast_id,
+          m.is_broadcast
+        FROM messages m
+        ORDER BY m.created_at ASC
+      `);
+
+      const messages = result.rows.map(row => ({
+        ...row,
+        attachment: row.attachment_url ? {
+          url: row.attachment_url,
+          mimetype: row.attachment_type
+        } : null
+      }));
+
+      messages.forEach(msg => {
+        socket.emit("new_message", msg);
+      });
+      
+      // Send user list with read receipts to admin
+      const userList = await getUserListWithReadReceipts();
+      socket.emit("user_list_with_read_receipts", userList);
+      
+    } catch (error) {
+      console.error("Error sending messages to admin:", error);
+    }
   });
 
   // User register (with whatsapp)
-  socket.on("register", ({ whatsapp }) => {
+  socket.on("register", async ({ whatsapp }) => {
     if (!whatsapp) return;
     users.set(socket.id, { whatsapp, type: 'user' });
     socket.join(whatsapp);
@@ -1274,28 +1623,52 @@ io.on("connection", (socket) => {
     console.log(`✓ Registered: ${whatsapp} with socket ${socket.id}`);
     
     // Update user list for all agents when a new user registers
-    updateUserListForAllAgents();
+    await updateUserListForAllAgents();
   });
 
   // Get messages for a specific whatsapp
-  socket.on("get_messages", ({ whatsapp, agentId, markAsRead = true }) => {
+  socket.on("get_messages", async ({ whatsapp, agentId, markAsRead = true }) => {
     try {
-      const conversation = conversations.get(whatsapp);
-      if (!conversation || !conversation.messages) {
-        socket.emit("message_history", []);
-        return;
+      const result = await pool.query(`
+        SELECT 
+          m.id,
+          m.chat_whatsapp as whatsapp,
+          m.sender_type as sender,
+          m.agent_id,
+          m.agent_name,
+          m.content as text,
+          m.message_type as type,
+          m.attachment_url,
+          m.attachment_type,
+          m.created_at as timestamp,
+          m.read,
+          m.broadcast_id,
+          m.is_broadcast
+        FROM messages m
+        WHERE m.chat_whatsapp = $1
+        ORDER BY m.created_at ASC
+      `, [whatsapp]);
+
+      const messages = result.rows.map(row => ({
+        ...row,
+        attachment: row.attachment_url ? {
+          url: row.attachment_url,
+          mimetype: row.attachment_type
+        } : null
+      }));
+
+      // Mark unread messages as read if requested
+      if (markAsRead && agentId) {
+        const unreadMessageIds = messages
+          .filter(msg => msg.sender === "user" && !msg.read)
+          .map(msg => msg.id);
+        
+        if (unreadMessageIds.length > 0) {
+          await markMessagesAsRead(whatsapp, unreadMessageIds);
+        }
       }
       
-      // Mark unread messages as read
-      if (markAsRead) {
-        conversation.messages.forEach((msg) => {
-          if (msg.sender === "user" && !msg.read) {
-            msg.read = true;
-          }
-        });
-      }
-      
-      socket.emit("message_history", conversation.messages);
+      socket.emit("message_history", messages);
     } catch (error) {
       console.error("Error fetching messages:", error);
       socket.emit("message_history", []);
@@ -1303,18 +1676,28 @@ io.on("connection", (socket) => {
   });
 
   // Get existing users for agent interface
-  socket.on("get_existing_users", () => {
+  socket.on("get_existing_users", async () => {
     try {
-      const usersList = Array.from(conversations.values())
-        .filter(conv => !conv.archived)
-        .map(conv => ({
-          whatsapp: conv.whatsapp,
-          lastMessage: conv.lastMessage,
-          lastMessageTime: conv.lastUpdated,
-          messageCount: conv.messages?.length || 0,
-          archived: conv.archived || false
-        }))
-        .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+      const result = await pool.query(`
+        SELECT 
+          whatsapp,
+          last_message,
+          last_message_time,
+          last_updated,
+          archived,
+          (SELECT COUNT(*) FROM messages WHERE chat_whatsapp = chats.whatsapp) as message_count
+        FROM chats
+        ORDER BY last_updated DESC
+      `);
+      
+      const usersList = result.rows.map(row => ({
+        whatsapp: row.whatsapp,
+        lastMessage: row.last_message,
+        lastMessageTime: row.last_message_time,
+        lastUpdated: row.last_updated,
+        messageCount: parseInt(row.message_count) || 0,
+        archived: row.archived || false
+      }));
       
       socket.emit("existing_users", usersList);
     } catch (error) {
@@ -1324,10 +1707,38 @@ io.on("connection", (socket) => {
   });
 
   // Get broadcast room messages
-  socket.on("get_broadcast_messages", () => {
+  socket.on("get_broadcast_messages", async () => {
     try {
       const userData = users.get(socket.id);
       if (userData?.type === 'agent' || userData?.type === 'super_admin' || userData?.type === 'admin') {
+        const result = await pool.query(`
+          SELECT 
+            m.id,
+            m.chat_whatsapp as whatsapp,
+            m.sender_type as sender,
+            m.agent_id,
+            m.agent_name,
+            m.content as text,
+            m.message_type as type,
+            m.attachment_url,
+            m.attachment_type,
+            m.created_at as timestamp,
+            m.read,
+            m.broadcast_id,
+            m.is_broadcast
+          FROM messages m
+          WHERE m.is_broadcast = TRUE
+          ORDER BY m.created_at ASC
+        `);
+
+        const broadcastMessages = result.rows.map(row => ({
+          ...row,
+          attachment: row.attachment_url ? {
+            url: row.attachment_url,
+            mimetype: row.attachment_type
+          } : null
+        }));
+
         socket.emit("broadcast_messages_history", broadcastMessages);
       }
     } catch (error) {
@@ -1337,7 +1748,7 @@ io.on("connection", (socket) => {
   });
 
   // Delete chat
-  socket.on("delete_chat", ({ whatsapp, archiveOnly = false }) => {
+  socket.on("delete_chat", async ({ whatsapp, archiveOnly = false }) => {
     try {
       const userData = users.get(socket.id);
       
@@ -1352,9 +1763,9 @@ io.on("connection", (socket) => {
       
       let success;
       if (archiveOnly) {
-        success = archiveChat(whatsapp);
+        success = await archiveChat(whatsapp);
       } else {
-        success = deleteChat(whatsapp);
+        success = await deleteChat(whatsapp);
       }
       
       if (success) {
@@ -1364,7 +1775,7 @@ io.on("connection", (socket) => {
         });
         
         // Update user list for all agents
-        updateUserListForAllAgents();
+        await updateUserListForAllAgents();
         
         logActivity('chat_deletion', {
           whatsapp,
@@ -1388,7 +1799,7 @@ io.on("connection", (socket) => {
   });
 
   // Delete individual message
-  socket.on("delete_message", ({ whatsapp, messageId, deleteForAll = false }) => {
+  socket.on("delete_message", async ({ whatsapp, messageId, deleteForAll = false }) => {
     try {
       const userData = users.get(socket.id);
       if (!userData) {
@@ -1396,50 +1807,62 @@ io.on("connection", (socket) => {
         return;
       }
       
-      const conversation = conversations.get(whatsapp);
-      if (!conversation || !conversation.messages) {
-        socket.emit("delete_message_response", { success: false, message: "Conversation not found" });
+      // Check if message exists and get sender info
+      const messageResult = await pool.query(`
+        SELECT sender_type, agent_id FROM messages 
+        WHERE id = $1 AND chat_whatsapp = $2
+      `, [messageId, whatsapp]);
+      
+      if (messageResult.rows.length === 0) {
+        socket.emit("delete_message_response", { success: false, message: "Message not found" });
         return;
       }
       
+      const message = messageResult.rows[0];
       let canDelete = false;
-      let messageIndex = -1;
       
-      // Find the message
-      conversation.messages.forEach((msg, index) => {
-        if (msg.id === messageId) {
-          messageIndex = index;
-          if (deleteForAll || userData.type === 'super_admin' || userData.type === 'admin') {
-            canDelete = true;
-          } else if (userData.type === 'agent' && msg.sender === "agent" && msg.agentId === userData.agentId) {
-            canDelete = true;
-          }
-        }
-      });
+      // Check permissions
+      if (deleteForAll || userData.type === 'super_admin' || userData.type === 'admin') {
+        canDelete = true;
+      } else if (userData.type === 'agent' && message.sender_type === "agent" && message.agent_id === userData.agentId) {
+        canDelete = true;
+      }
       
-      if (canDelete && messageIndex !== -1) {
-        // Remove the message
-        conversation.messages.splice(messageIndex, 1);
+      if (canDelete) {
+        // Delete the message from database
+        await pool.query("DELETE FROM messages WHERE id = $1", [messageId]);
         
-        // Update conversation metadata
-        if (conversation.messages.length > 0) {
-          const lastMsg = conversation.messages[conversation.messages.length - 1];
-          conversation.lastMessage = lastMsg.text || (lastMsg.attachment ? `[${lastMsg.attachment.mimetype?.split('/')[0] || 'File'}]` : '');
-          conversation.lastMessageTime = lastMsg.timestamp;
+        // Update chat's last message if needed
+        const lastMessageResult = await pool.query(`
+          SELECT content, created_at, attachment_type 
+          FROM messages 
+          WHERE chat_whatsapp = $1 
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `, [whatsapp]);
+        
+        if (lastMessageResult.rows.length > 0) {
+          const lastMsg = lastMessageResult.rows[0];
+          await pool.query(`
+            UPDATE chats 
+            SET last_message = $1, last_message_time = $2, last_updated = NOW()
+            WHERE whatsapp = $3
+          `, [
+            lastMsg.content || (lastMsg.attachment_type ? `[${lastMsg.attachment_type.split('/')[0] || 'File'}]` : ''),
+            lastMsg.created_at,
+            whatsapp
+          ]);
         } else {
-          conversation.lastMessage = null;
-          conversation.lastMessageTime = null;
-        }
-        conversation.lastUpdated = new Date();
-        
-        // Also remove from broadcast room if it exists there
-        const broadcastIndex = broadcastMessages.findIndex(msg => msg.id === messageId);
-        if (broadcastIndex !== -1) {
-          broadcastMessages.splice(broadcastIndex, 1);
+          // No messages left, update chat with null values
+          await pool.query(`
+            UPDATE chats 
+            SET last_message = NULL, last_message_time = NULL, last_updated = NOW()
+            WHERE whatsapp = $1
+          `, [whatsapp]);
         }
         
         // Update user list for all agents
-        updateUserListForAllAgents();
+        await updateUserListForAllAgents();
         
         // Notify all connected clients about the deletion
         io.to(whatsapp).emit("message_deleted", { whatsapp, messageId });
@@ -1471,30 +1894,26 @@ io.on("connection", (socket) => {
   });
 
   // Clear chat
-  socket.on("clear_chat", ({ whatsapp }) => {
+  socket.on("clear_chat", async ({ whatsapp }) => {
     try {
-      const conversation = conversations.get(whatsapp);
-      if (conversation) {
-        conversation.messages = [];
-        conversation.lastUpdated = new Date();
-        conversation.lastMessage = null;
-        conversation.lastMessageTime = null;
-        
-        activeChats.delete(whatsapp);
-        
-        // Update user list for all agents
-        updateUserListForAllAgents();
-        
-        socket.emit("clear_chat_response", { success: true });
-        io.to(whatsapp).emit("chat_cleared", { whatsapp });
-        
-        logActivity('chat_cleared', { whatsapp, by: socket.id });
-      } else {
-        socket.emit("clear_chat_response", { 
-          success: false, 
-          message: "Chat not found" 
-        });
-      }
+      // Delete all messages for this chat
+      await pool.query("DELETE FROM messages WHERE chat_whatsapp = $1", [whatsapp]);
+      
+      // Update chat metadata
+      await pool.query(`
+        UPDATE chats 
+        SET last_message = NULL, last_message_time = NULL, last_updated = NOW()
+        WHERE whatsapp = $1
+      `, [whatsapp]);
+      
+      // Update user list for all agents
+      await updateUserListForAllAgents();
+      
+      socket.emit("clear_chat_response", { success: true });
+      io.to(whatsapp).emit("chat_cleared", { whatsapp });
+      
+      logActivity('chat_cleared', { whatsapp, by: socket.id });
+      
     } catch (error) {
       console.error("Error clearing chat:", error);
       socket.emit("clear_chat_response", { 
@@ -1505,24 +1924,25 @@ io.on("connection", (socket) => {
   });
 
   // Get chat statistics
-  socket.on("get_chat_stats", () => {
+  socket.on("get_chat_stats", async () => {
     try {
       const userData = users.get(socket.id);
       if (!userData || (userData.type !== 'super_admin' && userData.type !== 'admin')) {
         return;
       }
       
-      const totalChats = Array.from(conversations.values()).filter(c => !c.archived).length;
-      const archivedChats = Array.from(conversations.values()).filter(c => c.archived).length;
-      const totalMessages = Array.from(conversations.values()).reduce((sum, conv) => sum + (conv.messages?.length || 0), 0);
+      const totalChats = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = FALSE");
+      const archivedChats = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = TRUE");
+      const totalMessages = await pool.query("SELECT COUNT(*) as total FROM messages");
+      const broadcastMessages = await pool.query("SELECT COUNT(*) as total FROM messages WHERE is_broadcast = TRUE");
       
       socket.emit("chat_stats", {
-        totalChats,
-        archivedChats,
-        totalMessages,
-        broadcastMessages: broadcastMessages.length,
-        storageMode: "IN-MEMORY ONLY",
-        note: "Data will be lost on server restart"
+        totalChats: parseInt(totalChats.rows[0].total),
+        archivedChats: parseInt(archivedChats.rows[0].total),
+        totalMessages: parseInt(totalMessages.rows[0].total),
+        broadcastMessages: parseInt(broadcastMessages.rows[0].total),
+        storageMode: "POSTGRESQL DATABASE",
+        note: "Data persists across server restarts"
       });
     } catch (error) {
       console.error("Error getting chat stats:", error);
@@ -1530,13 +1950,23 @@ io.on("connection", (socket) => {
   });
 
   // ===== DISCONNECTION =====
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     const user = users.get(socket.id);
     
     if (user) {
       if (user.type === 'agent' && user.agentId) {
         const agent = agents.get(user.agentId);
         if (agent) {
+          // Update agent status in database
+          try {
+            await pool.query(
+              "UPDATE agents SET socket_id = NULL, last_seen = NOW() WHERE id = $1",
+              [user.agentId]
+            );
+          } catch (error) {
+            console.error("Error updating agent status in database:", error);
+          }
+          
           agent.socketId = null;
           agent.lastSeen = new Date();
           agent.monitoringUser = null; // Clear monitoring status
@@ -1559,42 +1989,50 @@ io.on("connection", (socket) => {
 });
 
 // Initialize and start server
-function startServer() {
+async function startServer() {
   const PORT = process.env.PORT || 3000;
 
-  // Pre-register default agents on server start
-  preRegisterDefaultAgents();
-  
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
-    console.log(`📡 Broadcast Room: ${BROADCAST_ROOM}`);
-    console.log(`✅ Pre-registered agents: agent1, agent2, agent3`);
-    console.log(`📁 Available routes:`);
-    console.log(`   /chat - User chat interface`);
-    console.log(`   /admin - Original admin panel`);
-    console.log(`   /superadmin - Super admin panel`);
-    console.log(`   /agent - Agent panel`);
-    console.log(`   /agent/users - NEW: Get user list with read receipts`);
-    console.log(`   /agent/conversations - Get all conversations`);
-    console.log(`   /agent/:id/info - Get agent info (for debugging)`);
-    console.log(`   DELETE /chat/:whatsapp - Delete a chat`);
-    console.log(`   GET /chats/archived - Get archived chats`);
-    console.log(`   POST /chat/:whatsapp/restore - Restore archived chat`);
-    console.log(`   /test - Test endpoint`);
-    console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
-    console.log(`\n✅ System is ready with DUAL STORAGE SYSTEM!`);
-    console.log(`📡 BROADCAST ROOM: All messages saved for all agents`);
-    console.log(`💾 USER ROOMS: Each user's messages saved under their WhatsApp ID`);
-    console.log(`🔧 Agents automatically get broadcast history on login`);
-    console.log(`👤 Agents can join individual user rooms to see their history`);
-    console.log(`✅ NEW: User list with read receipts enabled!`);
-    console.log(`   - GET /agent/users endpoint for API access`);
-    console.log(`   - Socket event: get_user_list_with_read_receipts`);
-    console.log(`   - Real-time updates when messages are sent/read`);
-    console.log(`   - Shows unread count per user`);
-    console.log(`⚠️  WARNING: Data is ephemeral - will be lost on server restart`);
-  });
+  try {
+    // Initialize database tables
+    await initializeDatabase();
+    
+    // Pre-register default agents on server start
+    await preRegisterDefaultAgents();
+    
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
+      console.log(`📡 Broadcast Room: ${BROADCAST_ROOM}`);
+      console.log(`✅ Pre-registered agents: agent1, agent2, agent3`);
+      console.log(`📁 Available routes:`);
+      console.log(`   /chat - User chat interface`);
+      console.log(`   /admin - Original admin panel`);
+      console.log(`   /superadmin - Super admin panel`);
+      console.log(`   /agent - Agent panel`);
+      console.log(`   /agent/users - NEW: Get user list with read receipts`);
+      console.log(`   /agent/conversations - Get all conversations`);
+      console.log(`   /agent/:id/info - Get agent info (for debugging)`);
+      console.log(`   DELETE /chat/:whatsapp - Delete a chat`);
+      console.log(`   GET /chats/archived - Get archived chats`);
+      console.log(`   POST /chat/:whatsapp/restore - Restore archived chat`);
+      console.log(`   /test - Test endpoint`);
+      console.log(`📂 Uploads directory: ${UPLOADS_DIR}`);
+      console.log(`\n✅ System is ready with POSTGRESQL STORAGE!`);
+      console.log(`💾 Database: albastxz_db1`);
+      console.log(`📊 All data is now being saved to PostgreSQL`);
+      console.log(`🔧 Agents automatically get broadcast history on login`);
+      console.log(`👤 Agents can join individual user rooms to see their history`);
+      console.log(`✅ User list with read receipts enabled!`);
+      console.log(`   - GET /agent/users endpoint for API access`);
+      console.log(`   - Socket event: get_user_list_with_read_receipts`);
+      console.log(`   - Real-time updates when messages are sent/read`);
+      console.log(`   - Shows unread count per user`);
+      console.log(`✅ Data persists across server restarts!`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
 }
 
 startServer();
