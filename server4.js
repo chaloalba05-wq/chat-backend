@@ -11,7 +11,7 @@ const pool = require("./db");
 // ===== CONFIGURATION =====
 const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
 const BROADCAST_ROOM = "BROADCAST_ROOM_ALL_AGENTS";
-const DB_SYNC_INTERVAL = 20 * 60 * 1000; // 20 minutes
+const DB_SYNC_INTERVAL = 10 * 1000; // 10 seconds (reduced from 20 minutes)
 const MAX_LOCAL_MESSAGES = 1000;
 
 // ===== LOCAL STORAGE (Primary) =====
@@ -127,9 +127,9 @@ const localMessages = {
         this.userChats.set(msg.whatsapp, []);
       }
       const userMessages = this.userChats.get(msg.whatsapp);
-      userMessages.unshift(msg);
+      userMessages.push(msg); // ✅ FIXED: Changed from unshift() to push() (store chronologically)
       if (userMessages.length > 100) {
-        userMessages.pop();
+        userMessages.shift(); // ✅ FIXED: Changed from pop() to shift() (remove oldest)
       }
     }
     
@@ -139,11 +139,11 @@ const localMessages = {
   
   getUserMessages(whatsapp, limit = 100) {
     const messages = this.userChats.get(whatsapp) || [];
-    return messages.slice(0, limit).reverse();
+    return messages.slice(-limit); // ✅ FIXED: Get last N messages (newest last)
   },
   
   getBroadcastMessages(limit = 100) {
-    return this.broadcast.slice(0, limit).reverse();
+    return this.broadcast.slice(-limit); // ✅ FIXED: Get last N messages (newest last)
   },
   
   markAsRead(whatsapp, messageIds) {
@@ -370,7 +370,7 @@ async function getLocalUserList() {
   const userList = [];
   
   for (const [whatsapp, messages] of localMessages.userChats) {
-    const lastMessage = messages[0];
+    const lastMessage = messages[messages.length - 1]; // ✅ FIXED: Get last message (newest)
     const unreadCount = messages.filter(m => m.sender === 'user' && !m.read).length;
     
     userList.push({
@@ -430,13 +430,20 @@ async function handleAgentMessage(socket, data) {
     read: true,
     whatsapp,
     messageType: 'agent_message',
-    isBroadcast: true,
+    isBroadcast: false,
     attachment: data.attachment
   });
   
-  io.to(BROADCAST_ROOM).emit("broadcast_message", message);
+  // ✅ FIXED: Removed broadcast to BROADCAST_ROOM for chat messages
   io.to(whatsapp).emit("new_message", { ...message, whatsapp });
   io.to("super_admin").to("admin").emit("new_message", message);
+  
+  // Send to monitoring agents
+  agents.forEach(ag => {
+    if (ag.socketId && ag.monitoringUser === whatsapp) {
+      io.to(ag.socketId).emit("new_message", message);
+    }
+  });
   
   updateUserListForAllAgents();
   
@@ -458,13 +465,20 @@ async function handleUserMessage(socket, data) {
     read: false,
     whatsapp,
     messageType: 'user_message',
-    isBroadcast: false,  // ✅ FIXED: Changed from true to false
+    isBroadcast: false,
     attachment: data.attachment
   });
   
-  io.to(BROADCAST_ROOM).emit("broadcast_message", message);
+  // ✅ FIXED: Removed broadcast to BROADCAST_ROOM for chat messages
   io.to(whatsapp).emit("new_message", { ...message, whatsapp });
   io.to("super_admin").to("admin").emit("new_message", message);
+  
+  // Send to monitoring agents
+  agents.forEach(agent => {
+    if (agent.socketId && agent.monitoringUser === whatsapp) {
+      io.to(agent.socketId).emit("new_message", message);
+    }
+  });
   
   updateUserListForAllAgents();
   
@@ -1123,9 +1137,7 @@ io.on("connection", (socket) => {
       
       // Send local broadcast messages
       const broadcastMessages = localMessages.getBroadcastMessages(100);
-      broadcastMessages.forEach(msg => {
-        socket.emit("broadcast_message", msg);
-      });
+      socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Send as single array
       
       const userList = await getLocalUserList();
       socket.emit("user_list_with_read_receipts", userList);
@@ -1172,12 +1184,11 @@ io.on("connection", (socket) => {
     agent.monitoringUser = whatsapp;
     
     const userMessages = localMessages.getUserMessages(whatsapp);
-    userMessages.forEach(msg => {
-      socket.emit("user_chat_history", {
-        ...msg,
-        whatsapp: whatsapp,
-        isHistorical: true
-      });
+    // ✅ FIXED: Send as single object with array
+    socket.emit("user_chat_history", {
+      messages: userMessages,
+      whatsapp: whatsapp,
+      isHistorical: true
     });
     
     logActivity('agent_joined_user_room', {
@@ -1289,9 +1300,7 @@ io.on("connection", (socket) => {
 
     try {
       const broadcastMessages = localMessages.getBroadcastMessages();
-      broadcastMessages.forEach(msg => {
-        socket.emit("new_message", msg);
-      });
+      socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Send as array
       
       const userList = await getLocalUserList();
       socket.emit("user_list_with_read_receipts", userList);
@@ -1328,10 +1337,13 @@ io.on("connection", (socket) => {
         }
       }
       
-      socket.emit("message_history", messages);
+      socket.emit("message_history_data", { // ✅ FIXED: Renamed to avoid conflict
+        messages: messages,
+        whatsapp: whatsapp
+      });
     } catch (error) {
       console.error("Error fetching messages:", error);
-      socket.emit("message_history", []);
+      socket.emit("message_history_data", { messages: [], whatsapp: whatsapp });
     }
   });
 
@@ -1370,7 +1382,7 @@ io.on("connection", (socket) => {
       const userData = users.get(socket.id);
       if (userData?.type === 'agent' || userData?.type === 'super_admin' || userData?.type === 'admin') {
         const broadcastMessages = localMessages.getBroadcastMessages();
-        socket.emit("broadcast_messages_history", broadcastMessages);
+        socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Consistent naming
       }
     } catch (error) {
       console.error("Error fetching broadcast messages:", error);
@@ -1542,8 +1554,8 @@ io.on("connection", (socket) => {
         archivedChats: parseInt(archivedChats.rows[0].total),
         totalMessages: parseInt(totalMessages.rows[0].total),
         broadcastMessages: parseInt(broadcastMessages.rows[0].total),
-        storageMode: "HYBRID: Local-first with 20-minute database sync",
-        note: "Messages are instant, database syncs every 20 minutes"
+        storageMode: "HYBRID: Local-first with 10-second database sync",
+        note: "Messages are instant, database syncs every 10 seconds"
       });
     } catch (error) {
       console.error("Error getting chat stats:", error);
@@ -1602,9 +1614,9 @@ async function startServer() {
       console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
       console.log(`📡 Broadcast Room: ${BROADCAST_ROOM}`);
       console.log(`✅ Pre-registered agents: agent1, agent2, agent3`);
-      console.log(`⚡ HYBRID STORAGE MODE: Local-first with 20-minute database sync`);
+      console.log(`⚡ HYBRID STORAGE MODE: Local-first with 10-second database sync`);
       console.log(`💾 Database: albastxz_db1`);
-      console.log(`🔄 Database sync every 20 minutes`);
+      console.log(`🔄 Database sync every 10 seconds`);
       console.log(`✅ System is ready - No more message delays!`);
     });
   } catch (error) {
