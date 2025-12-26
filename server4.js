@@ -142,6 +142,9 @@ async function saveMessageToDatabase(message) {
       isBroadcast = false
     } = message;
 
+    // Create a truly unique ID by combining timestamp with UUID
+    const uniqueId = `${id}_${uuidv4().split('-')[0]}`;
+
     // First, ensure chat exists
     await pool.query(`
       INSERT INTO chats (whatsapp, last_message, last_message_time, last_updated)
@@ -158,16 +161,15 @@ async function saveMessageToDatabase(message) {
       new Date()
     ]);
 
-    // Save the message
+    // Save the message with unique ID
     await pool.query(`
       INSERT INTO messages (
         id, chat_whatsapp, sender_type, agent_id, agent_name, 
         content, message_type, attachment_url, attachment_type,
         created_at, read, broadcast_id, is_broadcast
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      ON CONFLICT (id) DO NOTHING
     `, [
-      id,
+      uniqueId,
       whatsapp,
       sender,
       agentId,
@@ -182,11 +184,11 @@ async function saveMessageToDatabase(message) {
       isBroadcast
     ]);
 
-    console.log(`💾 Saved message to database: ${id}`);
-    return true;
+    console.log(`💾 Saved message to database: ${uniqueId}`);
+    return { success: true, id: uniqueId };
   } catch (error) {
     console.error("Error saving message to database:", error);
-    return false;
+    return { success: false, error: error.message };
   }
 }
 
@@ -201,10 +203,15 @@ async function saveMessageToBroadcastRoom(message) {
     };
     
     // Save to database
-    await saveMessageToDatabase(broadcastMessage);
+    const result = await saveMessageToDatabase(broadcastMessage);
     
-    console.log(`📡 Saved to broadcast room in database: ${broadcastMessage.broadcastId}`);
-    return broadcastMessage;
+    if (!result.success) {
+      console.error("Failed to save broadcast message");
+      return null;
+    }
+    
+    console.log(`📡 Saved to broadcast room in database: ${result.id}`);
+    return { ...broadcastMessage, id: result.id };
   } catch (error) {
     console.error("Error saving to broadcast room:", error);
     return null;
@@ -215,13 +222,13 @@ async function saveMessageToBroadcastRoom(message) {
 async function saveMessageToUserHistory(whatsapp, message) {
   try {
     // Save to database (which handles both creation and updates)
-    await saveMessageToDatabase({
+    const result = await saveMessageToDatabase({
       ...message,
       whatsapp: whatsapp
     });
     
-    console.log(`💾 Saved message for ${whatsapp} to database`);
-    return true;
+    console.log(`💾 Saved message for ${whatsapp} to database: ${result.id}`);
+    return result.success;
   } catch (error) {
     console.error("Error saving message to user history:", error);
     return false;
@@ -1372,10 +1379,14 @@ io.on("connection", (socket) => {
       // ===== SAVE TO BOTH PLACES =====
       
       // 1. Save to broadcast room (all agents can see)
-      await saveMessageToBroadcastRoom(message);
+      const broadcastResult = await saveMessageToBroadcastRoom(message);
       
       // 2. Save to user's specific chat history
-      await saveMessageToUserHistory(whatsapp, message);
+      const userHistoryResult = await saveMessageToUserHistory(whatsapp, message);
+      
+      if (!broadcastResult || !userHistoryResult) {
+        throw new Error("Failed to save message to database");
+      }
       
       console.log(`✓ Agent message saved to database for ${whatsapp}`);
       
@@ -1448,10 +1459,14 @@ io.on("connection", (socket) => {
       // ===== SAVE TO BOTH PLACES =====
       
       // 1. Save to broadcast room (all agents can see)
-      await saveMessageToBroadcastRoom(message);
+      const broadcastResult = await saveMessageToBroadcastRoom(message);
       
       // 2. Save to user's specific chat history
-      await saveMessageToUserHistory(whatsapp, message);
+      const userHistoryResult = await saveMessageToUserHistory(whatsapp, message);
+      
+      if (!broadcastResult || !userHistoryResult) {
+        throw new Error("Failed to save message to database");
+      }
       
       console.log(`✓ User message saved to database for ${whatsapp}`);
       
