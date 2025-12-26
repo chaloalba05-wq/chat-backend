@@ -458,7 +458,7 @@ async function handleUserMessage(socket, data) {
     read: false,
     whatsapp,
     messageType: 'user_message',
-    isBroadcast: true,
+    isBroadcast: false,  // ✅ FIXED: Changed from true to false
     attachment: data.attachment
   });
   
