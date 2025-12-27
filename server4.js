@@ -46,66 +46,71 @@ async function addAndPersistMessage(msg) {
 async function persistMessageImmediately(message) {
   const dbMsg = localMessages.mapLocalToDb(message);
 
-  // 🔥 FIX: Ensure chat exists and get chat_id
-  const chatResult = await pool.query(`
-    INSERT INTO chats (whatsapp, last_message, last_message_time, last_updated)
-    VALUES ($1, $2, $3, NOW())
-    ON CONFLICT (whatsapp)
-    DO UPDATE SET
-      last_message = EXCLUDED.last_message,
-      last_message_time = EXCLUDED.last_message_time,
-      last_updated = EXCLUDED.last_updated
-    RETURNING id
-  `, [
-    dbMsg.chat_whatsapp,
-    dbMsg.content || (dbMsg.attachment_url ? '[Attachment]' : ''),
-    dbMsg.created_at
-  ]);
+  try {
+    // 🔥 FIX: Ensure chat exists and get chat_id - Generate separate chat ID
+    const chatResult = await pool.query(`
+      INSERT INTO chats (id, whatsapp, last_message, last_message_time, last_updated)
+      VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+      ON CONFLICT (whatsapp)
+      DO UPDATE SET
+        last_message = EXCLUDED.last_message,
+        last_message_time = EXCLUDED.last_message_time,
+        last_updated = EXCLUDED.last_updated
+      RETURNING id
+    `, [
+      dbMsg.chat_whatsapp,
+      dbMsg.content || (dbMsg.attachment_url ? '[Attachment]' : ''),
+      dbMsg.created_at
+    ]);
 
-  const chatId = chatResult.rows[0]?.id;
+    const chatId = chatResult.rows[0]?.id;
 
-  // 🔥 FIX: Insert message WITH chat_id
-  await pool.query(`
-    INSERT INTO messages (
-      id, chat_id, chat_whatsapp, sender_type, agent_id, agent_name,
-      content, message_type, attachment_url, attachment_type,
-      created_at, read, broadcast_id, is_broadcast
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-    ON CONFLICT (id) DO NOTHING
-  `, [
-    dbMsg.id,
-    chatId, // ✅ ADDED: chat_id
-    dbMsg.chat_whatsapp,
-    dbMsg.sender_type,
-    dbMsg.agent_id,
-    dbMsg.agent_name,
-    dbMsg.content,
-    dbMsg.message_type,
-    dbMsg.attachment_url,
-    dbMsg.attachment_type,
-    dbMsg.created_at,
-    dbMsg.read,
-    dbMsg.broadcast_id,
-    dbMsg.is_broadcast
-  ]);
-
-  // Insert read receipt for sender if agent
-  if (dbMsg.sender_type === 'agent' && dbMsg.agent_id) {
+    // 🔥 FIX: Insert message WITH chat_id
     await pool.query(`
-      INSERT INTO message_reads (message_id, agent_id, read_at)
-      VALUES ($1, $2, NOW())
-      ON CONFLICT (message_id, agent_id) DO NOTHING
-    `, [dbMsg.id, dbMsg.agent_id]);
-  }
+      INSERT INTO messages (
+        id, chat_id, chat_whatsapp, sender_type, agent_id, agent_name,
+        content, message_type, attachment_url, attachment_type,
+        created_at, read, broadcast_id, is_broadcast
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      ON CONFLICT (id) DO NOTHING
+    `, [
+      dbMsg.id,
+      chatId, // ✅ ADDED: chat_id
+      dbMsg.chat_whatsapp,
+      dbMsg.sender_type,
+      dbMsg.agent_id,
+      dbMsg.agent_name,
+      dbMsg.content,
+      dbMsg.message_type,
+      dbMsg.attachment_url,
+      dbMsg.attachment_type,
+      dbMsg.created_at,
+      dbMsg.read,
+      dbMsg.broadcast_id,
+      dbMsg.is_broadcast
+    ]);
 
-  // Mark message as fromDatabase in memory
-  const chatMessages = localMessages.userChats.get(message.whatsapp);
-  if (chatMessages) {
-    const localMsg = chatMessages.find(m => m.id === message.id);
-    if (localMsg) {
-      localMsg.fromDatabase = true;
-      localMsg.syncedToDb = true;
+    // Insert read receipt for sender if agent
+    if (dbMsg.sender_type === 'agent' && dbMsg.agent_id) {
+      await pool.query(`
+        INSERT INTO message_reads (message_id, agent_id, read_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (message_id, agent_id) DO NOTHING
+      `, [dbMsg.id, dbMsg.agent_id]);
     }
+
+    // Mark message as fromDatabase in memory
+    const chatMessages = localMessages.userChats.get(message.whatsapp);
+    if (chatMessages) {
+      const localMsg = chatMessages.find(m => m.id === message.id);
+      if (localMsg) {
+        localMsg.fromDatabase = true;
+        localMsg.syncedToDb = true;
+      }
+    }
+  } catch (error) {
+    console.error("Error persisting message:", error);
+    throw error;
   }
 }
 
@@ -204,6 +209,8 @@ const localMessages = {
   addMessage(message) {
     const msg = {
       ...message,
+      // 🔥 FIX: Ensure message has a proper UUID if not provided
+      id: message.id || uuidv4(),
       localId: uuidv4(),
       timestamp: message.timestamp || new Date(),
       read: message.read || false,
@@ -281,7 +288,7 @@ const localMessages = {
     );
   },
 
-  // NEW: Clean up orphaned temporary messages
+  // 🔥 FIXED: Clean up orphaned temporary messages with UUID validation
   async cleanupOrphanedMessages() {
     const now = Date.now();
     const staleThreshold = TEMP_MESSAGE_CLEANUP_INTERVAL;
@@ -293,13 +300,31 @@ const localMessages = {
       );
       
       if (tempMessages.length > 0) {
-        // Check if these messages exist in DB
-        const messageIds = tempMessages.map(msg => msg.id);
-        const result = await pool.query(`
-          SELECT id FROM messages WHERE id = ANY($1)
-        `, [messageIds]);
+        // Filter out invalid UUIDs before querying database
+        const validMessageIds = tempMessages
+          .map(msg => msg.id)
+          .filter(id => {
+            // Check if it's a valid UUID format
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            return uuidRegex.test(id);
+          });
         
-        const existingIds = new Set(result.rows.map(row => row.id));
+        let existingIds = new Set();
+        
+        // Only query database if we have valid UUIDs
+        if (validMessageIds.length > 0) {
+          try {
+            const result = await pool.query(`
+              SELECT id FROM messages WHERE id = ANY($1)
+            `, [validMessageIds]);
+            
+            existingIds = new Set(result.rows.map(row => row.id));
+          } catch (error) {
+            console.error("Error checking for existing messages:", error);
+            // If there's an error, skip database check for this batch
+          }
+        }
+        
         const toRemove = [];
         
         tempMessages.forEach(msg => {
@@ -571,8 +596,9 @@ async function handleAgentMessage(socket, data) {
   const whatsapp = data.whatsapp || 'unknown';
   const timestamp = new Date();
   
+  // 🔥 FIX: Use proper UUID for message ID instead of timestamp format
   const message = localMessages.addMessage({
-    id: `${timestamp.getTime()}_${uuidv4().slice(0, 8)}`,
+    id: uuidv4(), // Use proper UUID
     sender: 'agent',
     agentId: userData.agentId,
     agentName: agent.name,
@@ -597,8 +623,9 @@ async function handleUserMessage(socket, data) {
   
   const timestamp = new Date();
   
+  // 🔥 FIX: Use proper UUID for message ID instead of timestamp format
   const message = localMessages.addMessage({
-    id: `${timestamp.getTime()}_${uuidv4().slice(0, 8)}`,
+    id: uuidv4(), // Use proper UUID
     sender: 'user',
     text: data.message || '',
     timestamp,
@@ -640,7 +667,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.send("Chat backend running - POSTGRESQL MODE"));
 app.get("/chat", (req, res) => res.sendFile(path.join(__dirname, "public", "chat.html")));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("/superadmin", (req, res) => res.sendFile(path.join(__dirname, "public", "superadmin.html")));
+app.get("/superadmin", (req, res) res.sendFile(path.join(__dirname, "public", "superadmin.html")));
 app.get("/agent", (req, res) => res.sendFile(path.join(__dirname, "public", "agent.html")));
 
 app.get("/agent:num.html", (req, res) => {
@@ -1369,19 +1396,27 @@ io.on("connection", (socket) => {
       const updated = localMessages.markAsRead(whatsapp, messageIds);
       
       if (updated.length > 0) {
-        await pool.query(`
-          UPDATE messages
-          SET read = TRUE
-          WHERE id = ANY($1)
-        `, [updated]);
+        // Filter valid UUIDs for database query
+        const validMessageIds = updated.filter(id => {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return uuidRegex.test(id);
+        });
+        
+        if (validMessageIds.length > 0) {
+          await pool.query(`
+            UPDATE messages
+            SET read = TRUE
+            WHERE id = ANY($1)
+          `, [validMessageIds]);
 
-        await pool.query(`
-          INSERT INTO message_reads (message_id, agent_id, read_at)
-          SELECT id, $1, NOW()
-          FROM messages
-          WHERE id = ANY($2)
-          ON CONFLICT (message_id, agent_id) DO UPDATE SET read_at = EXCLUDED.read_at
-        `, [userData.agentId, updated]);
+          await pool.query(`
+            INSERT INTO message_reads (message_id, agent_id, read_at)
+            SELECT id, $1, NOW()
+            FROM messages
+            WHERE id = ANY($2)
+            ON CONFLICT (message_id, agent_id) DO UPDATE SET read_at = EXCLUDED.read_at
+          `, [userData.agentId, validMessageIds]);
+        }
         
         const updateData = {
           whatsapp,
@@ -1622,7 +1657,11 @@ io.on("connection", (socket) => {
       }
       
       if (canDelete) {
-        await pool.query("DELETE FROM messages WHERE id = $1", [messageId]);
+        // Check if messageId is a valid UUID before deleting from DB
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(messageId)) {
+          await pool.query("DELETE FROM messages WHERE id = $1", [messageId]);
+        }
         
         const userMessages = localMessages.userChats.get(whatsapp);
         if (userMessages) {
@@ -1780,6 +1819,7 @@ async function startServer() {
       console.log(`✅ No more disappearing messages!`);
       console.log(`✅ Merged DB + Memory messages!`);
       console.log(`✅ Robust user list generation!`);
+      console.log(`🔥 FIX: All messages now use proper UUIDs - No more "invalid input syntax for type uuid" errors!`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
