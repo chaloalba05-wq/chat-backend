@@ -130,12 +130,15 @@ const localMessages = {
       
       this.broadcast = broadcastResult.rows.map(row => this.mapDbToLocal(row));
       
-      // 🔥 FIX: Handle potential NULL is_broadcast
+      // 🔥 FIX: Changed from DISTINCT with ORDER BY to GROUP BY
       const chatsResult = await pool.query(`
-        SELECT DISTINCT chat_whatsapp 
+        SELECT 
+          chat_whatsapp,
+          MAX(created_at) as latest_message_time
         FROM messages 
         WHERE (is_broadcast = FALSE OR is_broadcast IS NULL)
-        ORDER BY created_at DESC 
+        GROUP BY chat_whatsapp
+        ORDER BY latest_message_time DESC 
         LIMIT 50
       `);
       
@@ -471,11 +474,15 @@ async function getLocalUserList() {
   
   // Get whatsapp numbers from DB for any missing chats
   try {
-    // 🔥 FIX: Handle potential NULL is_broadcast
+    // 🔥 FIX: Changed from DISTINCT with ORDER BY to GROUP BY
     const dbResult = await pool.query(`
-      SELECT DISTINCT chat_whatsapp FROM messages 
+      SELECT 
+        chat_whatsapp,
+        MAX(created_at) as latest_message_time
+      FROM messages 
       WHERE (is_broadcast = FALSE OR is_broadcast IS NULL)
-      ORDER BY created_at DESC
+      GROUP BY chat_whatsapp
+      ORDER BY latest_message_time DESC
       LIMIT 100
     `);
     
