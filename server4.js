@@ -11,13 +11,56 @@ const pool = require("./db");
 // ===== CONFIGURATION =====
 const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
 const BROADCAST_ROOM = "BROADCAST_ROOM_ALL_AGENTS";
-const DB_SYNC_INTERVAL = 20 * 60 * 1000; // ✅ FIX 5: Changed to 20 minutes
 const MAX_LOCAL_MESSAGES = 1000;
 
 // ===== LOCAL STORAGE (Primary) =====
 const users = new Map();
 const agents = new Map();
 const activityLog = [];
+
+// ===== IMMEDIATE PERSISTENCE HELPER =====
+async function persistMessageImmediately(message) {
+  const dbMsg = localMessages.mapLocalToDb(message);
+
+  // Update chats table
+  await pool.query(`
+    INSERT INTO chats (whatsapp, last_message, last_message_time, last_updated)
+    VALUES ($1, $2, $3, NOW())
+    ON CONFLICT (whatsapp)
+    DO UPDATE SET
+      last_message = EXCLUDED.last_message,
+      last_message_time = EXCLUDED.last_message_time,
+      last_updated = EXCLUDED.last_updated
+  `, [
+    dbMsg.chat_whatsapp,
+    dbMsg.content || (dbMsg.attachment_url ? '[Attachment]' : ''),
+    dbMsg.created_at
+  ]);
+
+  // Insert into messages table
+  await pool.query(`
+    INSERT INTO messages (
+      id, chat_whatsapp, sender_type, agent_id, agent_name,
+      content, message_type, attachment_url, attachment_type,
+      created_at, read, broadcast_id, is_broadcast
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    ON CONFLICT (id) DO NOTHING
+  `, [
+    dbMsg.id,
+    dbMsg.chat_whatsapp,
+    dbMsg.sender_type,
+    dbMsg.agent_id,
+    dbMsg.agent_name,
+    dbMsg.content,
+    dbMsg.message_type,
+    dbMsg.attachment_url,
+    dbMsg.attachment_type,
+    dbMsg.created_at,
+    dbMsg.read,
+    dbMsg.broadcast_id,
+    dbMsg.is_broadcast
+  ]);
+}
 
 // Local message storage
 const localMessages = {
@@ -114,7 +157,7 @@ const localMessages = {
       localId: uuidv4(),
       timestamp: message.timestamp || new Date(),
       read: message.read || false,
-      syncedToDb: false
+      syncedToDb: true  // Changed to true since we persist immediately now
     };
     
     if (msg.isBroadcast) {
@@ -133,7 +176,6 @@ const localMessages = {
       }
     }
     
-    this.syncQueue.push(msg);
     return msg;
   },
   
@@ -154,79 +196,11 @@ const localMessages = {
       const msg = messages.find(m => m.id === msgId || m.localId === msgId);
       if (msg && !msg.read) {
         msg.read = true;
-        msg.syncedToDb = false;
         updated.push(msgId);
       }
     });
     
     return updated;
-  },
-  
-  async syncToDatabase() {
-    if (this.syncQueue.length === 0) {
-      return;
-    }
-    
-    const toSync = [...this.syncQueue];
-    this.syncQueue = [];
-    
-    try {
-      console.log(`🔄 Syncing ${toSync.length} messages to database...`);
-      
-      for (const msg of toSync) {
-        if (msg.syncedToDb) continue;
-        
-        const dbMsg = this.mapLocalToDb(msg);
-        
-        await pool.query(`
-          INSERT INTO chats (whatsapp, last_message, last_message_time, last_updated)
-          VALUES ($1, $2, $3, $4)
-          ON CONFLICT (whatsapp) 
-          DO UPDATE SET 
-            last_message = EXCLUDED.last_message,
-            last_message_time = EXCLUDED.last_message_time,
-            last_updated = EXCLUDED.last_updated
-        `, [
-          dbMsg.chat_whatsapp,
-          dbMsg.content || (dbMsg.attachment_url ? '[Attachment]' : ''),
-          dbMsg.created_at,
-          new Date()
-        ]);
-        
-        await pool.query(`
-          INSERT INTO messages (
-            id, chat_whatsapp, sender_type, agent_id, agent_name, 
-            content, message_type, attachment_url, attachment_type,
-            created_at, read, broadcast_id, is_broadcast
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-          ON CONFLICT (id) 
-          DO UPDATE SET 
-            read = EXCLUDED.read
-        `, [
-          dbMsg.id || uuidv4(),
-          dbMsg.chat_whatsapp,
-          dbMsg.sender_type,
-          dbMsg.agent_id,
-          dbMsg.agent_name,
-          dbMsg.content,
-          dbMsg.message_type,
-          dbMsg.attachment_url,
-          dbMsg.attachment_type,
-          dbMsg.created_at,
-          dbMsg.read,
-          dbMsg.broadcast_id,
-          dbMsg.is_broadcast
-        ]);
-        
-        msg.syncedToDb = true;
-      }
-      
-      this.lastSync = new Date();
-      console.log(`✅ Synced ${toSync.length} messages to database`);
-    } catch (error) {
-      console.error("❌ Database sync failed:", error);
-      this.syncQueue.push(...toSync.filter(msg => !msg.syncedToDb));
-    }
   }
 };
 
@@ -434,6 +408,9 @@ async function handleAgentMessage(socket, data) {
     attachment: data.attachment
   });
   
+  // ✅ FIX: Persist to DB immediately before emitting
+  await persistMessageImmediately(message);
+  
   // ✅ FIX 1: Restored global agent delivery
   io.to(whatsapp).emit("new_message", { ...message, whatsapp });
   io.to(BROADCAST_ROOM).emit("new_message", { ...message, whatsapp }); // ✅ CRITICAL FIX
@@ -470,6 +447,9 @@ async function handleUserMessage(socket, data) {
     attachment: data.attachment
   });
   
+  // ✅ FIX: Persist to DB immediately before emitting
+  await persistMessageImmediately(message);
+  
   // ✅ FIX 1: Restored global agent delivery
   io.to(whatsapp).emit("new_message", { ...message, whatsapp });
   io.to(BROADCAST_ROOM).emit("new_message", { ...message, whatsapp }); // ✅ CRITICAL FIX
@@ -486,16 +466,6 @@ async function handleUserMessage(socket, data) {
   
   console.log(`⚡ User message received instantly: ${message.id}`);
   return true;
-}
-
-// ===== DATABASE SYNC SCHEDULER =====
-function startDatabaseSync() {
-  setTimeout(() => {
-    localMessages.syncToDatabase();
-    setInterval(() => {
-      localMessages.syncToDatabase();
-    }, DB_SYNC_INTERVAL);
-  }, DB_SYNC_INTERVAL);
 }
 
 // ===== SERVER SETUP =====
@@ -700,7 +670,7 @@ app.get("/test", async (req, res) => {
       totalAgents: parseInt(agentsCount.rows[0].count),
       totalMessages: parseInt(messagesCount.rows[0].count),
       localMessages: localMessages.broadcast.length + Array.from(localMessages.userChats.values()).reduce((sum, msgs) => sum + msgs.length, 0),
-      storageInfo: "Hybrid: Local-first with 20-minute database sync"
+      storageInfo: "IMMEDIATE PERSISTENCE: Messages saved to DB immediately"
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1185,12 +1155,25 @@ io.on("connection", (socket) => {
     socket.join(whatsapp);
     agent.monitoringUser = whatsapp;
     
-    const userMessages = localMessages.getUserMessages(whatsapp);
-    // ✅ FIXED: Send as single object with array
+    // ✅ FIX: Load messages from DB on reload
+    const result = await pool.query(`
+      SELECT * FROM messages
+      WHERE chat_whatsapp = $1
+      ORDER BY created_at ASC
+    `, [whatsapp]);
+    
+    const messages = result.rows.map(row =>
+      localMessages.mapDbToLocal(row)
+    );
+    
+    // Hydrate memory
+    localMessages.userChats.set(whatsapp, messages);
+    
+    // Send to UI
     socket.emit("user_chat_history", {
-      messages: userMessages,
-      whatsapp: whatsapp,
-      isHistorical: true
+      whatsapp,
+      messages,
+      source: "database"
     });
     
     logActivity('agent_joined_user_room', {
@@ -1234,7 +1217,14 @@ io.on("connection", (socket) => {
       
       const updated = localMessages.markAsRead(whatsapp, messageIds);
       
+      // ✅ FIX: Update DB immediately
       if (updated.length > 0) {
+        await pool.query(`
+          UPDATE messages
+          SET read = TRUE
+          WHERE id = ANY($1)
+        `, [updated]);
+        
         const updateData = {
           whatsapp,
           messageIds: updated,
@@ -1252,7 +1242,7 @@ io.on("connection", (socket) => {
           }
         });
         
-        console.log(`✅ Marked ${updated.length} message(s) as read`);
+        console.log(`✅ Marked ${updated.length} message(s) as read in DB`);
         
         logActivity('messages_marked_read', {
           whatsapp,
@@ -1556,8 +1546,8 @@ io.on("connection", (socket) => {
         archivedChats: parseInt(archivedChats.rows[0].total),
         totalMessages: parseInt(totalMessages.rows[0].total),
         broadcastMessages: parseInt(broadcastMessages.rows[0].total),
-        storageMode: "HYBRID: Local-first with 20-minute database sync",
-        note: "Messages are instant, database syncs every 20 minutes"
+        storageMode: "IMMEDIATE PERSISTENCE: Messages saved to DB immediately",
+        note: "Messages are instantly persisted to database"
       });
     } catch (error) {
       console.error("Error getting chat stats:", error);
@@ -1609,17 +1599,17 @@ async function startServer() {
     await preRegisterDefaultAgents();
     await localMessages.initialize();
     
-    startDatabaseSync();
+    // REMOVED: startDatabaseSync() - No more 20-minute sync
     
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
       console.log(`📡 Broadcast Room: ${BROADCAST_ROOM}`);
       console.log(`✅ Pre-registered agents: agent1, agent2, agent3`);
-      console.log(`⚡ HYBRID STORAGE MODE: Local-first with 20-minute database sync`);
+      console.log(`⚡ IMMEDIATE PERSISTENCE MODE: Messages saved to DB immediately`);
       console.log(`💾 Database: albastxz_db1`);
-      console.log(`🔄 Database sync every 20 minutes`);
       console.log(`✅ System is ready - Agents can now see all messages immediately!`);
+      console.log(`✅ No more disappearing messages!`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
