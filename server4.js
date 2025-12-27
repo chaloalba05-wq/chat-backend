@@ -404,13 +404,17 @@ async function getLocalUserList() {
 async function updateUserListForAllAgents() {
   const userList = await getLocalUserList();
   
-  agents.forEach(agent => {
+  // FIXED: Added missing closing parenthesis in arrow function
+  agents.forEach((agent, agentId) => {
+    const updateData = {
+      users: userList
+    };
     if (agent.socketId) {
-      io.to(agent.socketId).emit("user_list_with_read_receipts", userList);
+      io.to(agent.socketId).emit("user_list_with_read_receipts", updateData);
     }
   });
-  
-  io.to("super_admin").to("admin").emit("user_list_with_read_receipts", userList);
+
+  io.to("super_admin").to("admin").emit("user_list_with_read_receipts", { users: userList });
 }
 
 async function handleAgentMessage(socket, data) {
@@ -1116,7 +1120,7 @@ io.on("connection", (socket) => {
       socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Send as single array
       
       const userList = await getLocalUserList();
-      socket.emit("user_list_with_read_receipts", userList);
+      socket.emit("user_list_with_read_receipts", { users: userList });
       
       socket.emit("agent_login_response", {
         success: true,
@@ -1250,7 +1254,7 @@ io.on("connection", (socket) => {
         io.to(BROADCAST_ROOM).emit("broadcast_messages_read_update", updateData);
         io.to("super_admin").to("admin").emit("messages_read_update", updateData);
         
-        agents.forEach((agent, agentId) {
+        agents.forEach((agent, agentId) => {
           if (agent.socketId && agent.monitoringUser === whatsapp) {
             io.to(agent.socketId).emit("messages_read_update", updateData);
           }
@@ -1292,11 +1296,11 @@ io.on("connection", (socket) => {
       }
       
       const userList = await getLocalUserList();
-      socket.emit("user_list_with_read_receipts", userList);
+      socket.emit("user_list_with_read_receipts", { users: userList });
       
     } catch (error) {
       console.error("Error getting user list:", error);
-      socket.emit("user_list_with_read_receipts", []);
+      socket.emit("user_list_with_read_receipts", { users: [] });
     }
   });
 
@@ -1310,7 +1314,7 @@ io.on("connection", (socket) => {
       socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Send as array
       
       const userList = await getLocalUserList();
-      socket.emit("user_list_with_read_receipts", userList);
+      socket.emit("user_list_with_read_receipts", { users: userList });
       
     } catch (error) {
       console.error("Error sending messages to admin:", error);
