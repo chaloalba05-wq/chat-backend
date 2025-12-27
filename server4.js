@@ -12,6 +12,7 @@ const pool = require("./db");
 const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
 const BROADCAST_ROOM = "BROADCAST_ROOM_ALL_AGENTS";
 const MAX_LOCAL_MESSAGES = 1000;
+const TEMP_MESSAGE_CLEANUP_INTERVAL = 30000; // 30 seconds
 
 // ===== LOCAL STORAGE (Primary) =====
 const users = new Map();
@@ -91,6 +92,16 @@ async function persistMessageImmediately(message) {
       VALUES ($1, $2, NOW())
       ON CONFLICT (message_id, agent_id) DO NOTHING
     `, [dbMsg.id, dbMsg.agent_id]);
+  }
+
+  // Mark message as fromDatabase in memory
+  const chatMessages = localMessages.userChats.get(message.whatsapp);
+  if (chatMessages) {
+    const localMsg = chatMessages.find(m => m.id === message.id);
+    if (localMsg) {
+      localMsg.fromDatabase = true;
+      localMsg.syncedToDb = true;
+    }
   }
 }
 
@@ -189,7 +200,8 @@ const localMessages = {
       localId: uuidv4(),
       timestamp: message.timestamp || new Date(),
       read: message.read || false,
-      syncedToDb: true  // Changed to true since we persist immediately now
+      syncedToDb: false,
+      fromDatabase: false
     };
     
     if (msg.isBroadcast) {
@@ -202,9 +214,9 @@ const localMessages = {
         this.userChats.set(msg.whatsapp, []);
       }
       const userMessages = this.userChats.get(msg.whatsapp);
-      userMessages.push(msg); // ✅ FIXED: Changed from unshift() to push() (store chronologically)
+      userMessages.push(msg);
       if (userMessages.length > 100) {
-        userMessages.shift(); // ✅ FIXED: Changed from pop() to shift() (remove oldest)
+        userMessages.shift();
       }
     }
     
@@ -213,11 +225,11 @@ const localMessages = {
   
   getUserMessages(whatsapp, limit = 100) {
     const messages = this.userChats.get(whatsapp) || [];
-    return messages.slice(-limit); // ✅ FIXED: Get last N messages (newest last)
+    return messages.slice(-limit);
   },
   
   getBroadcastMessages(limit = 100) {
-    return this.broadcast.slice(-limit); // ✅ FIXED: Get last N messages (newest last)
+    return this.broadcast.slice(-limit);
   },
   
   markAsRead(whatsapp, messageIds) {
@@ -233,6 +245,75 @@ const localMessages = {
     });
     
     return updated;
+  },
+
+  // NEW: Merge DB and memory messages
+  mergeMessages(dbMessages = [], memoryMessages = []) {
+    const messageMap = new Map();
+    
+    // Add memory messages first (including temporary ones)
+    memoryMessages.forEach(msg => {
+      messageMap.set(msg.id, msg);
+    });
+    
+    // Add DB messages (won't overwrite existing memory messages)
+    dbMessages.forEach(dbMsg => {
+      if (!messageMap.has(dbMsg.id)) {
+        messageMap.set(dbMsg.id, dbMsg);
+      } else {
+        // Update memory message with DB flag if it exists in DB
+        const existing = messageMap.get(dbMsg.id);
+        existing.fromDatabase = true;
+        existing.syncedToDb = true;
+      }
+    });
+    
+    // Sort by timestamp
+    return Array.from(messageMap.values()).sort((a, b) => 
+      new Date(a.timestamp) - new Date(b.timestamp)
+    );
+  },
+
+  // NEW: Clean up orphaned temporary messages
+  async cleanupOrphanedMessages() {
+    const now = Date.now();
+    const staleThreshold = TEMP_MESSAGE_CLEANUP_INTERVAL;
+    
+    for (const [whatsapp, messages] of this.userChats) {
+      const tempMessages = messages.filter(msg => 
+        !msg.fromDatabase && !msg.syncedToDb && 
+        (now - new Date(msg.timestamp).getTime()) > staleThreshold
+      );
+      
+      if (tempMessages.length > 0) {
+        // Check if these messages exist in DB
+        const messageIds = tempMessages.map(msg => msg.id);
+        const result = await pool.query(`
+          SELECT id FROM messages WHERE id = ANY($1)
+        `, [messageIds]);
+        
+        const existingIds = new Set(result.rows.map(row => row.id));
+        const toRemove = [];
+        
+        tempMessages.forEach(msg => {
+          if (existingIds.has(msg.id)) {
+            // Mark as from database
+            msg.fromDatabase = true;
+            msg.syncedToDb = true;
+          } else if ((now - new Date(msg.timestamp).getTime()) > staleThreshold) {
+            // Remove stale temporary messages
+            toRemove.push(msg.id);
+          }
+        });
+        
+        // Remove stale messages
+        if (toRemove.length > 0) {
+          const updatedMessages = messages.filter(msg => !toRemove.includes(msg.id));
+          this.userChats.set(whatsapp, updatedMessages);
+          console.log(`🧹 Cleaned up ${toRemove.length} orphaned temp messages for ${whatsapp}`);
+        }
+      }
+    }
   }
 };
 
@@ -344,7 +425,7 @@ async function preRegisterDefaultAgents() {
         [agent.id]
       );
       
-      if (existingAgent.rows.length === 0) {
+      if (existingResult.rows.length === 0) {
         await pool.query(`
           INSERT INTO agents (id, name, password, filename, permanent)
           VALUES ($1, $2, $3, $4, $5)
@@ -374,26 +455,72 @@ function logActivity(type, details) {
 // ===== HELPER FUNCTIONS =====
 async function getLocalUserList() {
   const userList = [];
+  const seenWhatsapp = new Set();
   
+  // Get whatsapp numbers from memory
   for (const [whatsapp, messages] of localMessages.userChats) {
-    const lastMessage = messages[messages.length - 1]; // ✅ FIXED: Get last message (newest)
-    const unreadCount = messages.filter(m => m.sender === 'user' && !m.read).length;
+    seenWhatsapp.add(whatsapp);
+  }
+  
+  // Get whatsapp numbers from DB for any missing chats
+  try {
+    const dbResult = await pool.query(`
+      SELECT DISTINCT chat_whatsapp FROM messages 
+      WHERE is_broadcast = FALSE 
+      ORDER BY created_at DESC
+      LIMIT 100
+    `);
     
-    userList.push({
-      whatsapp,
-      lastMessage: lastMessage?.text || (lastMessage?.attachment ? '[Attachment]' : ''),
-      lastMessageTime: lastMessage?.timestamp,
-      messageCount: messages.length,
-      unreadCount,
-      lastMessageDetails: lastMessage ? {
-        id: lastMessage.id,
-        text: lastMessage.text,
-        sender: lastMessage.sender,
-        timestamp: lastMessage.timestamp,
-        read: lastMessage.read,
-        agent_name: lastMessage.agentName
-      } : null
+    dbResult.rows.forEach(row => {
+      seenWhatsapp.add(row.chat_whatsapp);
     });
+  } catch (error) {
+    console.error("Error getting whatsapp numbers from DB:", error);
+  }
+  
+  // Process each whatsapp number
+  for (const whatsapp of seenWhatsapp) {
+    let messages = localMessages.userChats.get(whatsapp) || [];
+    
+    // If memory is empty but we know this whatsapp exists, load from DB
+    if (messages.length === 0) {
+      try {
+        const result = await pool.query(`
+          SELECT * FROM messages 
+          WHERE chat_whatsapp = $1 
+          ORDER BY created_at ASC 
+          LIMIT 50
+        `, [whatsapp]);
+        
+        if (result.rows.length > 0) {
+          messages = result.rows.map(row => localMessages.mapDbToLocal(row));
+          localMessages.userChats.set(whatsapp, messages);
+        }
+      } catch (error) {
+        console.error(`Error loading messages for ${whatsapp}:`, error);
+      }
+    }
+    
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      const unreadCount = messages.filter(m => m.sender === 'user' && !m.read).length;
+      
+      userList.push({
+        whatsapp,
+        lastMessage: lastMessage?.text || (lastMessage?.attachment ? '[Attachment]' : ''),
+        lastMessageTime: lastMessage?.timestamp,
+        messageCount: messages.length,
+        unreadCount,
+        lastMessageDetails: lastMessage ? {
+          id: lastMessage.id,
+          text: lastMessage.text,
+          sender: lastMessage.sender,
+          timestamp: lastMessage.timestamp,
+          read: lastMessage.read,
+          agent_name: lastMessage.agentName
+        } : null
+      });
+    }
   }
   
   return userList.sort((a, b) => 
@@ -404,7 +531,6 @@ async function getLocalUserList() {
 async function updateUserListForAllAgents() {
   const userList = await getLocalUserList();
   
-  // FIXED: Added missing closing parenthesis in arrow function
   agents.forEach((agent, agentId) => {
     const updateData = {
       users: userList
@@ -444,7 +570,6 @@ async function handleAgentMessage(socket, data) {
     attachment: data.attachment
   });
   
-  // ✅ FIX: Use atomic helper
   await addAndPersistMessage(message);
   
   console.log(`⚡ Agent message sent instantly: ${message.id}`);
@@ -469,7 +594,6 @@ async function handleUserMessage(socket, data) {
     attachment: data.attachment
   });
   
-  // ✅ FIX: Use atomic helper
   await addAndPersistMessage(message);
   
   console.log(`⚡ User message received instantly: ${message.id}`);
@@ -1106,7 +1230,7 @@ io.on("connection", (socket) => {
       
       users.set(socket.id, { type: 'agent', agentId });
       
-      socket.join(BROADCAST_ROOM); // ✅ FIX 3: Agents join broadcast room (already correct)
+      socket.join(BROADCAST_ROOM);
       
       logActivity('agent_login', { 
         agentId, 
@@ -1117,7 +1241,7 @@ io.on("connection", (socket) => {
       
       // Send local broadcast messages
       const broadcastMessages = localMessages.getBroadcastMessages(100);
-      socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Send as single array
+      socket.emit("broadcast_messages_history", broadcastMessages);
       
       const userList = await getLocalUserList();
       socket.emit("user_list_with_read_receipts", { users: userList });
@@ -1163,27 +1287,27 @@ io.on("connection", (socket) => {
     socket.join(whatsapp);
     agent.monitoringUser = whatsapp;
     
-    // ✅ FIX: Load messages from DB on reload
+    // FIX 1: Merge DB + Memory messages
     const result = await pool.query(`
       SELECT * FROM messages
       WHERE chat_whatsapp = $1
       ORDER BY created_at ASC
     `, [whatsapp]);
     
-    const messages = result.rows.map(row =>
-      localMessages.mapDbToLocal(row)
-    );
+    const dbMessages = result.rows.map(row => localMessages.mapDbToLocal(row));
+    const memoryMessages = localMessages.userChats.get(whatsapp) || [];
     
-    // Hydrate memory only if empty
-    if (!localMessages.userChats.has(whatsapp) || localMessages.userChats.get(whatsapp).length === 0) {
-      localMessages.userChats.set(whatsapp, messages);
-    }
+    // Merge messages instead of overwriting
+    const mergedMessages = localMessages.mergeMessages(dbMessages, memoryMessages);
+    
+    // Update memory with merged messages
+    localMessages.userChats.set(whatsapp, mergedMessages);
     
     // Send to UI
     socket.emit("user_chat_history", {
       whatsapp,
-      messages,
-      source: "database"
+      messages: mergedMessages,
+      source: "merged"
     });
     
     logActivity('agent_joined_user_room', {
@@ -1195,7 +1319,8 @@ io.on("connection", (socket) => {
     socket.emit("user_room_joined", {
       success: true,
       whatsapp: whatsapp,
-      message: `Now monitoring ${whatsapp}`
+      message: `Now monitoring ${whatsapp}`,
+      messageCount: mergedMessages.length
     });
   });
 
@@ -1227,7 +1352,6 @@ io.on("connection", (socket) => {
       
       const updated = localMessages.markAsRead(whatsapp, messageIds);
       
-      // ✅ FIX: Update DB immediately with proper read receipt tracking
       if (updated.length > 0) {
         await pool.query(`
           UPDATE messages
@@ -1311,7 +1435,7 @@ io.on("connection", (socket) => {
 
     try {
       const broadcastMessages = localMessages.getBroadcastMessages();
-      socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Send as array
+      socket.emit("broadcast_messages_history", broadcastMessages);
       
       const userList = await getLocalUserList();
       socket.emit("user_list_with_read_receipts", { users: userList });
@@ -1348,7 +1472,7 @@ io.on("connection", (socket) => {
         }
       }
       
-      socket.emit("message_history_data", { // ✅ FIXED: Renamed to avoid conflict
+      socket.emit("message_history_data", {
         messages: messages,
         whatsapp: whatsapp
       });
@@ -1393,7 +1517,7 @@ io.on("connection", (socket) => {
       const userData = users.get(socket.id);
       if (userData?.type === 'agent' || userData?.type === 'super_admin' || userData?.type === 'admin') {
         const broadcastMessages = localMessages.getBroadcastMessages();
-        socket.emit("broadcast_messages_history", broadcastMessages); // ✅ FIXED: Consistent naming
+        socket.emit("broadcast_messages_history", broadcastMessages);
       }
     } catch (error) {
       console.error("Error fetching broadcast messages:", error);
@@ -1618,7 +1742,14 @@ async function startServer() {
     await preRegisterDefaultAgents();
     await localMessages.initialize();
     
-    // REMOVED: startDatabaseSync() - No more 20-minute sync
+    // Start periodic cleanup of orphaned temporary messages
+    setInterval(async () => {
+      try {
+        await localMessages.cleanupOrphanedMessages();
+      } catch (error) {
+        console.error("Error during message cleanup:", error);
+      }
+    }, TEMP_MESSAGE_CLEANUP_INTERVAL);
     
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
@@ -1627,8 +1758,11 @@ async function startServer() {
       console.log(`✅ Pre-registered agents: agent1, agent2, agent3`);
       console.log(`⚡ IMMEDIATE PERSISTENCE MODE: Messages saved to DB immediately`);
       console.log(`💾 Database: albastxz_db1`);
+      console.log(`🧹 Periodic cleanup: Every ${TEMP_MESSAGE_CLEANUP_INTERVAL/1000} seconds`);
       console.log(`✅ System is ready - Agents can now see all messages immediately!`);
       console.log(`✅ No more disappearing messages!`);
+      console.log(`✅ Merged DB + Memory messages!`);
+      console.log(`✅ Robust user list generation!`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
