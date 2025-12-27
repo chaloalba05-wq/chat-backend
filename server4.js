@@ -1,3 +1,5 @@
+so now, this will work with that schema ?
+
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -18,11 +20,43 @@ const users = new Map();
 const agents = new Map();
 const activityLog = [];
 
+// ===== HELPER: ADD AND PERSIST MESSAGE ATOMICALLY =====
+async function addAndPersistMessage(msg) {
+  // 1️⃣ Add to local memory
+  if (!msg.isBroadcast) {
+    if (!localMessages.userChats.has(msg.whatsapp)) {
+      localMessages.userChats.set(msg.whatsapp, []);
+    }
+    const userMessages = localMessages.userChats.get(msg.whatsapp);
+    userMessages.push(msg); // Maintain chronological order
+    if (userMessages.length > 100) {
+      userMessages.shift(); // Optional: keep last 100
+    }
+  }
+
+  // 2️⃣ Persist to DB
+  try {
+    await persistMessageImmediately(msg);
+  } catch (err) {
+    console.error("Failed to persist message:", err, msg);
+  }
+
+  // 3️⃣ Broadcast to all relevant sockets
+  io.to(msg.whatsapp).emit("new_message", msg);
+  io.to(BROADCAST_ROOM).emit("new_message", msg);
+  io.to("super_admin").to("admin").emit("new_message", msg);
+
+  // 4️⃣ Update read/unread counters
+  updateUserListForAllAgents();
+  
+  return msg;
+}
+
 // ===== IMMEDIATE PERSISTENCE HELPER =====
 async function persistMessageImmediately(message) {
   const dbMsg = localMessages.mapLocalToDb(message);
 
-  // Update chats table
+  // Ensure chat exists
   await pool.query(`
     INSERT INTO chats (whatsapp, last_message, last_message_time, last_updated)
     VALUES ($1, $2, $3, NOW())
@@ -37,7 +71,7 @@ async function persistMessageImmediately(message) {
     dbMsg.created_at
   ]);
 
-  // Insert into messages table
+  // Insert message
   await pool.query(`
     INSERT INTO messages (
       id, chat_whatsapp, sender_type, agent_id, agent_name,
@@ -60,6 +94,15 @@ async function persistMessageImmediately(message) {
     dbMsg.broadcast_id,
     dbMsg.is_broadcast
   ]);
+
+  // Insert read receipt for sender if agent
+  if (dbMsg.sender_type === 'agent' && dbMsg.agent_id) {
+    await pool.query(`
+      INSERT INTO message_reads (message_id, agent_id, read_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (message_id, agent_id) DO NOTHING
+    `, [dbMsg.id, dbMsg.agent_id]);
+  }
 }
 
 // Local message storage
@@ -96,7 +139,7 @@ const localMessages = {
         const messagesResult = await pool.query(`
           SELECT * FROM messages 
           WHERE chat_whatsapp = $1 
-          ORDER BY created_at DESC 
+          ORDER BY created_at ASC 
           LIMIT 50
         `, [row.chat_whatsapp]);
         
@@ -126,7 +169,7 @@ const localMessages = {
       } : null,
       timestamp: dbRow.created_at,
       read: dbRow.read,
-      broadcastId: dbRow.broadcast_id,
+      broadcastId: dbMsg.broadcast_id,
       isBroadcast: dbRow.is_broadcast,
       fromDatabase: true,
       syncedToDb: true
@@ -408,22 +451,8 @@ async function handleAgentMessage(socket, data) {
     attachment: data.attachment
   });
   
-  // ✅ FIX: Persist to DB immediately before emitting
-  await persistMessageImmediately(message);
-  
-  // ✅ FIX 1: Restored global agent delivery
-  io.to(whatsapp).emit("new_message", { ...message, whatsapp });
-  io.to(BROADCAST_ROOM).emit("new_message", { ...message, whatsapp }); // ✅ CRITICAL FIX
-  io.to("super_admin").to("admin").emit("new_message", message);
-  
-  // ✅ FIX 2: Remove monitoringUser filter for delivery (keeping for reference but not used)
-  // agents.forEach(ag => {
-  //   if (ag.socketId && ag.monitoringUser === whatsapp) {
-  //     io.to(ag.socketId).emit("new_message", message);
-  //   }
-  // });
-  
-  updateUserListForAllAgents();
+  // ✅ FIX: Use atomic helper
+  await addAndPersistMessage(message);
   
   console.log(`⚡ Agent message sent instantly: ${message.id}`);
   return true;
@@ -447,22 +476,8 @@ async function handleUserMessage(socket, data) {
     attachment: data.attachment
   });
   
-  // ✅ FIX: Persist to DB immediately before emitting
-  await persistMessageImmediately(message);
-  
-  // ✅ FIX 1: Restored global agent delivery
-  io.to(whatsapp).emit("new_message", { ...message, whatsapp });
-  io.to(BROADCAST_ROOM).emit("new_message", { ...message, whatsapp }); // ✅ CRITICAL FIX
-  io.to("super_admin").to("admin").emit("new_message", message);
-  
-  // ✅ FIX 2: Remove monitoringUser filter for delivery (keeping for reference but not used)
-  // agents.forEach(agent => {
-  //   if (agent.socketId && agent.monitoringUser === whatsapp) {
-  //     io.to(agent.socketId).emit("new_message", message);
-  //   }
-  // });
-  
-  updateUserListForAllAgents();
+  // ✅ FIX: Use atomic helper
+  await addAndPersistMessage(message);
   
   console.log(`⚡ User message received instantly: ${message.id}`);
   return true;
@@ -1217,13 +1232,21 @@ io.on("connection", (socket) => {
       
       const updated = localMessages.markAsRead(whatsapp, messageIds);
       
-      // ✅ FIX: Update DB immediately
+      // ✅ FIX: Update DB immediately with proper read receipt tracking
       if (updated.length > 0) {
         await pool.query(`
           UPDATE messages
           SET read = TRUE
           WHERE id = ANY($1)
         `, [updated]);
+
+        await pool.query(`
+          INSERT INTO message_reads (message_id, agent_id, read_at)
+          SELECT id, $1, NOW()
+          FROM messages
+          WHERE id = ANY($2)
+          ON CONFLICT (message_id, agent_id) DO UPDATE SET read_at = NOW()
+        `, [userData.agentId, updated]);
         
         const updateData = {
           whatsapp,
@@ -1247,7 +1270,8 @@ io.on("connection", (socket) => {
         logActivity('messages_marked_read', {
           whatsapp,
           messageCount: updated.length,
-          messageIds: updated
+          messageIds: updated,
+          agentId: userData.agentId
         });
         
         updateUserListForAllAgents();
