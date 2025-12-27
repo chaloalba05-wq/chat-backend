@@ -833,7 +833,7 @@ function joinUserRoom() {
 // ===== MESSAGE LOADING =====
 function loadMessages() {
   if (whatsapp && isAgentLoggedIn) {
-    console.log(`Loading messages for: ${whatsapp}`);
+    console.log(`📡 Loading messages for: ${whatsapp}`);
     socket.emit("get_messages", { whatsapp, agentId });
     
     messageLoadTimeout = setTimeout(() => {
@@ -861,7 +861,8 @@ function disableChatControls() {
 }
 
 // ===== SOCKET CONNECTION =====
-const socket = io("https://chat-backend-p2b9.onrender.com", {
+// FIXED: Use relative URL like in agent1.html
+const socket = io({
   reconnection: true,
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
@@ -963,8 +964,18 @@ async function uploadFile(file) {
       reject(new Error('Upload aborted'));
     });
     
-    xhr.open('POST', 'https://chat-backend-p2b9.onrender.com/upload');
+    xhr.open('POST', '/upload');
     xhr.send(formData);
+  });
+}
+
+// ===== AGENT REGISTRATION =====
+function registerAgent() {
+  console.log("Registering agent before login...");
+  socket.emit("register_permanent_agent", { 
+    id: agentId, 
+    name: agentId, 
+    password: agentPassword 
   });
 }
 
@@ -978,8 +989,8 @@ socket.on("connect", () => {
   document.getElementById('header').style.display = 'flex';
   document.getElementById('chat').style.display = 'flex';
   
-  // Login agent first, then join room
-  loginAgent();
+  // Register agent first, then login
+  registerAgent();
 });
 
 socket.on("disconnect", () => {
@@ -995,7 +1006,7 @@ socket.on("disconnect", () => {
 socket.on("reconnect", () => {
   console.log("🔄 Socket Reconnected");
   updateStatus('connected', 'Reconnected');
-  loginAgent(); // Re-login on reconnect
+  registerAgent(); // Re-register on reconnect
 });
 
 socket.on("connect_error", (error) => {
@@ -1005,6 +1016,18 @@ socket.on("connect_error", (error) => {
   disableChatControls();
   const messagesDiv = document.getElementById("messages");
   messagesDiv.innerHTML = '<div class="empty-state">Connection error. Reconnecting...</div>';
+});
+
+// AGENT REGISTRATION RESPONSE
+socket.on("agent_registration_response", (response) => {
+  console.log("Agent registration response:", response);
+  if (response.success) {
+    console.log("✅ Agent registered, now logging in...");
+    loginAgent();
+  } else {
+    console.log("Agent already exists or other issue, trying login...");
+    loginAgent();
+  }
 });
 
 // AGENT LOGIN RESPONSE HANDLER
@@ -1053,6 +1076,78 @@ socket.on("user_room_joined", (data) => {
   console.log(`✅ Ready to send/receive messages for ${data.whatsapp}`);
 });
 
+// CRITICAL FIX: Add handler for user_chat_history event (server sends this when agent joins room)
+socket.on("user_chat_history", (data) => {
+  console.log(`📨 Received user chat history for ${data.whatsapp}:`, data);
+  
+  clearTimeout(messageLoadTimeout);
+  const messagesDiv = document.getElementById("messages");
+  messagesDiv.innerHTML = '';
+  displayedMessageIds.clear();
+  
+  if (!data.messages || data.messages.length === 0) {
+    messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+    return;
+  }
+  
+  const uniqueMessages = [];
+  const seenIds = new Set();
+  
+  data.messages
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .forEach(msg => {
+      const id = msg.id || (msg.timestamp + '_' + (msg.text || ''));
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueMessages.push(msg);
+      }
+    });
+  
+  uniqueMessages.forEach(msg => displayMessage(msg));
+  setTimeout(scrollToBottom, 100);
+  
+  // Mark all loaded messages as read
+  setTimeout(() => {
+    markMessagesAsRead();
+  }, 500);
+});
+
+// Handle messages from server
+socket.on("message_history_data", (data) => {
+  console.log("Received message history:", data);
+  
+  clearTimeout(messageLoadTimeout);
+  const messagesDiv = document.getElementById("messages");
+  messagesDiv.innerHTML = '';
+  displayedMessageIds.clear();
+  
+  if (!data.messages || data.messages.length === 0) {
+    messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
+    return;
+  }
+  
+  const uniqueMessages = [];
+  const seenIds = new Set();
+  
+  data.messages
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .forEach(msg => {
+      const id = msg.id || (msg.timestamp + '_' + (msg.text || ''));
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        uniqueMessages.push(msg);
+      }
+    });
+  
+  uniqueMessages.forEach(msg => displayMessage(msg));
+  setTimeout(scrollToBottom, 100);
+  
+  // Mark all loaded messages as read
+  setTimeout(() => {
+    markMessagesAsRead();
+  }, 500);
+});
+
 // Only display messages from server echo
 socket.on("new_message", (msg) => {
   console.log('New message received from server:', msg);
@@ -1083,6 +1178,12 @@ socket.on("message_read_confirmation", (response) => {
       }
     });
   }
+});
+
+// Handle messages_read_update event
+socket.on("messages_read_update", (updateData) => {
+  console.log('Messages read update:', updateData);
+  // This event is for other agents' read receipts, not needed here
 });
 
 // ===== SCROLL MANAGEMENT =====
@@ -1317,40 +1418,6 @@ function displayMessage(msg) {
   }
 }
 
-// Socket message handlers
-socket.on("message_history", (messages) => {
-  clearTimeout(messageLoadTimeout);
-  const messagesDiv = document.getElementById("messages");
-  messagesDiv.innerHTML = '';
-  displayedMessageIds.clear();
-  
-  if (messages.length === 0) {
-    messagesDiv.innerHTML = '<div class="empty-state">No messages yet. Start the conversation!</div>';
-    return;
-  }
-  
-  const uniqueMessages = [];
-  const seenIds = new Set();
-  
-  messages
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-    .forEach(msg => {
-      const id = msg.id || (msg.timestamp + '_' + (msg.text || ''));
-      if (!seenIds.has(id)) {
-        seenIds.add(id);
-        uniqueMessages.push(msg);
-      }
-    });
-  
-  uniqueMessages.forEach(msg => displayMessage(msg));
-  setTimeout(scrollToBottom, 100);
-  
-  // Mark all loaded messages as read
-  setTimeout(() => {
-    markMessagesAsRead();
-  }, 500);
-});
-
 // ===== MESSAGE SENDING =====
 async function sendMessage() {
   if (!sendController.canSend()) {
@@ -1394,9 +1461,9 @@ async function sendMessage() {
         whatsapp: whatsapp,
         message: text || "",
         attachment: attachment,
-        type: attachment.mimetype.startsWith('image/') ? 'image' : 'file',
         sender: "agent",
         agentId: agentId,
+        agentName: "Agent 1",
         timestamp: new Date().toISOString()
       };
       
@@ -1412,6 +1479,7 @@ async function sendMessage() {
         message: text,
         sender: "agent",
         agentId: agentId,
+        agentName: "Agent 1",
         timestamp: new Date().toISOString()
       };
       
@@ -1422,14 +1490,13 @@ async function sendMessage() {
     // Reset input
     resetInput();
     
+    // Auto-finish after short delay
+    setTimeout(finishMessageSend, 1000);
+    
   } catch (error) {
     console.error('❌ Error sending message:', error);
     alert(`Failed to send: ${error.message}`);
-  } finally {
-    // Auto-finish after timeout (fallback)
-    setTimeout(() => {
-      finishMessageSend();
-    }, 5000);
+    finishMessageSend();
   }
 }
 
@@ -1487,7 +1554,7 @@ document.getElementById("messageInput").addEventListener("input", function() {
 });
 
 // FIXED: Changed keypress to keydown to handle Enter key properly
-document.getElementById("messageInput").addEventListener("keydown", (e) => {
+document.getElementById("messageInput").addEventListener("keydown", function(e) {
   if (e.key === "Enter") {
     if (e.shiftKey) {
       // Shift+Enter: Insert new line
@@ -1620,8 +1687,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupReadReceiptObserver();
   setupReadReceiptTriggers();
   
-  // Connect socket
-  socket.connect();
+  // Socket will auto-connect
 });
 
 // Cleanup on page unload
@@ -1630,10 +1696,6 @@ window.addEventListener('beforeunload', () => {
   stopConstantMessageChecking();
   
   if (socket && socket.connected) {
-    socket.emit('agent_disconnecting', { 
-      agentId: agentId,
-      whatsapp: whatsapp 
-    });
     socket.disconnect();
   }
 });
