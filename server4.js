@@ -1,5 +1,3 @@
-so now, this will work with that schema ?
-
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
