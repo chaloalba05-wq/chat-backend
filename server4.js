@@ -47,7 +47,7 @@ async function persistMessageImmediately(message) {
   const dbMsg = localMessages.mapLocalToDb(message);
 
   try {
-    // 🔥 FIX: Ensure chat exists and get chat_id - Generate separate chat ID
+    // Ensure chat exists and get chat_id
     const chatResult = await pool.query(`
       INSERT INTO chats (id, whatsapp, last_message, last_message_time, last_updated)
       VALUES (gen_random_uuid(), $1, $2, $3, NOW())
@@ -65,21 +65,22 @@ async function persistMessageImmediately(message) {
 
     const chatId = chatResult.rows[0]?.id;
 
-    // 🔥 FIX: Insert message WITH chat_id AND sender_id
+    // Insert message
     await pool.query(`
       INSERT INTO messages (
         id, chat_id, chat_whatsapp, sender_type, sender_id, agent_id, agent_name,
         content, message_type, attachment_url, attachment_type,
         created_at, read, broadcast_id, is_broadcast
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-      ON CONFLICT (id) DO NOTHING
+      ON CONFLICT (id) DO UPDATE SET
+        read = EXCLUDED.read,
+        chat_id = EXCLUDED.chat_id
     `, [
       dbMsg.id,
-      chatId, // ✅ ADDED: chat_id
+      chatId,
       dbMsg.chat_whatsapp,
       dbMsg.sender_type,
-      // ✅ ADDED: sender_id based on sender type
-      dbMsg.sender_type === 'user' ? dbMsg.chat_whatsapp : dbMsg.agent_id,
+      dbMsg.sender_id,
       dbMsg.agent_id,
       dbMsg.agent_name,
       dbMsg.content,
@@ -94,14 +95,18 @@ async function persistMessageImmediately(message) {
 
     // Insert read receipt for sender if agent
     if (dbMsg.sender_type === 'agent' && dbMsg.agent_id) {
-      await pool.query(`
-        INSERT INTO message_reads (message_id, agent_id, read_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (message_id, agent_id) DO NOTHING
-      `, [dbMsg.id, dbMsg.agent_id]);
+      try {
+        await pool.query(`
+          INSERT INTO message_reads (message_id, agent_id, read_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (message_id, agent_id) DO UPDATE SET read_at = EXCLUDED.read_at
+        `, [dbMsg.id, dbMsg.agent_id]);
+      } catch (readError) {
+        console.warn(`Could not insert read receipt (message might already be marked):`, readError.message);
+      }
     }
 
-    // Mark message as fromDatabase in memory
+    // Mark message as synced in memory
     const chatMessages = localMessages.userChats.get(message.whatsapp);
     if (chatMessages) {
       const localMsg = chatMessages.find(m => m.id === message.id);
@@ -110,9 +115,12 @@ async function persistMessageImmediately(message) {
         localMsg.syncedToDb = true;
       }
     }
+    
+    console.log(`💾 Persisted message ${dbMsg.id} for ${dbMsg.chat_whatsapp}`);
+    
   } catch (error) {
     console.error("Error persisting message:", error);
-    throw error;
+    // Don't throw here - allow message to stay in memory even if DB fails
   }
 }
 
@@ -452,6 +460,44 @@ async function initializeDatabase() {
   }
 }
 
+// Add function to verify and fix table structure
+async function verifyTableStructure() {
+  try {
+    // Check if agent_id column exists in message_reads
+    const checkResult = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'message_reads' AND column_name = 'agent_id'
+    `);
+    
+    if (checkResult.rows.length === 0) {
+      console.log("⚠️ Adding missing agent_id column to message_reads table...");
+      await pool.query(`
+        ALTER TABLE message_reads ADD COLUMN agent_id VARCHAR(255)
+      `);
+      console.log("✅ Added agent_id column to message_reads table");
+    }
+    
+    // Also ensure chat_id column exists in messages table
+    const checkChatId = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'messages' AND column_name = 'chat_id'
+    `);
+    
+    if (checkChatId.rows.length === 0) {
+      console.log("⚠️ Adding missing chat_id column to messages table...");
+      await pool.query(`
+        ALTER TABLE messages ADD COLUMN chat_id UUID REFERENCES chats(id) ON DELETE CASCADE
+      `);
+      console.log("✅ Added chat_id column to messages table");
+    }
+    
+  } catch (error) {
+    console.error("Error verifying table structure:", error);
+  }
+}
+
 async function preRegisterDefaultAgents() {
   const defaultAgents = [
     { id: "agent1", name: "agent1", password: "agent1", filename: "agent1.html" },
@@ -673,7 +719,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.send("Chat backend running - POSTGRESQL MODE"));
 app.get("/chat", (req, res) => res.sendFile(path.join(__dirname, "public", "chat.html")));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("/superadmin", (req, res) => res.sendFile(path.join(__dirname, "public", "superadmin.html"))); // 🔥 FIXED: Added missing =>
+app.get("/superadmin", (req, res) => res.sendFile(path.join(__dirname, "public", "superadmin.html")));
 app.get("/agent", (req, res) => res.sendFile(path.join(__dirname, "public", "agent.html")));
 
 app.get("/agent:num.html", (req, res) => {
@@ -1336,41 +1382,73 @@ io.on("connection", (socket) => {
     socket.join(whatsapp);
     agent.monitoringUser = whatsapp;
     
-    // FIX 1: Merge DB + Memory messages
-    const result = await pool.query(`
-      SELECT * FROM messages
-      WHERE chat_whatsapp = $1
-      ORDER BY created_at ASC
-    `, [whatsapp]);
-    
-    const dbMessages = result.rows.map(row => localMessages.mapDbToLocal(row));
-    const memoryMessages = localMessages.userChats.get(whatsapp) || [];
-    
-    // Merge messages instead of overwriting
-    const mergedMessages = localMessages.mergeMessages(dbMessages, memoryMessages);
-    
-    // Update memory with merged messages
-    localMessages.userChats.set(whatsapp, mergedMessages);
-    
-    // Send to UI
-    socket.emit("user_chat_history", {
-      whatsapp,
-      messages: mergedMessages,
-      source: "merged"
-    });
-    
-    logActivity('agent_joined_user_room', {
-      agentId: userData.agentId,
-      agentName: agent.name,
-      whatsapp: whatsapp
-    });
-    
-    socket.emit("user_room_joined", {
-      success: true,
-      whatsapp: whatsapp,
-      message: `Now monitoring ${whatsapp}`,
-      messageCount: mergedMessages.length
-    });
+    try {
+      // Get messages from database
+      const dbResult = await pool.query(`
+        SELECT m.*, 
+               COALESCE(c.id, '00000000-0000-0000-0000-000000000000') as chat_id_placeholder
+        FROM messages m
+        LEFT JOIN chats c ON c.whatsapp = m.chat_whatsapp
+        WHERE m.chat_whatsapp = $1
+        ORDER BY m.created_at ASC
+      `, [whatsapp]);
+      
+      const dbMessages = dbResult.rows.map(row => localMessages.mapDbToLocal(row));
+      
+      // Get messages from local memory
+      const memoryMessages = localMessages.userChats.get(whatsapp) || [];
+      
+      console.log(`📊 join_user_room: ${whatsapp} - DB: ${dbMessages.length}, Memory: ${memoryMessages.length} messages`);
+      
+      // Merge messages instead of overwriting
+      const mergedMessages = localMessages.mergeMessages(dbMessages, memoryMessages);
+      
+      // Update memory with merged messages
+      localMessages.userChats.set(whatsapp, mergedMessages);
+      
+      // Send to UI
+      socket.emit("user_chat_history", {
+        whatsapp,
+        messages: mergedMessages,
+        source: "merged",
+        totalCount: mergedMessages.length
+      });
+      
+      logActivity('agent_joined_user_room', {
+        agentId: userData.agentId,
+        agentName: agent.name,
+        whatsapp: whatsapp,
+        messageCount: mergedMessages.length
+      });
+      
+      socket.emit("user_room_joined", {
+        success: true,
+        whatsapp: whatsapp,
+        message: `Now monitoring ${whatsapp}`,
+        messageCount: mergedMessages.length,
+        hasMessages: mergedMessages.length > 0
+      });
+      
+    } catch (error) {
+      console.error(`❌ Error joining user room for ${whatsapp}:`, error);
+      
+      // Fallback: Use only memory messages
+      const memoryMessages = localMessages.userChats.get(whatsapp) || [];
+      socket.emit("user_chat_history", {
+        whatsapp,
+        messages: memoryMessages,
+        source: "memory_fallback",
+        totalCount: memoryMessages.length
+      });
+      
+      socket.emit("user_room_joined", {
+        success: true,
+        whatsapp: whatsapp,
+        message: `Now monitoring ${whatsapp} (fallback mode)`,
+        messageCount: memoryMessages.length,
+        hasMessages: memoryMessages.length > 0
+      });
+    }
   });
 
   socket.on("agent_message", async (data) => {
@@ -1801,6 +1879,7 @@ async function startServer() {
 
   try {
     await initializeDatabase();
+    await verifyTableStructure(); // Add this line to verify table structure
     await preRegisterDefaultAgents();
     await localMessages.initialize();
     
@@ -1827,6 +1906,8 @@ async function startServer() {
       console.log(`✅ Robust user list generation!`);
       console.log(`🔥 FIX: All messages now use proper UUIDs - No more "invalid input syntax for type uuid" errors!`);
       console.log(`🔥 FIX: Added sender_id to messages table inserts - No more null constraint violations!`);
+      console.log(`🔥 FIX: Added table structure verification for missing columns!`);
+      console.log(`🔥 FIX: Enhanced join_user_room with proper DB-memory merging!`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
