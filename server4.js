@@ -65,19 +65,21 @@ async function persistMessageImmediately(message) {
 
     const chatId = chatResult.rows[0]?.id;
 
-    // 🔥 FIX: Insert message WITH chat_id
+    // 🔥 FIX: Insert message WITH chat_id AND sender_id
     await pool.query(`
       INSERT INTO messages (
-        id, chat_id, chat_whatsapp, sender_type, agent_id, agent_name,
+        id, chat_id, chat_whatsapp, sender_type, sender_id, agent_id, agent_name,
         content, message_type, attachment_url, attachment_type,
         created_at, read, broadcast_id, is_broadcast
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       ON CONFLICT (id) DO NOTHING
     `, [
       dbMsg.id,
       chatId, // ✅ ADDED: chat_id
       dbMsg.chat_whatsapp,
       dbMsg.sender_type,
+      // ✅ ADDED: sender_id based on sender type
+      dbMsg.sender_type === 'user' ? dbMsg.chat_whatsapp : dbMsg.agent_id,
       dbMsg.agent_id,
       dbMsg.agent_name,
       dbMsg.content,
@@ -193,6 +195,8 @@ const localMessages = {
       id: localMsg.id,
       chat_whatsapp: localMsg.whatsapp,
       sender_type: localMsg.sender,
+      // ✅ ADDED: sender_id mapping
+      sender_id: localMsg.sender === 'user' ? localMsg.whatsapp : localMsg.agentId,
       agent_id: localMsg.agentId,
       agent_name: localMsg.agentName,
       content: localMsg.text,
@@ -261,22 +265,23 @@ const localMessages = {
     return updated;
   },
 
-  // NEW: Merge DB and memory messages
+  // ✅ UPDATED: Merge DB and memory messages
   mergeMessages(dbMessages = [], memoryMessages = []) {
     const messageMap = new Map();
     
-    // Add memory messages first (including temporary ones)
-    memoryMessages.forEach(msg => {
-      messageMap.set(msg.id, msg);
+    // Add DB messages first (authoritative source)
+    dbMessages.forEach(dbMsg => {
+      messageMap.set(dbMsg.id, dbMsg);
     });
     
-    // Add DB messages (won't overwrite existing memory messages)
-    dbMessages.forEach(dbMsg => {
-      if (!messageMap.has(dbMsg.id)) {
-        messageMap.set(dbMsg.id, dbMsg);
+    // Add memory messages (temporary ones that aren't in DB yet)
+    memoryMessages.forEach(memMsg => {
+      // Only keep memory messages if they're not already in DB
+      if (!messageMap.has(memMsg.id)) {
+        messageMap.set(memMsg.id, memMsg);
       } else {
-        // Update memory message with DB flag if it exists in DB
-        const existing = messageMap.get(dbMsg.id);
+        // Update with DB flag if it exists
+        const existing = messageMap.get(memMsg.id);
         existing.fromDatabase = true;
         existing.syncedToDb = true;
       }
@@ -394,6 +399,7 @@ async function initializeDatabase() {
         chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
         chat_whatsapp VARCHAR(255) REFERENCES chats(whatsapp) ON DELETE CASCADE,
         sender_type VARCHAR(50) NOT NULL,
+        sender_id TEXT NOT NULL,
         agent_id VARCHAR(255),
         agent_name VARCHAR(255),
         content TEXT,
@@ -1820,6 +1826,7 @@ async function startServer() {
       console.log(`✅ Merged DB + Memory messages!`);
       console.log(`✅ Robust user list generation!`);
       console.log(`🔥 FIX: All messages now use proper UUIDs - No more "invalid input syntax for type uuid" errors!`);
+      console.log(`🔥 FIX: Added sender_id to messages table inserts - No more null constraint violations!`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
