@@ -21,33 +21,24 @@ const activityLog = [];
 // ===== HELPER: ADD AND PERSIST MESSAGE ATOMICALLY =====
 async function addAndPersistMessage(msg) {
   // 1️⃣ Add to local memory
-  if (!msg.isBroadcast) {
-    if (!localMessages.userChats.has(msg.whatsapp)) {
-      localMessages.userChats.set(msg.whatsapp, []);
-    }
-    const userMessages = localMessages.userChats.get(msg.whatsapp);
-    userMessages.push(msg); // Maintain chronological order
-    if (userMessages.length > 100) {
-      userMessages.shift(); // Optional: keep last 100
-    }
-  }
+  const msgLocal = localMessages.addMessage(msg);
 
   // 2️⃣ Persist to DB
   try {
-    await persistMessageImmediately(msg);
+    await persistMessageImmediately(msgLocal);
   } catch (err) {
-    console.error("Failed to persist message:", err, msg);
+    console.error("Failed to persist message:", err, msgLocal);
   }
 
   // 3️⃣ Broadcast to all relevant sockets
-  io.to(msg.whatsapp).emit("new_message", msg);
-  io.to(BROADCAST_ROOM).emit("new_message", msg);
-  io.to("super_admin").to("admin").emit("new_message", msg);
+  io.to(msgLocal.whatsapp).emit("new_message", msgLocal);
+  io.to(BROADCAST_ROOM).emit("new_message", msgLocal);
+  io.to("super_admin").to("admin").emit("new_message", msgLocal);
 
   // 4️⃣ Update read/unread counters
   updateUserListForAllAgents();
   
-  return msg;
+  return msgLocal;
 }
 
 // ===== IMMEDIATE PERSISTENCE HELPER =====
@@ -167,7 +158,7 @@ const localMessages = {
       } : null,
       timestamp: dbRow.created_at,
       read: dbRow.read,
-      broadcastId: dbMsg.broadcast_id,
+      broadcastId: dbRow.broadcast_id,
       isBroadcast: dbRow.is_broadcast,
       fromDatabase: true,
       syncedToDb: true
@@ -1179,8 +1170,10 @@ io.on("connection", (socket) => {
       localMessages.mapDbToLocal(row)
     );
     
-    // Hydrate memory
-    localMessages.userChats.set(whatsapp, messages);
+    // Hydrate memory only if empty
+    if (!localMessages.userChats.has(whatsapp) || localMessages.userChats.get(whatsapp).length === 0) {
+      localMessages.userChats.set(whatsapp, messages);
+    }
     
     // Send to UI
     socket.emit("user_chat_history", {
@@ -1243,7 +1236,7 @@ io.on("connection", (socket) => {
           SELECT id, $1, NOW()
           FROM messages
           WHERE id = ANY($2)
-          ON CONFLICT (message_id, agent_id) DO UPDATE SET read_at = NOW()
+          ON CONFLICT (message_id, agent_id) DO UPDATE SET read_at = EXCLUDED.read_at
         `, [userData.agentId, updated]);
         
         const updateData = {
@@ -1257,7 +1250,7 @@ io.on("connection", (socket) => {
         io.to(BROADCAST_ROOM).emit("broadcast_messages_read_update", updateData);
         io.to("super_admin").to("admin").emit("messages_read_update", updateData);
         
-        agents.forEach((agent, agentId) => {
+        agents.forEach((agent, agentId) {
           if (agent.socketId && agent.monitoringUser === whatsapp) {
             io.to(agent.socketId).emit("messages_read_update", updateData);
           }
