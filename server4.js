@@ -11,7 +11,7 @@ const pool = require("./db");
 // ===== CONFIGURATION =====
 const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
 const BROADCAST_ROOM = "BROADCAST_ROOM_ALL_AGENTS";
-const DB_SYNC_INTERVAL = 10 * 1000; // 10 seconds (reduced from 20 minutes)
+const DB_SYNC_INTERVAL = 20 * 60 * 1000; // ✅ FIX 5: Changed to 20 minutes
 const MAX_LOCAL_MESSAGES = 1000;
 
 // ===== LOCAL STORAGE (Primary) =====
@@ -434,16 +434,17 @@ async function handleAgentMessage(socket, data) {
     attachment: data.attachment
   });
   
-  // ✅ FIXED: Removed broadcast to BROADCAST_ROOM for chat messages
+  // ✅ FIX 1: Restored global agent delivery
   io.to(whatsapp).emit("new_message", { ...message, whatsapp });
+  io.to(BROADCAST_ROOM).emit("new_message", { ...message, whatsapp }); // ✅ CRITICAL FIX
   io.to("super_admin").to("admin").emit("new_message", message);
   
-  // Send to monitoring agents
-  agents.forEach(ag => {
-    if (ag.socketId && ag.monitoringUser === whatsapp) {
-      io.to(ag.socketId).emit("new_message", message);
-    }
-  });
+  // ✅ FIX 2: Remove monitoringUser filter for delivery (keeping for reference but not used)
+  // agents.forEach(ag => {
+  //   if (ag.socketId && ag.monitoringUser === whatsapp) {
+  //     io.to(ag.socketId).emit("new_message", message);
+  //   }
+  // });
   
   updateUserListForAllAgents();
   
@@ -469,16 +470,17 @@ async function handleUserMessage(socket, data) {
     attachment: data.attachment
   });
   
-  // ✅ FIXED: Removed broadcast to BROADCAST_ROOM for chat messages
+  // ✅ FIX 1: Restored global agent delivery
   io.to(whatsapp).emit("new_message", { ...message, whatsapp });
+  io.to(BROADCAST_ROOM).emit("new_message", { ...message, whatsapp }); // ✅ CRITICAL FIX
   io.to("super_admin").to("admin").emit("new_message", message);
   
-  // Send to monitoring agents
-  agents.forEach(agent => {
-    if (agent.socketId && agent.monitoringUser === whatsapp) {
-      io.to(agent.socketId).emit("new_message", message);
-    }
-  });
+  // ✅ FIX 2: Remove monitoringUser filter for delivery (keeping for reference but not used)
+  // agents.forEach(agent => {
+  //   if (agent.socketId && agent.monitoringUser === whatsapp) {
+  //     io.to(agent.socketId).emit("new_message", message);
+  //   }
+  // });
   
   updateUserListForAllAgents();
   
@@ -1126,7 +1128,7 @@ io.on("connection", (socket) => {
       
       users.set(socket.id, { type: 'agent', agentId });
       
-      socket.join(BROADCAST_ROOM);
+      socket.join(BROADCAST_ROOM); // ✅ FIX 3: Agents join broadcast room (already correct)
       
       logActivity('agent_login', { 
         agentId, 
@@ -1554,8 +1556,8 @@ io.on("connection", (socket) => {
         archivedChats: parseInt(archivedChats.rows[0].total),
         totalMessages: parseInt(totalMessages.rows[0].total),
         broadcastMessages: parseInt(broadcastMessages.rows[0].total),
-        storageMode: "HYBRID: Local-first with 10-second database sync",
-        note: "Messages are instant, database syncs every 10 seconds"
+        storageMode: "HYBRID: Local-first with 20-minute database sync",
+        note: "Messages are instant, database syncs every 20 minutes"
       });
     } catch (error) {
       console.error("Error getting chat stats:", error);
@@ -1614,10 +1616,10 @@ async function startServer() {
       console.log(`🔐 Super Admin password: ${SUPER_ADMIN_PASSWORD}`);
       console.log(`📡 Broadcast Room: ${BROADCAST_ROOM}`);
       console.log(`✅ Pre-registered agents: agent1, agent2, agent3`);
-      console.log(`⚡ HYBRID STORAGE MODE: Local-first with 10-second database sync`);
+      console.log(`⚡ HYBRID STORAGE MODE: Local-first with 20-minute database sync`);
       console.log(`💾 Database: albastxz_db1`);
-      console.log(`🔄 Database sync every 10 seconds`);
-      console.log(`✅ System is ready - No more message delays!`);
+      console.log(`🔄 Database sync every 20 minutes`);
+      console.log(`✅ System is ready - Agents can now see all messages immediately!`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
