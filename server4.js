@@ -667,7 +667,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => res.send("Chat backend running - POSTGRESQL MODE"));
 app.get("/chat", (req, res) => res.sendFile(path.join(__dirname, "public", "chat.html")));
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("/superadmin", (req, res) res.sendFile(path.join(__dirname, "public", "superadmin.html")));
+app.get("/superadmin", (req, res) => res.sendFile(path.join(__dirname, "public", "superadmin.html"))); // 🔥 FIXED: Added missing =>
 app.get("/agent", (req, res) => res.sendFile(path.join(__dirname, "public", "agent.html")));
 
 app.get("/agent:num.html", (req, res) => {
