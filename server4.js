@@ -46,8 +46,8 @@ async function addAndPersistMessage(msg) {
 async function persistMessageImmediately(message) {
   const dbMsg = localMessages.mapLocalToDb(message);
 
-  // Ensure chat exists
-  await pool.query(`
+  // 🔥 FIX: Ensure chat exists and get chat_id
+  const chatResult = await pool.query(`
     INSERT INTO chats (whatsapp, last_message, last_message_time, last_updated)
     VALUES ($1, $2, $3, NOW())
     ON CONFLICT (whatsapp)
@@ -55,22 +55,26 @@ async function persistMessageImmediately(message) {
       last_message = EXCLUDED.last_message,
       last_message_time = EXCLUDED.last_message_time,
       last_updated = EXCLUDED.last_updated
+    RETURNING id
   `, [
     dbMsg.chat_whatsapp,
     dbMsg.content || (dbMsg.attachment_url ? '[Attachment]' : ''),
     dbMsg.created_at
   ]);
 
-  // Insert message
+  const chatId = chatResult.rows[0]?.id;
+
+  // 🔥 FIX: Insert message WITH chat_id
   await pool.query(`
     INSERT INTO messages (
-      id, chat_whatsapp, sender_type, agent_id, agent_name,
+      id, chat_id, chat_whatsapp, sender_type, agent_id, agent_name,
       content, message_type, attachment_url, attachment_type,
       created_at, read, broadcast_id, is_broadcast
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
     ON CONFLICT (id) DO NOTHING
   `, [
     dbMsg.id,
+    chatId, // ✅ ADDED: chat_id
     dbMsg.chat_whatsapp,
     dbMsg.sender_type,
     dbMsg.agent_id,
@@ -126,11 +130,11 @@ const localMessages = {
       
       this.broadcast = broadcastResult.rows.map(row => this.mapDbToLocal(row));
       
-      // Load recent user chats (last 50 messages each)
+      // 🔥 FIX: Handle potential NULL is_broadcast
       const chatsResult = await pool.query(`
         SELECT DISTINCT chat_whatsapp 
         FROM messages 
-        WHERE is_broadcast = FALSE 
+        WHERE (is_broadcast = FALSE OR is_broadcast IS NULL)
         ORDER BY created_at DESC 
         LIMIT 50
       `);
@@ -341,9 +345,10 @@ const upload = multer({
 // ===== DATABASE HELPER FUNCTIONS =====
 async function initializeDatabase() {
   try {
+    // 🔥 FIX: Remove SERIAL, use UUID for chats table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS chats (
-        id SERIAL PRIMARY KEY,
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
         whatsapp VARCHAR(255) UNIQUE NOT NULL,
         last_message TEXT,
         last_message_time TIMESTAMP,
@@ -354,9 +359,11 @@ async function initializeDatabase() {
       )
     `);
 
+    // 🔥 FIX: Remove SERIAL, use UUID for messages table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS messages (
-        id VARCHAR(255) PRIMARY KEY,
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
         chat_whatsapp VARCHAR(255) REFERENCES chats(whatsapp) ON DELETE CASCADE,
         sender_type VARCHAR(50) NOT NULL,
         agent_id VARCHAR(255),
@@ -375,7 +382,7 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS message_reads (
         id SERIAL PRIMARY KEY,
-        message_id VARCHAR(255) REFERENCES messages(id) ON DELETE CASCADE,
+        message_id UUID REFERENCES messages(id) ON DELETE CASCADE,
         agent_id VARCHAR(255),
         read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -420,7 +427,7 @@ async function preRegisterDefaultAgents() {
   
   for (const agent of defaultAgents) {
     try {
-      const existingAgent = await pool.query(
+      const existingResult = await pool.query(
         "SELECT id FROM agents WHERE id = $1",
         [agent.id]
       );
@@ -464,9 +471,10 @@ async function getLocalUserList() {
   
   // Get whatsapp numbers from DB for any missing chats
   try {
+    // 🔥 FIX: Handle potential NULL is_broadcast
     const dbResult = await pool.query(`
       SELECT DISTINCT chat_whatsapp FROM messages 
-      WHERE is_broadcast = FALSE 
+      WHERE (is_broadcast = FALSE OR is_broadcast IS NULL)
       ORDER BY created_at DESC
       LIMIT 100
     `);
@@ -650,17 +658,18 @@ app.get("/agent/users", async (req, res) => {
 
 app.get("/agent/conversations", async (req, res) => {
   try {
+    // 🔥 FIX: Use COALESCE for last_updated in case it's NULL
     const result = await pool.query(`
       SELECT 
         whatsapp,
         last_message,
         last_message_time,
         created_at,
-        last_updated,
+        COALESCE(last_updated, created_at) as last_updated,
         (SELECT COUNT(*) FROM messages WHERE chat_whatsapp = chats.whatsapp) as message_count
       FROM chats
-      WHERE archived = FALSE
-      ORDER BY last_updated DESC
+      WHERE COALESCE(archived, FALSE) = FALSE
+      ORDER BY COALESCE(last_updated, created_at) DESC
     `);
     
     const conversationsList = result.rows.map(row => ({
@@ -725,8 +734,8 @@ app.get("/chats/archived", async (req, res) => {
         archived_at,
         (SELECT COUNT(*) FROM messages WHERE chat_whatsapp = chats.whatsapp) as message_count
       FROM chats
-      WHERE archived = TRUE
-      ORDER BY archived_at DESC
+      WHERE COALESCE(archived, FALSE) = TRUE
+      ORDER BY COALESCE(archived_at, created_at) DESC
     `);
     
     const archivedChats = result.rows.map(row => ({
@@ -1150,8 +1159,8 @@ io.on("connection", (socket) => {
           filename: agent.filename || null
         }));
         
-        const chatsResult = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = FALSE");
-        const archivedResult = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = TRUE");
+        const chatsResult = await pool.query("SELECT COUNT(*) as total FROM chats WHERE COALESCE(archived, FALSE) = FALSE");
+        const archivedResult = await pool.query("SELECT COUNT(*) as total FROM chats WHERE COALESCE(archived, FALSE) = TRUE");
         const messagesResult = await pool.query("SELECT COUNT(*) as total FROM messages");
         const broadcastResult = await pool.query("SELECT COUNT(*) as total FROM messages WHERE is_broadcast = TRUE");
         
@@ -1484,16 +1493,17 @@ io.on("connection", (socket) => {
 
   socket.on("get_existing_users", async () => {
     try {
+      // 🔥 FIX: Use COALESCE for NULL columns
       const result = await pool.query(`
         SELECT 
           whatsapp,
           last_message,
           last_message_time,
-          last_updated,
-          archived,
+          COALESCE(last_updated, created_at) as last_updated,
+          COALESCE(archived, FALSE) as archived,
           (SELECT COUNT(*) FROM messages WHERE chat_whatsapp = chats.whatsapp) as message_count
         FROM chats
-        ORDER BY last_updated DESC
+        ORDER BY COALESCE(last_updated, created_at) DESC
       `);
       
       const usersList = result.rows.map(row => ({
@@ -1502,7 +1512,7 @@ io.on("connection", (socket) => {
         lastMessageTime: row.last_message_time,
         lastUpdated: row.last_updated,
         messageCount: parseInt(row.message_count) || 0,
-        archived: row.archived || false
+        archived: row.archived
       }));
       
       socket.emit("existing_users", usersList);
@@ -1679,8 +1689,8 @@ io.on("connection", (socket) => {
         return;
       }
       
-      const totalChats = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = FALSE");
-      const archivedChats = await pool.query("SELECT COUNT(*) as total FROM chats WHERE archived = TRUE");
+      const totalChats = await pool.query("SELECT COUNT(*) as total FROM chats WHERE COALESCE(archived, FALSE) = FALSE");
+      const archivedChats = await pool.query("SELECT COUNT(*) as total FROM chats WHERE COALESCE(archived, FALSE) = TRUE");
       const totalMessages = await pool.query("SELECT COUNT(*) as total FROM messages");
       const broadcastMessages = await pool.query("SELECT COUNT(*) as total FROM messages WHERE is_broadcast = TRUE");
       
