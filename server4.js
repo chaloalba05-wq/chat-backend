@@ -7,12 +7,28 @@ const multer = require("multer");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const pool = require("./db");
+const https = require('https'); // Added for Telegram notifications
 
 // ===== CONFIGURATION =====
 const SUPER_ADMIN_PASSWORD = "SUPER.ADMIN";
 const BROADCAST_ROOM = "BROADCAST_ROOM_ALL_AGENTS";
 const MAX_LOCAL_MESSAGES = 1000;
 const TEMP_MESSAGE_CLEANUP_INTERVAL = 30000; // 30 seconds
+
+// ===== TELEGRAM NOTIFICATION FUNCTION =====
+function sendTelegramNotification(text) {
+  const botToken = '8383365206:AAHA2tpapBlKJnse2a5eFlUdwcsmDK0eH8o'; // your bot token
+  const chatId = 8295391547; // your chat ID
+  const message = encodeURIComponent(text);
+
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage?chat_id=${chatId}&text=${message}`;
+
+  https.get(url, (res) => {
+    console.log(`Telegram notification sent, status code: ${res.statusCode}`);
+  }).on('error', (e) => {
+    console.error(`Error sending Telegram message: ${e}`);
+  });
+}
 
 // ===== LOCAL STORAGE (Primary) =====
 const users = new Map();
@@ -229,6 +245,13 @@ const localMessages = {
       syncedToDb: false,
       fromDatabase: false
     };
+    
+    // ===== Add Telegram notification here =====
+    if (msg.sender === 'user' && !msg.isBroadcast) {
+      const sender = msg.whatsapp || 'Unknown';
+      const messageText = msg.text || (msg.attachment ? '[Attachment]' : 'New message');
+      sendTelegramNotification(`New message from ${sender}: ${messageText}`);
+    }
     
     if (msg.isBroadcast) {
       this.broadcast.unshift(msg);
@@ -1900,6 +1923,7 @@ async function startServer() {
       console.log(`⚡ IMMEDIATE PERSISTENCE MODE: Messages saved to DB immediately`);
       console.log(`💾 Database: albastxz_db1`);
       console.log(`🧹 Periodic cleanup: Every ${TEMP_MESSAGE_CLEANUP_INTERVAL/1000} seconds`);
+      console.log(`📱 Telegram notifications: ENABLED`);
       console.log(`✅ System is ready - Agents can now see all messages immediately!`);
       console.log(`✅ No more disappearing messages!`);
       console.log(`✅ Merged DB + Memory messages!`);
