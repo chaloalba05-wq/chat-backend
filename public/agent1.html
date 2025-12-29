@@ -8,15 +8,14 @@
 <style>
 body { font-family: Arial; display: flex; flex-direction: column; height: 100vh; margin: 0; background: #f9f9f9; }
 header { padding: 10px; background: #222; color: #fff; display: flex; justify-content: space-between; align-items: center; }
-#dashboard { display: flex; flex: 1; overflow: hidden; }
-#activeMessages { flex: 0 0 250px; overflow-y: auto; border-right: 1px solid #ccc; padding: 10px; background: #fff; }
+#dashboard { flex: 1; overflow: hidden; }
+#activeMessages { width: 100%; height: 100%; overflow-y: auto; padding: 10px; background: #fff; }
 .user-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; border-radius: 4px; margin-bottom: 5px; }
 .user-item:hover { background: #f0f0f0; }
 .user-item.highlight { background: #ffd27f !important; }
 .message-item { font-size: 0.9em; margin-left: 10px; color: #333; }
 .read-indicator { font-size: 0.8em; color: #4CAF50; font-weight: bold; margin-left: 5px; }
 .unread-indicator { font-size: 0.8em; color: #FF5722; font-weight: bold; margin-left: 5px; }
-#main { flex: 1; padding: 10px; }
 .status { font-weight: bold; }
 .empty-message { font-style: italic; color: #888; }
 </style>
@@ -32,18 +31,11 @@ header { padding: 10px; background: #222; color: #fff; display: flex; justify-co
 
 <div id="dashboard">
   <div id="activeMessages"><div class="empty-message">No active users</div></div>
-  <div id="main">Select a user to open chat</div>
 </div>
 
 <script>
 const agentId = "agent1";
 const agentPassword = "agent1";
-
-// Check if agent is verified (you might want to implement proper login)
-if (!localStorage.getItem("agentVerified")) {
-  // Uncomment this if you have a login page
-  // window.location.href = "login.html";
-}
 
 const socket = io({ 
   reconnection: true, 
@@ -54,16 +46,13 @@ const socket = io({
 
 const connectionStatus = document.getElementById("connectionStatus");
 
-// ===== SOCKET CONNECTION HANDLING =====
 socket.on("connect", () => { 
-  console.log("Socket connected:", socket.id);
   connectionStatus.textContent = "Connected"; 
   connectionStatus.style.color = "green"; 
   loginAgent();
 });
 
 socket.on("disconnect", () => { 
-  console.log("Socket disconnected");
   connectionStatus.textContent = "Disconnected"; 
   connectionStatus.style.color = "red"; 
 });
@@ -74,15 +63,12 @@ socket.on("reconnect_attempt", () => {
 });
 
 socket.on("reconnect", () => {
-  console.log("Socket reconnected");
   connectionStatus.textContent = "Connected"; 
   connectionStatus.style.color = "green";
   loginAgent();
 });
 
-// ===== AGENT AUTHENTICATION =====
 function loginAgent() {
-  console.log("Attempting agent login...");
   socket.emit("agent_login", { 
     agentId, 
     password: agentPassword, 
@@ -91,14 +77,9 @@ function loginAgent() {
 }
 
 socket.on("agent_login_response", (res) => {
-  console.log("Login response:", res);
   if(res.success){
-    console.log("✅ Agent logged in successfully");
-    // Request initial user list from server
     socket.emit("get_user_list_with_read_receipts");
   } else {
-    console.error("❌ Agent login failed:", res.message);
-    // Try to register the agent first
     socket.emit("register_permanent_agent", { 
       id: agentId, 
       name: agentId, 
@@ -108,14 +89,11 @@ socket.on("agent_login_response", (res) => {
 });
 
 socket.on("agent_registration_response", (res) => {
-  console.log("Registration response:", res);
   if(res.success) {
-    console.log("✅ Agent registered, attempting login...");
     loginAgent();
   }
 });
 
-// ===== DATA STORAGE =====
 let allUsers = [];
 let unreadMessages = JSON.parse(localStorage.getItem("unreadMessages")) || {};
 
@@ -131,12 +109,8 @@ function updateUnreadCount() {
   document.getElementById("unreadCount").textContent = count;
 }
 
-// ===== USER LIST MANAGEMENT =====
 socket.on("user_list_with_read_receipts", (data) => {
-  console.log("Received user list update:", data);
-  
   if (data && data.users && Array.isArray(data.users)) {
-    // Process the user list from server
     allUsers = data.users.map(user => ({
       whatsapp: user.whatsapp,
       lastMessage: user.lastMessage || "",
@@ -145,14 +119,11 @@ socket.on("user_list_with_read_receipts", (data) => {
       lastMessageDetails: user.lastMessageDetails || null
     }));
     
-    // Update unread messages based on server data
     data.users.forEach(user => {
       if (user.unreadCount > 0) {
         if (!unreadMessages[user.whatsapp]) {
           unreadMessages[user.whatsapp] = [];
         }
-        
-        // Add placeholder entries for unread messages
         while (unreadMessages[user.whatsapp].length < user.unreadCount) {
           unreadMessages[user.whatsapp].push({
             id: `temp_${Date.now()}_${unreadMessages[user.whatsapp].length}`,
@@ -161,7 +132,6 @@ socket.on("user_list_with_read_receipts", (data) => {
           });
         }
       } else {
-        // Clear if no unread messages
         delete unreadMessages[user.whatsapp];
       }
     });
@@ -185,7 +155,6 @@ function updateUserList() {
     return;
   }
 
-  // Sort by unread count (highest first), then by last message time
   allUsers.sort((a, b) => {
     if (b.unreadCount !== a.unreadCount) {
       return b.unreadCount - a.unreadCount;
@@ -205,7 +174,6 @@ function updateUserList() {
     title.textContent = `${user.whatsapp} ${user.unreadCount > 0 ? `(${user.unreadCount})` : ''}`;
     div.appendChild(title);
 
-    // Show last message preview
     if (user.lastMessage) {
       const msgDiv = document.createElement("div");
       msgDiv.className = "message-item";
@@ -215,7 +183,6 @@ function updateUserList() {
       div.appendChild(msgDiv);
     }
 
-    // Show time of last message
     if (user.lastMessageTime) {
       const timeDiv = document.createElement("div");
       timeDiv.className = "message-item";
@@ -239,16 +206,15 @@ function updateUserList() {
     }
 
     div.addEventListener("click", () => {
-      // Open chat in new window/tab
-      window.open(`agent-chat.html?whatsapp=${user.whatsapp}`, "_blank");
+      // Encode WhatsApp number to handle + and special characters
+      const encodedWhatsApp = encodeURIComponent(user.whatsapp);
+      window.open(`agent-chat.html?whatsapp=${encodedWhatsApp}`, "_blank");
       
-      // Clear unread messages for this user
       if (unreadMessages[user.whatsapp]) {
         delete unreadMessages[user.whatsapp];
         saveUnreadMessages();
       }
       
-      // Update the UI
       updateUserList();
       updateUnreadCount();
     });
@@ -259,33 +225,18 @@ function updateUserList() {
   updateUnreadCount();
 }
 
-// ===== REAL-TIME MESSAGE HANDLING =====
 socket.on("new_message", handleMessageEvent);
 
 function handleMessageEvent(msg) {
-  console.log("New message received:", msg);
-  
-  // Ignore messages from agents
-  if (msg.sender === 'agent') return;
-  
-  // Ignore already read messages
-  if (msg.read) return;
-  
-  // Check if this is a broadcast message
-  if (msg.isBroadcast) {
-    // Handle broadcast messages differently if needed
-    console.log("Broadcast message received:", msg);
-    return;
-  }
+  if (msg.sender === 'agent' || msg.read) return;
+  if (msg.isBroadcast) return;
   
   const whatsapp = msg.whatsapp;
   
-  // Update unread messages
   if (!unreadMessages[whatsapp]) {
     unreadMessages[whatsapp] = [];
   }
   
-  // Check if this message is already tracked
   const existingIndex = unreadMessages[whatsapp].findIndex(m => m.id === msg.id);
   if (existingIndex === -1) {
     unreadMessages[whatsapp].push({
@@ -295,10 +246,8 @@ function handleMessageEvent(msg) {
     });
   }
   
-  // Check if user exists in our list
   const existingUser = allUsers.find(u => u.whatsapp === whatsapp);
   if (!existingUser) {
-    // Add new user to list
     allUsers.push({
       whatsapp: whatsapp,
       lastMessage: msg.text || (msg.attachment ? '[Attachment]' : ''),
@@ -306,7 +255,6 @@ function handleMessageEvent(msg) {
       unreadCount: (unreadMessages[whatsapp]?.length || 0) + 1
     });
   } else {
-    // Update existing user
     existingUser.lastMessage = msg.text || (msg.attachment ? '[Attachment]' : '');
     existingUser.lastMessageTime = msg.timestamp || new Date();
     existingUser.unreadCount = unreadMessages[whatsapp]?.length || 0;
@@ -316,7 +264,6 @@ function handleMessageEvent(msg) {
   updateUserList();
   updateUnreadCount();
   
-  // Trigger notifications
   if (document.hidden) {
     playNotificationSound();
     notifyUser("New message from " + whatsapp, 
@@ -324,29 +271,20 @@ function handleMessageEvent(msg) {
   }
 }
 
-// Handle read receipt updates
 socket.on("messages_read_update", (updateData) => {
-  console.log("Messages read update:", updateData);
-  
   const { whatsapp, messageIds } = updateData;
   if (whatsapp && messageIds && Array.isArray(messageIds) && messageIds.length > 0) {
     if (unreadMessages[whatsapp]) {
-      // Remove the read messages from our unread list
       unreadMessages[whatsapp] = unreadMessages[whatsapp].filter(
         msg => !messageIds.includes(msg.id)
       );
-      
-      // Clean up if empty
       if (unreadMessages[whatsapp].length === 0) {
         delete unreadMessages[whatsapp];
       }
-      
-      // Update user in list
       const user = allUsers.find(u => u.whatsapp === whatsapp);
       if (user) {
         user.unreadCount = unreadMessages[whatsapp]?.length || 0;
       }
-      
       saveUnreadMessages();
       updateUserList();
       updateUnreadCount();
@@ -354,28 +292,20 @@ socket.on("messages_read_update", (updateData) => {
   }
 });
 
-// Handle chat deletions/archiving
 socket.on("chat_deleted", handleChatRemoval);
 socket.on("chat_archived", handleChatRemoval);
 
 function handleChatRemoval(data) {
   const { whatsapp } = data;
   if (whatsapp) {
-    // Remove from our lists
     allUsers = allUsers.filter(u => u.whatsapp !== whatsapp);
-    if (unreadMessages[whatsapp]) {
-      delete unreadMessages[whatsapp];
-    }
-    
+    if (unreadMessages[whatsapp]) delete unreadMessages[whatsapp];
     saveUnreadMessages();
     updateUserList();
     updateUnreadCount();
-    
-    console.log(`Chat removed: ${whatsapp}`);
   }
 }
 
-// ===== NOTIFICATIONS =====
 function playNotificationSound() {
   try {
     const context = new (window.AudioContext || window.webkitAudioContext)();
@@ -410,44 +340,28 @@ function notifyUser(title, body) {
       body, 
       icon: "/favicon.ico" 
     });
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-    };
-    
-    // Auto-close after 5 seconds
+    notification.onclick = () => { window.focus(); notification.close(); };
     setTimeout(() => notification.close(), 5000);
   }
 }
 
-// ===== INITIALIZATION =====
 window.addEventListener("DOMContentLoaded", () => {
-  console.log("Dashboard loaded");
   requestNotificationPermission();
   updateUserList();
   updateUnreadCount();
-  
-  // Refresh user list every 30 seconds to stay in sync
   setInterval(() => {
-    if (socket.connected) {
-      socket.emit("get_user_list_with_read_receipts");
-    }
+    if (socket.connected) socket.emit("get_user_list_with_read_receipts");
   }, 30000);
 });
 
-// Handle page visibility changes
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && socket.connected) {
-    // Page is now visible, refresh data
     socket.emit("get_user_list_with_read_receipts");
   }
 });
 
-// Handle beforeunload to clean up
 window.addEventListener("beforeunload", () => {
-  if (socket.connected) {
-    socket.disconnect();
-  }
+  if (socket.connected) socket.disconnect();
 });
 </script>
 </body>
