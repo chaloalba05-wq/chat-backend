@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Live Chat</title>
+  <title>Albastuz3D Support Chat</title>
   <style>
     /* ===== GLOBAL STYLES ===== */
     * {
@@ -30,7 +30,7 @@
 
     /* ===== RESPONSIVE HEADER ===== */
     #header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
       color: white;
       text-align: center;
       padding: 12px 16px;
@@ -88,17 +88,18 @@
     }
 
     .register-container h2 {
-      color: #333;
-      margin-bottom: 25px;
+      color: #2ecc71;
+      margin-bottom: 15px;
       font-size: clamp(1.4rem, 5vw, 1.8rem);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .register-container h3 {
       color: #555;
       margin-bottom: 25px;
-      font-size: clamp(1rem, 4vw, 1.2rem);
+      font-size: clamp(1rem, 4vw, 1.1rem);
       font-weight: 400;
+      line-height: 1.5;
     }
 
     /* ===== INPUT FIELDS ===== */
@@ -112,13 +113,14 @@
       background: #fafafa;
       -webkit-appearance: none;
       appearance: none;
+      text-align: center;
     }
 
     input:focus {
       outline: none;
-      border-color: #667eea;
+      border-color: #2ecc71;
       background: white;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
     }
 
     #whatsapp {
@@ -148,15 +150,15 @@
     }
 
     .start-chat-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
       color: white;
       width: 100%;
       margin-top: 15px;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
     }
 
     .start-chat-btn:hover {
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
       transform: translateY(-1px);
     }
 
@@ -215,8 +217,15 @@
     }
 
     .chat-header span {
-      color: #667eea;
+      color: #2ecc71;
       font-weight: 500;
+    }
+
+    .chat-header p {
+      margin: 4px 0 0 0;
+      color: #666;
+      font-size: 0.85rem;
+      font-style: italic;
     }
 
     /* Messages container - FIXED SCROLLABLE BOX */
@@ -254,18 +263,18 @@
     }
 
     #messages::-webkit-scrollbar-thumb {
-      background: rgba(102, 126, 234, 0.5);
+      background: rgba(46, 204, 113, 0.5);
       border-radius: 3px;
     }
 
     #messages::-webkit-scrollbar-thumb:hover {
-      background: rgba(102, 126, 234, 0.7);
+      background: rgba(46, 204, 113, 0.7);
     }
 
     /* Firefox scrollbar */
     #messages {
       scrollbar-width: thin;
-      scrollbar-color: rgba(102, 126, 234, 0.5) rgba(241, 241, 241, 0.5);
+      scrollbar-color: rgba(46, 204, 113, 0.5) rgba(241, 241, 241, 0.5);
     }
 
     /* ===== INPUT SECTION - FIXED AT BOTTOM ===== */
@@ -373,7 +382,7 @@
 
     .file-upload-btn {
       background: transparent;
-      color: #667eea;
+      color: #2ecc71;
       border: none;
       padding: 12px;
       cursor: pointer;
@@ -388,7 +397,7 @@
     }
 
     .file-upload-btn:active {
-      background: rgba(102, 126, 234, 0.1);
+      background: rgba(46, 204, 113, 0.1);
       transform: scale(0.95);
     }
 
@@ -400,19 +409,19 @@
     }
 
     .send-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
       color: white;
       padding: 14px 24px;
       border-radius: 25px;
       font-weight: 600;
       min-height: 50px;
       min-width: 80px;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
     }
 
     .send-btn:active {
       transform: scale(0.95);
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+      box-shadow: 0 2px 8px rgba(46, 204, 113, 0.2);
     }
 
     /* ===== MESSAGE BUBBLES ===== */
@@ -443,7 +452,7 @@
     }
 
     .user-message {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
       color: white;
       margin-left: auto;
       margin-right: 8px;
@@ -525,7 +534,7 @@
 
     .other-message .attachment {
       background: #f8f9fa;
-      border-left-color: #667eea;
+      border-left-color: #2ecc71;
     }
 
     .attachment a {
@@ -557,7 +566,7 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: #667eea;
+      background: #2ecc71;
       color: white;
       border: none;
       cursor: pointer;
@@ -578,7 +587,7 @@
     }
     
     .scroll-to-bottom-btn:hover {
-      background: #764ba2;
+      background: #27ae60;
       transform: translateY(-2px);
     }
 
@@ -598,7 +607,7 @@
     .typing-dot {
       width: 8px;
       height: 8px;
-      background: #667eea;
+      background: #2ecc71;
       border-radius: 50%;
       animation: typing 1.4s infinite;
     }
@@ -797,7 +806,7 @@
       width: 40px;
       height: 40px;
       border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
+      border-top: 4px solid #2ecc71;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
@@ -853,8 +862,8 @@
 <div id="register">
   <div class="register-container">
     <h2>Welcome to Albastuz3D Support</h2>
-    <h3>Enter your WhatsApp number to start chatting</h3>
-    <input id="whatsapp" placeholder="+2547xxxxxxx" type="tel">
+    <h3>Enter your WhatsApp number to start chatting<br>Use your real number for future visits</h3>
+    <input id="whatsapp" placeholder="+xxxxxxxxxx" type="tel">
     <button class="start-chat-btn" onclick="register()">
       Start Chat
     </button>
@@ -868,6 +877,7 @@
     <div class="messages-section">
       <div class="chat-header">
         <h3>Chat: <span id="chatNumber"></span></h3>
+        <p>This chat is permanent - reload page for new replies and to send messages</p>
       </div>
       
       <!-- Scroll to bottom button -->
